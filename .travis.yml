@@ -37,4 +37,3 @@ script:
   - mysql -uroot < sql/create/drop_mysql.sql
   - cd bin
   - make -j 10 -k
-
