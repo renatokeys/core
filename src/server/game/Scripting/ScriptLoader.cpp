@@ -32,6 +32,7 @@ void AddEventsScripts();
 void AddPetScripts();
 void AddOutdoorPvPScripts();
 void AddCustomScripts();
+void AddSC_Reset();
 #endif
 
 void AddScripts()
@@ -39,6 +40,7 @@ void AddScripts()
     AddSpellsScripts();
     AddSC_SmartScripts();
     AddCommandsScripts();
+	AddSC_Reset();
 #ifdef SCRIPTS
     AddWorldScripts();
     AddEasternKingdomsScripts();

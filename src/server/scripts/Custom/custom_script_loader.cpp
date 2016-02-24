@@ -22,4 +22,5 @@
 // void Add${NameOfDirectory}Scripts()
 void AddCustomScripts()
 {
+	Custom\duelo.cpp
 }
