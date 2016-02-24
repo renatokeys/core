@@ -929,6 +929,7 @@ void World::LoadConfigSettings(bool reload)
     m_bool_configs[CONFIG_SKILL_MILLING] = sConfigMgr->GetBoolDefault("SkillChance.Milling", false);
 
     m_int_configs[CONFIG_SKILL_GAIN_CRAFTING]  = sConfigMgr->GetIntDefault("SkillGain.Crafting", 1);
+	m_int_configs[CONFIG_SKILL_GAIN_CRAFTING_PREMIUM]  = sConfigMgr->GetIntDefault("SkillGain.Crafting.premium", 1);
 
     m_int_configs[CONFIG_SKILL_GAIN_DEFENSE]  = sConfigMgr->GetIntDefault("SkillGain.Defense", 1);
 
