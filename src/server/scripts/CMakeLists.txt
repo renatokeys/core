@@ -16,15 +16,9 @@ if (USE_SCRIPTPCH)
 endif ()
 
 message(STATUS "SCRIPT PREPARATIONS")
+include(Spells/CMakeLists.txt)
 
-macro(PrepareScripts name out)
-  file(GLOB_RECURSE found
-    ${name}/*.h
-    ${name}/*.cpp
-  )
-  list(APPEND ${out} ${found})
-  message(STATUS "  -> Prepared: ${name}")
-endmacro(PrepareScripts)
+include(Commands/CMakeLists.txt)
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
@@ -34,20 +28,16 @@ set(scripts_STAT_SRCS
   ../game/Maps/AreaBoundary.cpp
 )
 
-PrepareScripts(Spells scripts_STAT_SRCS)
-PrepareScripts(Commands scripts_STAT_SRCS)
-
 if(SCRIPTS)
-  PrepareScripts(Commands scripts_STAT_SRCS)
-  PrepareScripts(Custom scripts_STAT_SRCS)
-  PrepareScripts(World scripts_STAT_SRCS)
-  PrepareScripts(OutdoorPvP scripts_STAT_SRCS)
-  PrepareScripts(EasternKingdoms scripts_STAT_SRCS)
-  PrepareScripts(Kalimdor scripts_STAT_SRCS)
-  PrepareScripts(Outland scripts_STAT_SRCS)
-  PrepareScripts(Northrend scripts_STAT_SRCS)
-  PrepareScripts(Events scripts_STAT_SRCS)
-  PrepareScripts(Pet scripts_STAT_SRCS)
+  include(Custom/CMakeLists.txt)
+  include(World/CMakeLists.txt)
+  include(OutdoorPvP/CMakeLists.txt)
+  include(EasternKingdoms/CMakeLists.txt)
+  include(Kalimdor/CMakeLists.txt)
+  include(Outland/CMakeLists.txt)
+  include(Northrend/CMakeLists.txt)
+  include(Events/CMakeLists.txt)
+  include(Pet/CMakeLists.txt)
 endif()
 
 message(STATUS "SCRIPT PREPARATION COMPLETE")
@@ -57,6 +47,8 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/dep/cppformat
   ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
   ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour/Include
+  ${CMAKE_SOURCE_DIR}/dep/lualib
+  ${CMAKE_SOURCE_DIR}/src/LuaEngine
   ${CMAKE_SOURCE_DIR}/src/common/
   ${CMAKE_SOURCE_DIR}/src/common/Collision
   ${CMAKE_SOURCE_DIR}/src/common/Collision/Management

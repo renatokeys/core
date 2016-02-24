@@ -291,6 +291,11 @@ class Field
             return data.value == NULL;
         }
 
+        enum_field_types GetType() const
+        {
+            return data.type;
+        }
+
         struct Metadata
         {
             char const* TableName;

@@ -64,6 +64,9 @@
 #include "WaypointMovementGenerator.h"
 #include "WeatherMgr.h"
 #include "WorldSession.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 
 
 std::atomic<bool> World::m_stopEvent(false);
@@ -446,11 +449,6 @@ void World::LoadConfigSettings(bool reload)
     rate_values[RATE_DROP_ITEM_REFERENCED_AMOUNT] = sConfigMgr->GetFloatDefault("Rate.Drop.Item.ReferencedAmount", 1.0f);
     rate_values[RATE_DROP_MONEY]  = sConfigMgr->GetFloatDefault("Rate.Drop.Money", 1.0f);
     rate_values[RATE_XP_KILL]     = sConfigMgr->GetFloatDefault("Rate.XP.Kill", 1.0f);
-	rate_values[RATE_XP_KILL_PREMIUM]    = sConfigMgr->GetFloatDefault("Rate.XP.Kill.Premium", 1.0f);
-    rate_values[RATE_XP_QUEST_PREMIUM]   = sConfigMgr->GetFloatDefault("Rate.XP.Quest.Premium", 1.0f);
-    rate_values[RATE_XP_EXPLORE_PREMIUM] = sConfigMgr->GetFloatDefault("Rate.XP.Explore.Premium", 1.0f);
-    rate_values[RATE_REPUTATION_PREMIUM] = sConfigMgr->GetFloatDefault("Rate.Reputation.Premium", 1.0f);
-    rate_values[RATE_HONOR_PREMIUM]      = sConfigMgr->GetFloatDefault("Rate.Honor.Premium", 1.0f);
     rate_values[RATE_XP_BG_KILL]  = sConfigMgr->GetFloatDefault("Rate.XP.BattlegroundKill", 1.0f);
     rate_values[RATE_XP_QUEST]    = sConfigMgr->GetFloatDefault("Rate.XP.Quest", 1.0f);
     rate_values[RATE_XP_EXPLORE]  = sConfigMgr->GetFloatDefault("Rate.XP.Explore", 1.0f);
@@ -929,7 +927,6 @@ void World::LoadConfigSettings(bool reload)
     m_bool_configs[CONFIG_SKILL_MILLING] = sConfigMgr->GetBoolDefault("SkillChance.Milling", false);
 
     m_int_configs[CONFIG_SKILL_GAIN_CRAFTING]  = sConfigMgr->GetIntDefault("SkillGain.Crafting", 1);
-	m_int_configs[CONFIG_SKILL_GAIN_CRAFTING_PREMIUM]  = sConfigMgr->GetIntDefault("SkillGain.Crafting.premium", 1);
 
     m_int_configs[CONFIG_SKILL_GAIN_DEFENSE]  = sConfigMgr->GetIntDefault("SkillGain.Defense", 1);
 
@@ -1355,6 +1352,12 @@ void World::SetInitialWorldSettings()
         TC_LOG_FATAL("server.loading", "Unable to load critical files - server shutting down !!!");
         exit(1);
     }
+
+#ifdef ELUNA
+    ///- Initialize Lua Engine
+    TC_LOG_INFO("server.loading", "Initialize Eluna Lua Engine...");
+    Eluna::Initialize();
+#endif
 
     ///- Initialize pool manager
     sPoolMgr->Initialize();
@@ -1893,6 +1896,13 @@ void World::SetInitialWorldSettings()
     InitGuildResetTime();
 
     LoadCharacterInfoStore();
+
+#ifdef ELUNA
+    ///- Run eluna scripts.
+    // in multithread foreach: run scripts
+    sEluna->RunScripts();
+    sEluna->OnConfigLoad(false); // Must be done after Eluna is initialized and scripts have run.
+#endif
 
     uint32 startupDuration = GetMSTimeDiffToNow(startupBegin);
 

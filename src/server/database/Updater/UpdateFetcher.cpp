@@ -137,33 +137,22 @@ UpdateFetcher::AppliedFileStorage UpdateFetcher::ReceiveAppliedFiles() const
     return map;
 }
 
-std::string UpdateFetcher::ReadSQLUpdate(boost::filesystem::path const& file) const
+UpdateFetcher::SQLUpdate UpdateFetcher::ReadSQLUpdate(boost::filesystem::path const& file) const
 {
     std::ifstream in(file.c_str());
-    if (!in.is_open())
-    {
-        TC_LOG_FATAL("sql.updates", "Failed to open the sql update \"%s\" for reading! "
-                     "Stopping the server to keep the database integrity, "
-                     "try to identify and solve the issue or disabled the database updater.",
-                     file.generic_string().c_str());
-
-        throw UpdateException("Opening the sql update failed!");
-    }
+    WPFatal(in.is_open(), "Could not read an update file.");
 
     auto update = [&in]  {
         std::ostringstream ss;
         ss << in.rdbuf();
-        return ss.str();
+        return Trinity::make_unique<std::string>(ss.str());
     }();
 
     in.close();
     return update;
 }
 
-UpdateResult UpdateFetcher::Update(bool const redundancyChecks,
-                                   bool const allowRehash,
-                                   bool const archivedRedundancy,
-                                   int32 const cleanDeadReferencesMaxCount) const
+UpdateResult UpdateFetcher::Update(bool const redundancyChecks, bool const allowRehash, bool const archivedRedundancy, int32 const cleanDeadReferencesMaxCount) const
 {
     LocaleFileStorage const available = GetFileList();
     AppliedFileStorage applied = ReceiveAppliedFiles();
@@ -209,9 +198,11 @@ UpdateResult UpdateFetcher::Update(bool const redundancyChecks,
             }
         }
 
+        // Read update from file
+        SQLUpdate const update = ReadSQLUpdate(availableQuery.first);
+
         // Calculate hash
-        std::string const hash =
-            CalculateHash(ReadSQLUpdate(availableQuery.first));
+        std::string const hash = CalculateHash(update);
 
         UpdateMode mode = MODE_APPLY;
 
@@ -334,11 +325,11 @@ UpdateResult UpdateFetcher::Update(bool const redundancyChecks,
     return UpdateResult(importedUpdates, countRecentUpdates, countArchivedUpdates);
 }
 
-std::string UpdateFetcher::CalculateHash(std::string const& query) const
+std::string UpdateFetcher::CalculateHash(SQLUpdate const& query) const
 {
     // Calculate a Sha1 hash based on query content.
     unsigned char digest[SHA_DIGEST_LENGTH];
-    SHA1((unsigned char*)query.c_str(), query.length(), (unsigned char*)&digest);
+    SHA1((unsigned char*)query->c_str(), query->length(), (unsigned char*)&digest);
 
     return ByteArrayToHexStr(digest, SHA_DIGEST_LENGTH);
 }

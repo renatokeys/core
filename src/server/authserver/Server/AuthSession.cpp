@@ -347,8 +347,7 @@ void AuthSession::LogonChallengeCallback(PreparedQueryResult result)
     std::string ipAddress = GetRemoteIpAddress().to_string();
     uint16 port = GetRemotePort();
 
-	
-	// If the IP is 'locked', check that the player comes indeed from the correct IP address
+    // If the IP is 'locked', check that the player comes indeed from the correct IP address
     if (_accountInfo.IsLockedToIP)
     {
         TC_LOG_DEBUG("server.authserver", "[AuthChallenge] Account '%s' is locked to IP - '%s' is logging in from '%s'", _accountInfo.Login.c_str(), _accountInfo.LastIP.c_str(), ipAddress.c_str());
@@ -375,7 +374,7 @@ void AuthSession::LogonChallengeCallback(PreparedQueryResult result)
             }
         }
     }
-	LoginDatabase.DirectExecute(LoginDatabase.GetPreparedStatement(LOGIN_UPD_EXPIRED_ACCOUNT_PREMIUM));
+
     // If the account is banned, reject the logon attempt
     if (_accountInfo.IsBanned)
     {

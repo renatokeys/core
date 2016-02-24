@@ -48,6 +48,8 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
   ${CMAKE_SOURCE_DIR}/dep/gsoap
   ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour/Include
+  ${CMAKE_SOURCE_DIR}/dep/lualib
+  ${CMAKE_SOURCE_DIR}/src/LuaEngine
   ${CMAKE_SOURCE_DIR}/src/common/
   ${CMAKE_SOURCE_DIR}/src/common/Collision
   ${CMAKE_SOURCE_DIR}/src/common/Collision/Models
@@ -83,6 +85,7 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/Globals
   ${CMAKE_SOURCE_DIR}/src/server/game/Grids
   ${CMAKE_SOURCE_DIR}/src/server/game/Grids/Cells
+  ${CMAKE_SOURCE_DIR}/src/server/game/Groups
   ${CMAKE_SOURCE_DIR}/src/server/game/Handlers
   ${CMAKE_SOURCE_DIR}/src/server/game/Instances
   ${CMAKE_SOURCE_DIR}/src/server/game/Loot
@@ -131,10 +134,10 @@ set_target_properties(worldserver PROPERTIES LINK_FLAGS "${worldserver_LINK_FLAG
 
 target_link_libraries(worldserver
   game
-  scripts
+  common
   shared
   database
-  common
+  scripts
   g3dlib
   gsoap
   Detour

@@ -79,10 +79,10 @@ if( NOT WIN32 )
 endif()
 
 target_link_libraries(authserver
-  shared
-  database
   common
+  shared
   format
+  database
   ${MYSQL_LIBRARY}
   ${OPENSSL_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}

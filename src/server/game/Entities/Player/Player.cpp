@@ -16,7 +16,6 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../../../scripts/Custom/Transmog/Transmogrification.h"
 #include "Player.h"
 #include "AccountMgr.h"
 #include "AchievementMgr.h"
@@ -82,6 +81,9 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "GameObjectAI.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
 
@@ -4723,6 +4725,10 @@ void Player::ResurrectPlayer(float restore_percent, bool applySickness)
     // update visibility
     UpdateObjectVisibility();
 
+#ifdef ELUNA
+    sEluna->OnResurrect(this);
+#endif
+
     if (!applySickness)
         return;
 
@@ -5723,8 +5729,6 @@ bool Player::UpdateCraftSkill(uint32 spellid)
             }
 
             uint32 craft_skill_gain = sWorld->getIntConfig(CONFIG_SKILL_GAIN_CRAFTING);
-			if(GetSession()->IsPremium())
-				uint32 craft_skill_gain = sWorld->getIntConfig(CONFIG_SKILL_GAIN_CRAFTING_PREMIUM);
 
             return UpdateSkillPro(_spell_idx->second->skillId, SkillGainChance(SkillValue,
                 _spell_idx->second->max_value,
@@ -6495,8 +6499,6 @@ void Player::CheckAreaExploreAndOutdoor()
                 {
                     XP = uint32(sObjectMgr->GetBaseXP(areaEntry->area_level)*sWorld->getRate(RATE_XP_EXPLORE));
                 }
-				if(GetSession()->IsPremium())
-                    XP *= sWorld->getRate(RATE_XP_EXPLORE_PREMIUM);
 
                 GiveXP(XP, NULL);
                 SendExplorationExperience(areaId, XP);
@@ -6851,9 +6853,6 @@ bool Player::RewardHonor(Unit* victim, uint32 groupsize, int32 honor, bool pvpto
 
     honor_f *= sWorld->getRate(RATE_HONOR);
     // Back to int now
-	 if(GetSession()->IsPremium())
-        honor_f *= sWorld->getRate(RATE_HONOR_PREMIUM);
-
     honor = int32(honor_f);
     // honor - for show honor points in log
     // victim_guid - for show victim name in log
@@ -11622,6 +11621,12 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
         if (HasSpell(proto->Spells[1].SpellId))
             return EQUIP_ERR_NONE;
 
+#ifdef ELUNA
+    InventoryResult eres = sEluna->OnCanUseItem(this, proto->ItemId);
+    if (eres != EQUIP_ERR_OK)
+        return eres;
+#endif
+
     return EQUIP_ERR_OK;
 }
 
@@ -12050,6 +12055,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
         ApplyEquipCooldown(pItem2);
 
+#ifdef ELUNA
+        sEluna->OnEquip(this, pItem2, bag, slot);
+#endif
         return pItem2;
     }
 
@@ -12057,6 +12065,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, pItem->GetEntry(), slot);
 
+#ifdef ELUNA
+        sEluna->OnEquip(this, pItem, bag, slot);
+#endif
     return pItem;
 }
 
@@ -12078,6 +12089,10 @@ void Player::QuickEquipItem(uint16 pos, Item* pItem)
 
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, pItem->GetEntry(), slot);
+
+#ifdef ELUNA
+        sEluna->OnEquip(this, pItem, (pos >> 8), slot);
+#endif
     }
 }
 
@@ -12085,10 +12100,7 @@ void Player::SetVisibleItemSlot(uint8 slot, Item* pItem)
 {
     if (pItem)
     {
-        if (uint32 entry = sTransmogrification->GetFakeEntry(pItem))
-            SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), entry);
-        else
-            SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), pItem->GetEntry());
+        SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), pItem->GetEntry());
         SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 0, pItem->GetEnchantmentId(PERM_ENCHANTMENT_SLOT));
         SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 1, pItem->GetEnchantmentId(TEMP_ENCHANTMENT_SLOT));
     }
@@ -12214,7 +12226,6 @@ void Player::MoveItemFromInventory(uint8 bag, uint8 slot, bool update)
 {
     if (Item* it = GetItemByPos(bag, slot))
     {
-        sTransmogrification->DeleteFakeEntry(this, it);
         ItemRemovedQuestCheck(it->GetEntry(), it->GetCount());
         RemoveItem(bag, slot, update);
         it->SetNotRefundable(this, false);
@@ -14939,10 +14950,6 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
 
     // Not give XP in case already completed once repeatable quest
     uint32 XP = rewarded && !quest->IsDFQuest() ? 0 : uint32(quest->XPValue(this)*sWorld->getRate(RATE_XP_QUEST));
-	if (GetSession()->IsPremium())
-        uint32 XP = rewarded && !quest->IsDFQuest() ? 0 : uint32(quest->XPValue(this)*sWorld->getRate(RATE_XP_QUEST_PREMIUM));
-
-
 
     // handle SPELL_AURA_MOD_XP_QUEST_PCT auras
     Unit::AuraEffectList const& ModXPPctAuras = GetAuraEffectsByType(SPELL_AURA_MOD_XP_QUEST_PCT);
@@ -24428,6 +24435,9 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
         if (loot->containerID > 0)
             loot->DeleteLootItemFromContainerItemDB(item->itemid);
 
+#ifdef ELUNA
+        sEluna->OnLootItem(this, newitem, item->count, this->GetLootGUID());
+#endif
     }
     else
         SendEquipError(msg, NULL, NULL, item->itemid);
@@ -24860,6 +24870,10 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
 
     // update free talent points
     SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
+
+#ifdef ELUNA
+    sEluna->OnLearnTalents(this, talentId, talentRank, spellid);
+#endif
 }
 
 void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRank)

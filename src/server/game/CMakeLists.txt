@@ -175,6 +175,8 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
   ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour/Include
   ${CMAKE_SOURCE_DIR}/dep/zlib
+  ${CMAKE_SOURCE_DIR}/dep/lualib
+  ${CMAKE_SOURCE_DIR}/src/LuaEngine
   ${CMAKE_SOURCE_DIR}/src/common
   ${CMAKE_SOURCE_DIR}/src/common/Collision
   ${CMAKE_SOURCE_DIR}/src/common/Collision/Management
@@ -205,7 +207,18 @@ GroupSources(${CMAKE_CURRENT_SOURCE_DIR})
 add_library(game STATIC
   ${game_STAT_SRCS}
   ${game_STAT_PCH_SRC}
+  ${lua_STAT_SRCS}
+  ${LuaEngine_STAT_SRCS}
 )
+
+add_dependencies(game lualib)
+
+if (ELUNA)
+target_link_libraries(game
+ lualib
+ LuaEngine
+)
+endif()
 
 # Generate precompiled header
 if (USE_COREPCH)

@@ -47,6 +47,9 @@
 #include "GitRevision.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include "DatabaseLoader.h"
 #include "AppenderDB.h"
 
@@ -257,6 +260,10 @@ extern int main(int argc, char** argv)
     sOutdoorPvPMgr->Die();
     sMapMgr->UnloadAll();                     // unload all grids (including locked in memory)
     sScriptMgr->Unload();
+
+#ifdef ELUNA
+    Eluna::Uninitialize();
+#endif
 
     // set server offline
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realmID);
