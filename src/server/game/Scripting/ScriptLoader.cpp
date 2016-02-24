@@ -33,6 +33,8 @@ void AddPetScripts();
 void AddOutdoorPvPScripts();
 void AddCustomScripts();
 void AddSC_Reset();
+void AddSC_PWS_Transmogrification();
+void AddSC_CS_Transmogrification();
 #endif
 
 void AddScripts()
@@ -40,7 +42,6 @@ void AddScripts()
     AddSpellsScripts();
     AddSC_SmartScripts();
     AddCommandsScripts();
-	AddSC_Reset();
 #ifdef SCRIPTS
     AddWorldScripts();
     AddEasternKingdomsScripts();
@@ -51,5 +52,8 @@ void AddScripts()
     AddPetScripts();
     AddOutdoorPvPScripts();
     AddCustomScripts();
+	AddSC_Reset();
+	AddSC_PWS_Transmogrification();
+    AddSC_CS_Transmogrification();
 #endif
 }
