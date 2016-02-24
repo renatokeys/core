@@ -9,10 +9,8 @@ class Reset_OnDuelEnd : public PlayerScript
     {
 					if (winner->GetZoneId() == 14 or winner->GetZoneId() == 12)
 					{
-                        winner->GetSession()->SendNotification("Você ganhou de %s! em um duelo!", looser->GetName());
                         winner->GetSpellHistory()->ResetAllCooldowns(); 
  						looser->GetSpellHistory()->ResetAllCooldowns(); 
-                        looser->GetSession()->SendNotification("%s ganhou de você em um duelo!", winner->GetName());
 					}
     }
 };
