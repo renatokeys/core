@@ -1,4 +1,4 @@
-#include "ScriptPCH.h"
+#include "SpellHistory.h"
 
 class Reset_OnDuelEnd : public PlayerScript
 {
