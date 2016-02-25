@@ -23,6 +23,7 @@
 #include "SharedDefines.h"
 #include "ScriptMgr.h"
 #include "Player.h"
+#include "WorldSession.h"
 
 namespace Trinity
 {
