@@ -1,3 +1,3 @@
 # core
 
-[[!3.3.5]https://travis-ci.org/renatokeys/core.svg?branch=master]
+[![Build Status](https://travis-ci.org/renatokeys/core.svg?branch=master)](https://travis-ci.org/renatokeys/core)
