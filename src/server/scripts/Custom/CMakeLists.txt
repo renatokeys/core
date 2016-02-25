@@ -13,6 +13,10 @@
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
 #  ${sources_Custom}
+    Custom/Transmog/Transmogrification.h
+    Custom/Transmog/Transmogrification.cpp
+    Custom/Transmog/Transmogrifier.cpp
+	Custom/duelo.cpp
 )
 
 message("  -> Prepared: Custom")
