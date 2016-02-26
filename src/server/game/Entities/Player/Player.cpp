@@ -5730,8 +5730,8 @@ bool Player::UpdateCraftSkill(uint32 spellid)
             }
 
             uint32 craft_skill_gain = sWorld->getIntConfig(CONFIG_SKILL_GAIN_CRAFTING);
-			if(player->GetSession()->IsPremium())  
-				uint32 craft_skill_gain = sWorld->getIntConfig(CONFIG_SKILL_GAIN_CRAFTING_PREMIUM);  
+			//if(player->GetSession()->IsPremium())  
+				//uint32 craft_skill_gain = sWorld->getIntConfig(CONFIG_SKILL_GAIN_CRAFTING_PREMIUM);  
 
 
             return UpdateSkillPro(_spell_idx->second->skillId, SkillGainChance(SkillValue,
