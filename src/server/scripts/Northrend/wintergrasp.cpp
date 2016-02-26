@@ -433,7 +433,7 @@ public:
 void AddSC_wintergrasp()
 {
     // new npc_demolisher_engineerer();
-    new npc_wg_ally_battle_mage();
-    new npc_wg_horde_battle_mage();
-    new go_wg_veh_teleporter();
+    //new npc_wg_ally_battle_mage();
+    //new npc_wg_horde_battle_mage();
+    //new go_wg_veh_teleporter();
 }
