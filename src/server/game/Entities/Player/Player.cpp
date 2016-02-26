@@ -6504,8 +6504,8 @@ void Player::CheckAreaExploreAndOutdoor()
                     XP = uint32(sObjectMgr->GetBaseXP(areaEntry->area_level)*sWorld->getRate(RATE_XP_EXPLORE));
 					
                 }
-				if(player->GetSession()->IsPremium())
-                    XP *= sWorld->getRate(RATE_XP_EXPLORE_PREMIUM);
+				//if(player->GetSession()->IsPremium())
+                    //XP *= sWorld->getRate(RATE_XP_EXPLORE_PREMIUM);
 
 
 
@@ -6861,8 +6861,8 @@ bool Player::RewardHonor(Unit* victim, uint32 groupsize, int32 honor, bool pvpto
     }
 
     honor_f *= sWorld->getRate(RATE_HONOR);
-	if(player->GetSession()->IsPremium())
-        honor_f *= sWorld->getRate(RATE_HONOR_PREMIUM);
+	//if(player->GetSession()->IsPremium())
+        //honor_f *= sWorld->getRate(RATE_HONOR_PREMIUM);
 
     // Back to int now
     honor = int32(honor_f);
@@ -14966,8 +14966,8 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
 
     // Not give XP in case already completed once repeatable quest
     uint32 XP = rewarded && !quest->IsDFQuest() ? 0 : uint32(quest->XPValue(this)*sWorld->getRate(RATE_XP_QUEST));
-	if(player->GetSession()->IsPremium())
-		uint32 XP = rewarded && !quest->IsDFQuest() ? 0 : uint32(quest->XPValue(this)*sWorld->getRate(RATE_XP_QUEST_PREMIUM));
+	//if(player->GetSession()->IsPremium())
+		//uint32 XP = rewarded && !quest->IsDFQuest() ? 0 : uint32(quest->XPValue(this)*sWorld->getRate(RATE_XP_QUEST_PREMIUM));
 
     // handle SPELL_AURA_MOD_XP_QUEST_PCT auras
     Unit::AuraEffectList const& ModXPPctAuras = GetAuraEffectsByType(SPELL_AURA_MOD_XP_QUEST_PCT);
