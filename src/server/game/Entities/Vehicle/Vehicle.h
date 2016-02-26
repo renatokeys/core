@@ -26,6 +26,7 @@
 #include <list>
 
 struct VehicleEntry;
+struct Position;
 class Unit;
 class VehicleJoinEvent;
 
@@ -61,6 +62,7 @@ class Vehicle : public TransportBase
         void RelocatePassengers();
         void RemoveAllPassengers();
         bool IsVehicleInUse() const;
+        void Relocate(Position pos);
 
         void SetLastShootPos(Position const& pos) { _lastShootPos.Relocate(pos); }
         Position const& GetLastShootPos() const { return _lastShootPos; }

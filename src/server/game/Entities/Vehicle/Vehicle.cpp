@@ -869,3 +869,29 @@ void VehicleJoinEvent::Abort(uint64)
     if (Passenger->IsInWorld() && Passenger->HasUnitTypeMask(UNIT_MASK_ACCESSORY))
         Passenger->ToCreature()->DespawnOrUnsummon();
 }
+
+void Vehicle::Relocate(Position pos)
+{
+    TC_LOG_DEBUG("entities.vehicle","Vehicle::Relocate %u", _me->GetEntry());
+
+    std::set<Unit*> vehiclePlayers;
+    for (int8 i = 0; i < 8; i++)
+        vehiclePlayers.insert(GetPassenger(i));
+
+    // passengers should be removed or they will have movement stuck
+    RemoveAllPassengers();
+
+    for (std::set<Unit*>::const_iterator itr = vehiclePlayers.begin(); itr != vehiclePlayers.end(); ++itr)
+    {
+        if (Unit* plr = (*itr))
+        {
+            // relocate/setposition doesn't work for player
+            plr->NearTeleportTo(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation());
+            //plr->TeleportTo(pPlayer->GetMapId(), triggerPos.GetPositionX(), triggerPos.GetPositionY(), triggerPos.GetPositionZ(), triggerPos.GetOrientation(), TELE_TO_NOT_LEAVE_COMBAT);
+        }
+    }
+
+    _me->UpdatePosition(pos, true);
+    // problems, and impossible to do delayed enter
+    //pPlayer->EnterVehicle(veh);
+}

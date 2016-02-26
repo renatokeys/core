@@ -314,6 +314,7 @@ void ObjectMgr::LoadCreatureLocales()
         AddLocaleString(name,       locale, data.Name);
         AddLocaleString(title,      locale, data.Title);
 
+
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u creature locale strings in %u ms", uint32(_creatureLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -1743,6 +1744,7 @@ void ObjectMgr::LoadCreatures()
         if (!IsTransportMap(data.mapid) && data.spawnMask & ~spawnMasks[data.mapid])
             TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u) that have wrong spawn mask %u including unsupported difficulty modes for map (Id: %u).", guid, data.spawnMask, data.mapid);
 
+
         bool ok = true;
         for (uint32 diff = 0; diff < MAX_DIFFICULTY - 1 && ok; ++diff)
         {
@@ -1909,6 +1911,38 @@ ObjectGuid::LowType ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, fl
     return guid;
 }
 
+bool ObjectMgr::MoveCreData(uint32 guid, uint32 mapId, Position pos)
+{
+    CreatureData& data = NewOrExistCreatureData(guid);
+    if (!data.id)
+        return false;
+
+    RemoveCreatureFromGrid(guid, &data);
+    if (data.posX == pos.GetPositionX() && data.posY == pos.GetPositionY() && data.posZ == pos.GetPositionZ())
+        return true;
+    data.posX = pos.GetPositionX();
+    data.posY = pos.GetPositionY();
+    data.posZ = pos.GetPositionZ();
+    data.orientation = pos.GetOrientation();
+    AddCreatureToGrid(guid, &data);
+
+    // Spawn if necessary (loaded grids only)
+    if (Map* map = sMapMgr->CreateBaseMap(mapId))
+    {
+        // We use spawn coords to spawn
+        if (!map->Instanceable() && map->IsGridLoaded(data.posX, data.posY))
+        {
+            Creature* creature = new Creature;
+            if (!creature->LoadCreatureFromDB(guid, map))
+            {
+                TC_LOG_ERROR("misc", "MoveCreData: Cannot add creature guid %u to map", guid);
+                delete creature;
+                return false;
+            }
+        }
+    }
+    return true;
+}
 
 ObjectGuid::LowType ObjectMgr::AddCreatureData(uint32 entry, uint32 mapId, float x, float y, float z, float o, uint32 spawntimedelay /*= 0*/)
 {
@@ -2183,6 +2217,7 @@ bool ObjectMgr::GetPlayerNameByGUID(ObjectGuid guid, std::string& name) const
 
     stmt->setUInt32(0, guid.GetCounter());
 
+
     PreparedQueryResult result = CharacterDatabase.Query(stmt);
 
     if (result)
@@ -2221,6 +2256,9 @@ uint32 ObjectMgr::GetPlayerAccountIdByGUID(ObjectGuid guid) const
 {
     if (CharacterInfo const* characterInfo = sWorld->GetCharacterInfo(guid))
         return characterInfo->AccountId;
+
+
+
 
 
 
@@ -2896,6 +2934,7 @@ void ObjectMgr::LoadItemSetNameLocales()
 
     if (!result)
         return;
+
 
     do
     {
@@ -6417,15 +6456,18 @@ AreaTrigger const* ObjectMgr::GetMapEntranceTrigger(uint32 Map) const
     return NULL;
 }
 
+
 void ObjectMgr::SetHighestGuids()
 {
     QueryResult result = CharacterDatabase.Query("SELECT MAX(guid) FROM characters");
     if (result)
         GetGuidSequenceGenerator<HighGuid::Player>().Set((*result)[0].GetUInt32()+1);
 
+
     result = CharacterDatabase.Query("SELECT MAX(guid) FROM item_instance");
     if (result)
         GetGuidSequenceGenerator<HighGuid::Item>().Set((*result)[0].GetUInt32()+1);
+
 
     // Cleanup other tables from nonexistent guids ( >= _hiItemGuid)
     CharacterDatabase.PExecute("DELETE FROM character_inventory WHERE item >= '%u'", GetGuidSequenceGenerator<HighGuid::Item>().GetNextAfterMaxUsed());      // One-time query
@@ -6553,6 +6595,7 @@ void ObjectMgr::LoadGameObjectLocales()
 
         AddLocaleString(name, locale, data.Name);
         AddLocaleString(castBarCaption, locale, data.CastBarCaption);
+
 
     } while (result->NextRow());
 
@@ -7061,6 +7104,7 @@ void ObjectMgr::LoadReputationOnKill()
         }
 
         _repOnKillStore[creature_id] = repOnKill;
+
 
         ++count;
     } while (result->NextRow());
@@ -7734,6 +7778,7 @@ bool ObjectMgr::LoadTrinityStrings()
     uint32 oldMSTime = getMSTime();
 
     _trinityStringStore.clear(); // for reload case
+
 
     QueryResult result = WorldDatabase.Query("SELECT entry, content_default, content_loc1, content_loc2, content_loc3, content_loc4, content_loc5, content_loc6, content_loc7, content_loc8 FROM trinity_string");
     if (!result)
@@ -9074,6 +9119,7 @@ CreatureTemplate const* ObjectMgr::GetCreatureTemplate(uint32 entry)
     CreatureTemplateContainer::const_iterator itr = _creatureTemplateStore.find(entry);
     if (itr != _creatureTemplateStore.end())
         return &(itr->second);
+
 
     return NULL;
 }

@@ -45,6 +45,8 @@
 #include "BattlegroundMgr.h"
 #include "Battlefield.h"
 #include "BattlefieldMgr.h"
+#include "OutdoorPvPMgr.h"
+#include "OutdoorPvPWG.h"
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
@@ -1763,6 +1765,15 @@ void WorldSession::HandleAreaSpiritHealerQueryOpcode(WorldPacket& recvData)
 
     if (bg)
         sBattlegroundMgr->SendAreaSpiritHealerQueryOpcode(_player, bg, guid);
+    else
+    {  // Wintergrasp Hack till 3.3.5 and it's implemented as BG
+        if (GetPlayer()->GetZoneId() == 4197)
+        {
+            OutdoorPvPWG *pvpWG = (OutdoorPvPWG*)sOutdoorPvPMgr->GetOutdoorPvPToZoneId(4197);
+            if (pvpWG && pvpWG->isWarTime())
+                pvpWG->SendAreaSpiritHealerQueryOpcode(_player, guid);
+        }
+    }
 
     if (Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(_player->GetZoneId()))
         bf->SendAreaSpiritHealerQueryOpcode(_player, guid);
@@ -1786,6 +1797,15 @@ void WorldSession::HandleAreaSpiritHealerQueueOpcode(WorldPacket& recvData)
 
     if (bg)
         bg->AddPlayerToResurrectQueue(guid, _player->GetGUID());
+    else
+    {  // Wintergrasp Hack till 3.3.5 and it's implemented as BG
+        if (GetPlayer()->GetZoneId() == 4197)
+        {
+            OutdoorPvPWG *pvpWG = (OutdoorPvPWG*)sOutdoorPvPMgr->GetOutdoorPvPToZoneId(4197);
+            if (pvpWG && pvpWG->isWarTime())
+                pvpWG->AddPlayerToResurrectQueue(guid, _player->GetGUID());
+        }
+    }
 
     if (Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(_player->GetZoneId()))
         bf->AddPlayerToResurrectQueue(guid, _player->GetGUID());

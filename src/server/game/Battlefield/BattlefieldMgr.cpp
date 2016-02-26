@@ -16,7 +16,8 @@
  */
 
 #include "BattlefieldMgr.h"
-#include "BattlefieldWG.h"
+#include "OutdoorPvPMgr.h"
+#include "OutdoorPvPWG.h"
 #include "Player.h"
 
 BattlefieldMgr::BattlefieldMgr()
@@ -34,6 +35,7 @@ BattlefieldMgr::~BattlefieldMgr()
 
 void BattlefieldMgr::InitBattlefield()
 {
+/*
     Battlefield* wg = new BattlefieldWG();
     // respawn, init variables
     if (!wg->SetupBattlefield())
@@ -46,7 +48,7 @@ void BattlefieldMgr::InitBattlefield()
         _battlefieldSet.push_back(wg);
         TC_LOG_INFO("bg.battlefield", "Battlefield: Wintergrasp successfully initiated.");
     }
-
+*/
     /*
     For Cataclysm: Tol Barad
     Battlefield* tb = new BattlefieldTB;

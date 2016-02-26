@@ -24,9 +24,10 @@
 #include "DBCStores.h"
 #include "Chat.h"
 #include "BattlegroundMgr.h"
-#include "BattlefieldWG.h"
 #include "BattlefieldMgr.h"
 #include "Player.h"
+#include "OutdoorPvPMgr.h"
+#include "OutdoorPvPWG.h"
 
 bool IsPrimaryProfessionSkill(uint32 skill)
 {
@@ -1166,6 +1167,7 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
                 return false;
             break;
         }
+/* Removed by Wintergrasp Patch
         case 58730: // No fly Zone - Wintergrasp
         {
             if (!player)
@@ -1175,7 +1177,7 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
             if (!Bf || Bf->CanFlyIn() || (!player->HasAuraType(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED) && !player->HasAuraType(SPELL_AURA_FLY)))
                 return false;
             break;
-        }
+        }*/
         case 56618: // Horde Controls Factory Phase Shift
         case 56617: // Alliance Controls Factory Phase Shift
         {
@@ -1204,6 +1206,19 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
 
             if (Battlefield* battlefieldWG = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG))
                 return battlefieldWG->IsEnabled() && (player->GetTeamId() == battlefieldWG->GetDefenderTeam()) && !battlefieldWG->IsWarTime();
+            break;
+        }
+        case 58730: // No fly Zone - Wintergrasp
+        {
+            if (!player)
+                return false;
+
+            if (sWorld->getBoolConfig(CONFIG_OUTDOORPVP_WINTERGRASP_ENABLED))
+            {
+                OutdoorPvPWG *pvpWG = (OutdoorPvPWG*)sOutdoorPvPMgr->GetOutdoorPvPToZoneId(4197);
+                if ((pvpWG->isWarTime()==false) || player->isDead() || player->HasAura(45472) || player->HasAura(44795) || player->GetPositionZ() > 619.2f || player->IsInFlight() || (!player->HasAuraType(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED) && !player->HasAuraType(SPELL_AURA_FLY)))
+                   return false;
+            }
             break;
         }
         case 74411: // Battleground - Dampening
@@ -3680,6 +3695,13 @@ void SpellMgr::LoadSpellInfoCorrections()
                 break;
             // ENDOF ICECROWN CITADEL SPELLS
             //
+            // WINTERGRASP
+            //
+            case 51678: // WintergraspSiegeEngine Ram set radius of damage for units to 5 yards 
+                spellInfo->Effects[EFFECT_0].RadiusEntry = sSpellRadiusStore.LookupEntry(EFFECT_RADIUS_5_YARDS); // SPELL_EFFECT_KNOCK_BACK
+                spellInfo->Effects[EFFECT_1].RadiusEntry = sSpellRadiusStore.LookupEntry(EFFECT_RADIUS_5_YARDS); // SPELL_EFFECT_SCHOOL_DAMAGE
+                spellInfo->Effects[EFFECT_2].RadiusEntry = sSpellRadiusStore.LookupEntry(EFFECT_RADIUS_20_YARDS); // SPELL_EFFECT_WMO_DAMAGE, Huck but it must be -> Fortress towers are much bigger than original WMO damage radius of spell
+                break;
             // RUBY SANCTUM SPELLS
             //
             case 74799: // Soul Consumption

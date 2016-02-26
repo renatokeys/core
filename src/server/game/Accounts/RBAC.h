@@ -697,6 +697,13 @@ enum RBACPermissions
     // 799 - 834 6.x only
     RBAC_PERM_COMMAND_DEBUG_LOADCELLS                        = 835,
     RBAC_PERM_COMMAND_DEBUG_BOUNDARY                         = 836,
+	RBAC_PERM_COMMAND_WG                                    = 1910,
+    RBAC_PERM_COMMAND_WG_STATUS                             = 1911,
+    RBAC_PERM_COMMAND_WG_ENABLE                             = 1912,
+    RBAC_PERM_COMMAND_WG_START                              = 1913,
+    RBAC_PERM_COMMAND_WG_STOP                               = 1914,
+    RBAC_PERM_COMMAND_WG_SWITCH                             = 1915,
+    RBAC_PERM_COMMAND_WG_TIMER                              = 1916,
 
     // custom permissions 1000+
     RBAC_PERM_MAX

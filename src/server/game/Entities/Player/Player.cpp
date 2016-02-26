@@ -24,7 +24,6 @@
 #include "ArenaTeamMgr.h"
 #include "Battlefield.h"
 #include "BattlefieldMgr.h"
-#include "BattlefieldWG.h"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
 #include "BattlegroundScore.h"
@@ -59,6 +58,7 @@
 #include "Opcodes.h"
 #include "OutdoorPvP.h"
 #include "OutdoorPvPMgr.h"
+#include "OutdoorPvPWG.h"
 #include "Pet.h"
 #include "QuestDef.h"
 #include "ReputationMgr.h"
@@ -5730,7 +5730,7 @@ bool Player::UpdateCraftSkill(uint32 spellid)
             }
 
             uint32 craft_skill_gain = sWorld->getIntConfig(CONFIG_SKILL_GAIN_CRAFTING);
-			if(GetSession()->IsPremium())  
+			if(player->GetSession()->IsPremium())  
 				uint32 craft_skill_gain = sWorld->getIntConfig(CONFIG_SKILL_GAIN_CRAFTING_PREMIUM);  
 
 
@@ -6504,7 +6504,7 @@ void Player::CheckAreaExploreAndOutdoor()
                     XP = uint32(sObjectMgr->GetBaseXP(areaEntry->area_level)*sWorld->getRate(RATE_XP_EXPLORE));
 					
                 }
-				if(GetSession()->IsPremium())
+				if(player->GetSession()->IsPremium())
                     XP *= sWorld->getRate(RATE_XP_EXPLORE_PREMIUM);
 
 
@@ -6861,7 +6861,7 @@ bool Player::RewardHonor(Unit* victim, uint32 groupsize, int32 honor, bool pvpto
     }
 
     honor_f *= sWorld->getRate(RATE_HONOR);
-	if(GetSession()->IsPremium())
+	if(player->GetSession()->IsPremium())
         honor_f *= sWorld->getRate(RATE_HONOR_PREMIUM);
 
     // Back to int now
@@ -9340,7 +9340,7 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
 
     GetSession()->SendPacket(&data);
     SendBGWeekendWorldStates();
-    SendBattlefieldWorldStates();
+    //SendBattlefieldWorldStates();
 }
 
 void Player::SendBGWeekendWorldStates()
@@ -9357,7 +9357,7 @@ void Player::SendBGWeekendWorldStates()
         }
     }
 }
-
+/* Replaced by WinterGrasp Patch
 void Player::SendBattlefieldWorldStates()
 {
     /// Send misc stuff that needs to be sent on every login, like the battle timers.
@@ -9371,7 +9371,7 @@ void Player::SendBattlefieldWorldStates()
         }
     }
 }
-
+*/
 uint32 Player::GetXPRestBonus(uint32 xp)
 {
     uint32 rested_bonus = (uint32)GetRestBonus();           // xp for each rested bonus
@@ -14966,7 +14966,7 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
 
     // Not give XP in case already completed once repeatable quest
     uint32 XP = rewarded && !quest->IsDFQuest() ? 0 : uint32(quest->XPValue(this)*sWorld->getRate(RATE_XP_QUEST));
-	if (GetSession()->IsPremium())
+	if(player->GetSession()->IsPremium())
 		uint32 XP = rewarded && !quest->IsDFQuest() ? 0 : uint32(quest->XPValue(this)*sWorld->getRate(RATE_XP_QUEST_PREMIUM));
 
     // handle SPELL_AURA_MOD_XP_QUEST_PCT auras

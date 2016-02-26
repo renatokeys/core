@@ -585,6 +585,11 @@ void GameObject::Update(uint32 diff)
                         if (goInfo->trap.spellId)
                             CastSpell(target, goInfo->trap.spellId);
 
+                        // allow go to use wg script
+                        if (target->GetTypeId() == TYPEID_PLAYER)
+                            if (sScriptMgr->OnGossipHello(target->ToPlayer(), this))
+                                return;
+
                         // Template value or 4 seconds
                         m_cooldownTime = time(NULL) + (goInfo->trap.cooldown ? goInfo->trap.cooldown : uint32(4));
 

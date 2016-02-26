@@ -45,6 +45,8 @@
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include "OutdoorPvPWG.h"
+#include "OutdoorPvPMgr.h"
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
@@ -898,6 +900,23 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
 
     ObjectAccessor::AddObject(pCurrChar);
     //TC_LOG_DEBUG("Player %s added to Map.", pCurrChar->GetName().c_str());
+
+    //Send WG timer to player at login 
+    if (sWorld->getBoolConfig(CONFIG_OUTDOORPVP_WINTERGRASP_ENABLED))
+    {
+        if (OutdoorPvPWG *pvpWG = (OutdoorPvPWG*)sOutdoorPvPMgr->GetOutdoorPvPToZoneId(4197))
+        {
+            if (pvpWG->isWarTime()) // "Battle in progress"
+            {
+                pCurrChar->SendUpdateWorldState(ClockWorldState[1], uint32(time(NULL)));
+            } 
+            else // Time to next battle
+            {
+                pvpWG->SendInitWorldStatesTo(pCurrChar);
+                pCurrChar->SendUpdateWorldState(ClockWorldState[1], uint32(time(NULL) + pvpWG->GetTimer()));
+            }
+        }
+    }
 
     pCurrChar->SendInitialPacketsAfterAddToMap();
 

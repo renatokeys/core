@@ -22,6 +22,8 @@
 #include "ArenaTeamMgr.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include "OutdoorPvPWG.h"
+#include "OutdoorPvPMgr.h"
 
 #include "ArenaTeam.h"
 #include "BattlegroundMgr.h"
