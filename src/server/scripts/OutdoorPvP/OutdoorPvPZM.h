@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,21 +18,8 @@
 #ifndef OUTDOOR_PVP_ZM_
 #define OUTDOOR_PVP_ZM_
 
+#include "Language.h"
 #include "OutdoorPvP.h"
-
-enum DefenseMessages
-{
-    TEXT_WEST_BEACON_TAKEN_ALLIANCE         = 15541, // '|cffffff00The Alliance has taken control of the West Beacon!|r'
-    TEXT_WEST_BEACON_TAKEN_HORDE            = 15543, // '|cffffff00The Horde has taken control of the West Beacon!|r'
-    TEXT_EAST_BEACON_TAKEN_ALLIANCE         = 15546, // '|cffffff00The Alliance has taken control of the East Beacon!|r'
-    TEXT_EAST_BEACON_TAKEN_HORDE            = 15545, // '|cffffff00The Horde has taken control of the East Beacon!|r'
-    TEXT_TWIN_SPIRE_RUINS_TAKEN_ALLIANCE    = 15591, // '|cffffff00The Alliance has taken control of Twin Spire Ruins!|r'
-    TEXT_TWIN_SPIRE_RUINS_TAKEN_HORDE       = 15590, // '|cffffff00The Horde has taken control of Twin Spire Ruins!|r'
-    TEXT_BOTH_BEACONS_TAKEN_ALLIANCE        = 16284, // (NYI) '|cffffff00The Alliance has taken control of both beacons!|r'
-    TEXT_BOTH_BEACONS_TAKEN_HORDE           = 16285, // (NYI) '|cffffff00The Horde has taken control of both beacons!|r'
-    TEXT_BATTLE_STANDARDS_ALLIANCE          = 16287, // (NYI) '|cffffff00The Alliance Field Scout is now issuing battle standards.|r'
-    TEXT_BATTLE_STANDARDS_HORDE             = 16288  // (NYI) '|cffffff00The Horde Field Scout is now issuing battle standards.|r'
-};
 
 const uint8 OutdoorPvPZMBuffZonesNum = 5;
 
@@ -79,6 +66,9 @@ enum ZMCreatureTypes
 
 struct zm_beacon
 {
+    uint32 slider_disp;
+    uint32 slider_n;
+    uint32 slider_pos;
     uint32 ui_tower_n;
     uint32 ui_tower_h;
     uint32 ui_tower_a;
@@ -98,20 +88,32 @@ enum ZM_BeaconType
 
 const zm_beacon ZMBeaconInfo[ZM_NUM_BEACONS] =
 {
-    {2560, 2559, 2558, 2652, 2651, 2650, 11807, 11806},
-    {2557, 2556, 2555, 2646, 2645, 2644, 11805, 11804}
+    {2533, 2535, 2534, 2560, 2559, 2558, 2652, 2651, 2650, 11807, 11806},
+    {2527, 2529, 2528, 2557, 2556, 2555, 2646, 2645, 2644, 11805, 11804}
 };
 
 const uint32 ZMBeaconCaptureA[ZM_NUM_BEACONS] =
 {
-    TEXT_EAST_BEACON_TAKEN_ALLIANCE,
-    TEXT_WEST_BEACON_TAKEN_ALLIANCE
+    LANG_OPVP_ZM_CAPTURE_EAST_A,
+    LANG_OPVP_ZM_CAPTURE_WEST_A
 };
 
 const uint32 ZMBeaconCaptureH[ZM_NUM_BEACONS] =
 {
-    TEXT_EAST_BEACON_TAKEN_HORDE,
-    TEXT_WEST_BEACON_TAKEN_HORDE
+    LANG_OPVP_ZM_CAPTURE_EAST_H,
+    LANG_OPVP_ZM_CAPTURE_WEST_H
+};
+
+const uint32 ZMBeaconLoseA[ZM_NUM_BEACONS] =
+{
+    LANG_OPVP_ZM_LOSE_EAST_A,
+    LANG_OPVP_ZM_LOSE_WEST_A
+};
+
+const uint32 ZMBeaconLoseH[ZM_NUM_BEACONS] =
+{
+    LANG_OPVP_ZM_LOSE_EAST_H,
+    LANG_OPVP_ZM_LOSE_WEST_H
 };
 
 const go_type ZMCapturePoints[ZM_NUM_BEACONS] =
@@ -122,6 +124,14 @@ const go_type ZMCapturePoints[ZM_NUM_BEACONS] =
 
 enum OutdoorPvPZMWorldStates
 {
+    ZM_UI_TOWER_SLIDER_N_W = 2529,
+    ZM_UI_TOWER_SLIDER_POS_W = 2528,
+    ZM_UI_TOWER_SLIDER_DISPLAY_W = 2527,
+
+    ZM_UI_TOWER_SLIDER_N_E = 2535,
+    ZM_UI_TOWER_SLIDER_POS_E = 2534,
+    ZM_UI_TOWER_SLIDER_DISPLAY_E = 2533,
+
     ZM_WORLDSTATE_UNK_1 = 2653,
 
     ZM_UI_TOWER_EAST_N = 2560,
@@ -159,15 +169,23 @@ class OutdoorPvPZM;
 class OPvPCapturePointZM_Beacon : public OPvPCapturePoint
 {
     public:
+
         OPvPCapturePointZM_Beacon(OutdoorPvP* pvp, ZM_BeaconType type);
 
         void ChangeState();
 
+        void SendChangePhase();
+
         void FillInitialWorldStates(WorldPacket & data);
+
+        // used when player is activated/inactivated in the area
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
 
         void UpdateTowerState();
 
     protected:
+
         ZM_BeaconType m_TowerType;
         uint32 m_TowerState;
 };
@@ -182,40 +200,43 @@ enum ZM_GraveYardState
 class OPvPCapturePointZM_GraveYard : public OPvPCapturePoint
 {
     public:
+
         OPvPCapturePointZM_GraveYard(OutdoorPvP* pvp);
 
-        bool Update(uint32 diff) override;
+        bool Update(uint32 diff);
 
-        void ChangeState() override { }
+        void ChangeState() {}
 
-        void FillInitialWorldStates(WorldPacket & data) override;
+        void FillInitialWorldStates(WorldPacket & data);
 
         void UpdateTowerState();
 
-        int32 HandleOpenGo(Player* player, GameObject* go) override;
+        int32 HandleOpenGo(Player* player, uint64 guid);
 
-        void SetBeaconState(uint32 controlling_team); // not good atm
+        void SetBeaconState(TeamId controlling_teamId); // not good atm
 
-        bool HandleGossipOption(Player* player, Creature* creature, uint32 gossipid) override;
+        bool HandleGossipOption(Player* player, uint64 guid, uint32 gossipid);
 
-        bool HandleDropFlag(Player* player, uint32 spellId) override;
+        bool HandleDropFlag(Player* player, uint32 spellId);
 
-        bool CanTalkTo(Player* player, Creature* creature, GossipMenuItems const& gso) override;
+        bool CanTalkTo(Player* player, Creature* creature, GossipMenuItems const& gso);
 
         uint32 GetGraveYardState() const;
 
     private:
+
         uint32 m_GraveYardState;
 
     protected:
-        uint32 m_BothControllingFaction;
 
-        ObjectGuid m_FlagCarrierGUID;
+        TeamId m_BothControllingFactionId;
+        uint64 m_FlagCarrierGUID;
 };
 
 class OutdoorPvPZM : public OutdoorPvP
 {
     public:
+
         OutdoorPvPZM();
 
         bool SetupOutdoorPvP();
@@ -238,11 +259,12 @@ class OutdoorPvPZM : public OutdoorPvP
         void SetHordeTowersControlled(uint32 count);
 
     private:
+
         OPvPCapturePointZM_GraveYard * m_GraveYard;
 
         uint32 m_AllianceTowersControlled;
         uint32 m_HordeTowersControlled;
 };
 
-/// @todo flag carrier death/leave/mount/activitychange should give back the gossip options
+// todo: flag carrier death/leave/mount/activitychange should give back the gossip options
 #endif

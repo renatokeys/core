@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,8 +37,7 @@ enum Says
     SAY_WATCH                 = 2,
     SAY_WATCH_WHISPER         = 3,
     SAY_OHGAN_DEAD            = 4,
-
-    SAY_GRATS_JINDO           = 0
+    SAY_GRATS_JINDO           = 0,
 };
 
 enum Spells
@@ -107,30 +106,21 @@ Position const PosMandokir[2] =
 
 class boss_mandokir : public CreatureScript
 {
-    public:
-        boss_mandokir() : CreatureScript("boss_mandokir") { }
+    public: boss_mandokir() : CreatureScript("boss_mandokir") { }
 
         struct boss_mandokirAI : public BossAI
         {
-            boss_mandokirAI(Creature* creature) : BossAI(creature, DATA_MANDOKIR)
-            {
-                Initialize();
-            }
+            boss_mandokirAI(Creature* creature) : BossAI(creature, DATA_MANDOKIR) { }
 
-            void Initialize()
-            {
-                killCount = 0;
-            }
-
-            void Reset() override
+            void Reset()
             {
                 if (me->GetPositionZ() > 140.0f)
                 {
                     _Reset();
-                    Initialize();
-                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                    killCount = 0;
+                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC|UNIT_FLAG_IMMUNE_TO_NPC);
                     events.ScheduleEvent(EVENT_CHECK_START, 1000);
-                    if (Creature* speaker = ObjectAccessor::GetCreature(*me, instance->GetGuidData(NPC_VILEBRANCH_SPEAKER)))
+                    if (Creature* speaker = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_VILEBRANCH_SPEAKER)))
                         if (!speaker->IsAlive())
                             speaker->Respawn(true);
                 }
@@ -138,7 +128,7 @@ class boss_mandokir : public CreatureScript
                 me->Mount(MODEL_OHGAN_MOUNT);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 // Do not want to unsummon Ohgan
                 for (int i = 0; i < CHAINED_SPIRT_COUNT; ++i)
@@ -148,7 +138,7 @@ class boss_mandokir : public CreatureScript
                 instance->SaveToDB();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 events.ScheduleEvent(EVENT_OVERPOWER, urand(7000, 9000));
@@ -171,7 +161,7 @@ class boss_mandokir : public CreatureScript
                 DoZoneInCombat();
             }
 
-            void KilledUnit(Unit* victim) override
+            void KilledUnit(Unit* victim)
             {
                 if (victim->GetTypeId() != TYPEID_PLAYER)
                     return;
@@ -179,7 +169,7 @@ class boss_mandokir : public CreatureScript
                 if (++killCount == 3)
                 {
                     Talk(SAY_DING_KILL);
-                    if (Creature* jindo = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_JINDO)))
+                    if (Creature* jindo = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_JINDO)))
                         if (jindo->IsAlive())
                             jindo->AI()->Talk(SAY_GRATS_JINDO);
                     DoCast(me, SPELL_LEVEL_UP, true);
@@ -187,7 +177,7 @@ class boss_mandokir : public CreatureScript
                 }
             }
 
-            void MovementInform(uint32 type, uint32 id) override
+            void MovementInform(uint32 type, uint32 id)
             {
                 if (type == WAYPOINT_MOTION_TYPE)
                 {
@@ -201,7 +191,7 @@ class boss_mandokir : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 events.Update(diff);
 
@@ -223,7 +213,7 @@ class boss_mandokir : public CreatureScript
                                         events.ScheduleEvent(EVENT_CHECK_START, 1000);
                                     break;
                                 case EVENT_STARTED:
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC|UNIT_FLAG_IMMUNE_TO_NPC);
                                     me->GetMotionMaster()->MovePath(PATH_MANDOKIR, false);
                                     break;
                                 default:
@@ -246,7 +236,7 @@ class boss_mandokir : public CreatureScript
                             events.ScheduleEvent(EVENT_OVERPOWER, urand(6000, 12000));
                             break;
                         case EVENT_MORTAL_STRIKE:
-                            if (me->GetVictim() && me->EnsureVictim()->HealthBelowPct(50))
+                            if (me->GetVictim() && me->GetVictim()->HealthBelowPct(50))
                                 DoCastVictim(SPELL_MORTAL_STRIKE, true);
                             events.ScheduleEvent(EVENT_MORTAL_STRIKE, urand(12000, 18000));
                             break;
@@ -285,10 +275,10 @@ class boss_mandokir : public CreatureScript
 
         private:
             uint8 killCount;
-            ObjectGuid chainedSpirtGUIDs[CHAINED_SPIRT_COUNT];
+            uint64 chainedSpirtGUIDs[CHAINED_SPIRT_COUNT];
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetZulGurubAI<boss_mandokirAI>(creature);
         }
@@ -303,34 +293,25 @@ enum OhganSpells
 
 class npc_ohgan : public CreatureScript
 {
-    public:
-        npc_ohgan() : CreatureScript("npc_ohgan") { }
+    public: npc_ohgan() : CreatureScript("npc_ohgan") { }
 
         struct npc_ohganAI : public ScriptedAI
         {
-            npc_ohganAI(Creature* creature) : ScriptedAI(creature), instance(creature->GetInstanceScript())
-            {
-                Initialize();
-            }
+            npc_ohganAI(Creature* creature) : ScriptedAI(creature), instance(creature->GetInstanceScript()) { }
 
-            void Initialize()
+            void Reset()
             {
                 SunderArmor_Timer = 5000;
             }
 
-            void Reset() override
-            {
-                Initialize();
-            }
+            void EnterCombat(Unit* /*who*/) { }
 
-            void EnterCombat(Unit* /*who*/) override { }
-
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 instance->SetBossState(DATA_OHGAN, DONE);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 // Return since we have no target
                 if (!UpdateVictim())
@@ -350,7 +331,7 @@ class npc_ohgan : public CreatureScript
             InstanceScript* instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetZulGurubAI<npc_ohganAI>(creature);
         }
@@ -364,35 +345,26 @@ enum VilebranchSpells
 
 class npc_vilebranch_speaker : public CreatureScript
 {
-    public:
-        npc_vilebranch_speaker() : CreatureScript("npc_vilebranch_speaker") { }
+    public: npc_vilebranch_speaker() : CreatureScript("npc_vilebranch_speaker") { }
 
         struct npc_vilebranch_speakerAI : public ScriptedAI
         {
-            npc_vilebranch_speakerAI(Creature* creature) : ScriptedAI(creature), instance(creature->GetInstanceScript())
-            {
-                Initialize();
-            }
+            npc_vilebranch_speakerAI(Creature* creature) : ScriptedAI(creature), instance(creature->GetInstanceScript()) { }
 
-            void Initialize()
+            void Reset()
             {
                 demoralizing_Shout_Timer = urand(2000, 4000);
                 cleave_Timer = urand(5000, 8000);
             }
 
-            void Reset() override
-            {
-                Initialize();
-            }
+            void EnterCombat(Unit* /*who*/) { }
 
-            void EnterCombat(Unit* /*who*/) override { }
-
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 instance->SetBossState(DATA_MANDOKIR, SPECIAL);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 // Return since we have no target
                 if (!UpdateVictim())
@@ -419,7 +391,7 @@ class npc_vilebranch_speaker : public CreatureScript
             InstanceScript* instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<npc_vilebranch_speakerAI>(creature);
         }
@@ -442,13 +414,13 @@ class spell_threatening_gaze : public SpellScriptLoader
                             caster->CastSpell(target, SPELL_WATCH_CHARGE);
             }
 
-            void Register() override
+            void Register()
             {
                 OnEffectRemove += AuraEffectRemoveFn(spell_threatening_gaze_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const override
+        AuraScript* GetAuraScript() const
         {
             return new spell_threatening_gaze_AuraScript();
         }

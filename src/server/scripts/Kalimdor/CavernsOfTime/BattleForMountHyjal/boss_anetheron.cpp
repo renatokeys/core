@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -45,7 +45,7 @@ class boss_anetheron : public CreatureScript
 public:
     boss_anetheron() : CreatureScript("boss_anetheron") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_anetheronAI>(creature);
     }
@@ -54,18 +54,8 @@ public:
     {
         boss_anetheronAI(Creature* creature) : hyjal_trashAI(creature)
         {
-            Initialize();
             instance = creature->GetInstanceScript();
             go = false;
-        }
-
-        void Initialize()
-        {
-            SwarmTimer = 45000;
-            SleepTimer = 60000;
-            AuraTimer = 5000;
-            InfernoTimer = 45000;
-            damageTaken = 0;
         }
 
         uint32 SwarmTimer;
@@ -74,15 +64,19 @@ public:
         uint32 InfernoTimer;
         bool go;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            damageTaken = 0;
+            SwarmTimer = 45000;
+            SleepTimer = 60000;
+            AuraTimer = 5000;
+            InfernoTimer = 45000;
 
             if (IsEvent)
                 instance->SetData(DATA_ANETHERONEVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             if (IsEvent)
                 instance->SetData(DATA_ANETHERONEVENT, IN_PROGRESS);
@@ -90,23 +84,23 @@ public:
             Talk(SAY_ONAGGRO);
         }
 
-        void KilledUnit(Unit* who) override
+        void KilledUnit(Unit* who)
         {
             if (who->GetTypeId() == TYPEID_PLAYER)
                 Talk(SAY_ONSLAY);
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             if (waypointId == 7)
             {
-                Unit* target = ObjectAccessor::GetUnit(*me, instance->GetGuidData(DATA_JAINAPROUDMOORE));
+                Unit* target = ObjectAccessor::GetUnit(*me, instance->GetData64(DATA_JAINAPROUDMOORE));
                 if (target && target->IsAlive())
                     me->AddThreat(target, 0.0f);
             }
         }
 
-        void JustDied(Unit* killer) override
+        void JustDied(Unit* killer)
         {
             hyjal_trashAI::JustDied(killer);
             if (IsEvent)
@@ -114,7 +108,7 @@ public:
             Talk(SAY_ONDEATH);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (IsEvent)
             {
@@ -182,7 +176,7 @@ class npc_towering_infernal : public CreatureScript
 public:
     npc_towering_infernal() : CreatureScript("npc_towering_infernal") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<npc_towering_infernalAI>(creature);
     }
@@ -191,51 +185,49 @@ public:
     {
         npc_towering_infernalAI(Creature* creature) : ScriptedAI(creature)
         {
-            ImmolationTimer = 5000;
-            CheckTimer = 5000;
             instance = creature->GetInstanceScript();
-            AnetheronGUID = instance->GetGuidData(DATA_ANETHERON);
+            AnetheronGUID = instance->GetData64(DATA_ANETHERON);
         }
 
         uint32 ImmolationTimer;
         uint32 CheckTimer;
-        ObjectGuid AnetheronGUID;
+        uint64 AnetheronGUID;
         InstanceScript* instance;
 
-        void Reset() override
+        void Reset()
         {
             DoCast(me, SPELL_INFERNO_EFFECT);
             ImmolationTimer = 5000;
             CheckTimer = 5000;
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
         }
 
-        void KilledUnit(Unit* /*victim*/) override
+        void KilledUnit(Unit* /*victim*/)
         {
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
         }
 
-        void MoveInLineOfSight(Unit* who) override
+        void MoveInLineOfSight(Unit* who)
 
         {
             if (me->IsWithinDist(who, 50) && !me->IsInCombat() && me->IsValidAttackTarget(who))
                 AttackStart(who);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (CheckTimer <= diff)
             {
                 if (AnetheronGUID)
                 {
                     Creature* boss = ObjectAccessor::GetCreature(*me, AnetheronGUID);
-                    if (!boss || boss->isDead())
+                    if (!boss || (boss && boss->isDead()))
                     {
                         me->setDeathState(JUST_DIED);
                         me->RemoveCorpse();

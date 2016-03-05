@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -55,7 +55,7 @@ class npc_beaten_corpse : public CreatureScript
 public:
     npc_beaten_corpse() : CreatureScript("npc_beaten_corpse") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_INFO_DEF +1)
@@ -66,7 +66,7 @@ public:
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (player->GetQuestStatus(QUEST_LOST_IN_BATTLE) == QUEST_STATUS_INCOMPLETE || player->GetQuestStatus(QUEST_LOST_IN_BATTLE) == QUEST_STATUS_COMPLETE)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_CORPSE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
@@ -102,7 +102,7 @@ class npc_gilthares : public CreatureScript
 public:
     npc_gilthares() : CreatureScript("npc_gilthares") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest)
     {
         if (quest->GetQuestId() == QUEST_FREE_FROM_HOLD)
         {
@@ -117,7 +117,7 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_giltharesAI(creature);
     }
@@ -126,9 +126,9 @@ public:
     {
         npc_giltharesAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Reset() override { }
+        void Reset() { }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -158,10 +158,10 @@ public:
             }
         }
 
-        void EnterCombat(Unit* who) override
+        void EnterCombat(Unit* who)
         {
             //not always use
-            if (rand32() % 4)
+            if (rand()%4)
                 return;
 
             //only aggro text if not player and only in this area
@@ -191,7 +191,7 @@ class npc_taskmaster_fizzule : public CreatureScript
 public:
     npc_taskmaster_fizzule() : CreatureScript("npc_taskmaster_fizzule") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_taskmaster_fizzuleAI(creature);
     }
@@ -200,15 +200,7 @@ public:
     {
         npc_taskmaster_fizzuleAI(Creature* creature) : ScriptedAI(creature)
         {
-            Initialize();
             factionNorm = creature->getFaction();
-        }
-
-        void Initialize()
-        {
-            IsFriend = false;
-            ResetTimer = 120000;
-            FlareCount = 0;
         }
 
         uint32 factionNorm;
@@ -216,9 +208,11 @@ public:
         uint32 ResetTimer;
         uint8 FlareCount;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            IsFriend = false;
+            ResetTimer = 120000;
+            FlareCount = 0;
             me->setFaction(factionNorm);
         }
 
@@ -235,7 +229,7 @@ public:
             me->HandleEmoteCommand(EMOTE_ONESHOT_SALUTE);
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellInfo* spell) override
+        void SpellHit(Unit* /*caster*/, const SpellInfo* spell)
         {
             if (spell->Id == SPELL_FLARE || spell->Id == SPELL_FOLLY)
             {
@@ -246,9 +240,9 @@ public:
             }
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (IsFriend)
             {
@@ -265,7 +259,7 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void ReceiveEmote(Player* /*player*/, uint32 emote) override
+        void ReceiveEmote(Player* /*player*/, uint32 emote)
         {
             if (emote == TEXT_EMOTE_SALUTE)
             {
@@ -313,35 +307,14 @@ class npc_twiggy_flathead : public CreatureScript
 public:
     npc_twiggy_flathead() : CreatureScript("npc_twiggy_flathead") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_twiggy_flatheadAI(creature);
+        return new npc_twiggy_flatheadAI (creature);
     }
 
     struct npc_twiggy_flatheadAI : public ScriptedAI
     {
-        npc_twiggy_flatheadAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            EventInProgress = false;
-            EventGrate = false;
-            EventBigWill = false;
-            WaveTimer = 600000;
-            ChallengerChecker = 0;
-            Wave = 0;
-            PlayerGUID.Clear();
-
-            for (uint8 i = 0; i < 6; ++i)
-            {
-                AffrayChallenger[i].Clear();
-                ChallengerDown[i] = false;
-            }
-            BigWill.Clear();
-        }
+        npc_twiggy_flatheadAI(Creature* creature) : ScriptedAI(creature) {}
 
         bool EventInProgress;
         bool EventGrate;
@@ -350,74 +323,88 @@ public:
         uint8 Wave;
         uint32 WaveTimer;
         uint32 ChallengerChecker;
-        ObjectGuid PlayerGUID;
-        ObjectGuid AffrayChallenger[6];
-        ObjectGuid BigWill;
+        uint64 PlayerGUID;
+        uint64 AffrayChallenger[6];
+        uint64 BigWill;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            EventInProgress = false;
+            EventGrate = false;
+            EventBigWill = false;
+            WaveTimer = 600000;
+            ChallengerChecker = 0;
+            Wave = 0;
+            PlayerGUID = 0;
+
+            for (uint8 i = 0; i < 6; ++i)
+            {
+                AffrayChallenger[i] = 0;
+                ChallengerDown[i] = false;
+            }
+            BigWill = 0;
         }
 
-        void MoveInLineOfSight(Unit* who) override
+        void EnterCombat(Unit* /*who*/) { }
+
+		void EnterEvadeMode()
+		{
+			CleanUp();
+			ScriptedAI::EnterEvadeMode();
+		}
+
+		void CleanUp()
+		{
+			for (uint8 i = 0; i < 6; ++i) // unsummon challengers
+                if (AffrayChallenger[i])
+                    if (Creature* creature = ObjectAccessor::GetCreature((*me), AffrayChallenger[i]))
+                        creature->DespawnOrUnsummon(1);
+
+            if (BigWill) // unsummon bigWill
+                if (Creature* creature = ObjectAccessor::GetCreature((*me), BigWill))
+                    creature->DespawnOrUnsummon(1);
+		}
+
+        void MoveInLineOfSight(Unit* who)
         {
-            if (!who || !who->IsAlive() || EventInProgress)
+            if (!who->IsAlive() || EventInProgress || who->GetTypeId() != TYPEID_PLAYER)
                 return;
 
-            if (who->GetTypeId() == TYPEID_PLAYER && me->IsWithinDistInMap(who, 10.0f))
-                if (Player* player = who->ToPlayer())
-                    if (player->GetQuestStatus(1719) == QUEST_STATUS_INCOMPLETE)
-                    {
-                        PlayerGUID = who->GetGUID();
-                        EventInProgress = true;
-                    }
+            if (me->IsWithinDistInMap(who, 10.0f) && who->ToPlayer()->GetQuestStatus(1719) == QUEST_STATUS_INCOMPLETE)
+            {
+                PlayerGUID = who->GetGUID();
+                EventInProgress = true;
+            }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (EventInProgress)
-            {
-                Player* warrior = NULL;
-
-                if (PlayerGUID)
-                    warrior = ObjectAccessor::GetPlayer(*me, PlayerGUID);
-
-                if (!warrior)
+			{
+                Player* pWarrior = ObjectAccessor::GetPlayer(*me, PlayerGUID);
+                if (!pWarrior || me->GetDistance2d(pWarrior) >= 200.0f)
+				{
+					EnterEvadeMode();
                     return;
+				}
 
-                if (!warrior->IsAlive() && warrior->GetQuestStatus(1719) == QUEST_STATUS_INCOMPLETE)
-                {
+                if (!pWarrior->IsAlive() && pWarrior->GetQuestStatus(1719) == QUEST_STATUS_INCOMPLETE)
+				{
                     Talk(SAY_TWIGGY_FLATHEAD_DOWN);
-                    warrior->FailQuest(1719);
-
-                    for (uint8 i = 0; i < 6; ++i) // unsummon challengers
-                    {
-                        if (AffrayChallenger[i])
-                        {
-                            Creature* creature = ObjectAccessor::GetCreature((*me), AffrayChallenger[i]);
-                            if (creature && creature->IsAlive())
-                                creature->DisappearAndDie();
-                        }
-                    }
-
-                    if (BigWill) // unsummon bigWill
-                    {
-                        Creature* creature = ObjectAccessor::GetCreature((*me), BigWill);
-                        if (creature && creature->IsAlive())
-                            creature->DisappearAndDie();
-                    }
-                    Reset();
+                    pWarrior->FailQuest(1719);
+					EnterEvadeMode();
+                    return;
                 }
 
-                if (!EventGrate && EventInProgress)
+                if (!EventGrate)
                 {
                     float x, y, z;
-                    warrior->GetPosition(x, y, z);
+                    pWarrior->GetPosition(x, y, z);
 
                     if (x >= -1684 && x <= -1674 && y >= -4334 && y <= -4324)
-                    {
-                        warrior->AreaExploredOrEventHappens(1719);
-                        Talk(SAY_TWIGGY_FLATHEAD_BEGIN, warrior);
+					{
+                        pWarrior->AreaExploredOrEventHappens(1719);
+                        Talk(SAY_TWIGGY_FLATHEAD_BEGIN, pWarrior);
 
                         for (uint8 i = 0; i < 6; ++i)
                         {
@@ -435,7 +422,7 @@ public:
                         EventGrate = true;
                     }
                 }
-                else if (EventInProgress)
+                else
                 {
                     if (ChallengerChecker <= diff)
                     {
@@ -443,8 +430,8 @@ public:
                         {
                             if (AffrayChallenger[i])
                             {
-                                Creature* creature = ObjectAccessor::GetCreature((*me), AffrayChallenger[i]);
-                                if ((!creature || (!creature->IsAlive())) && !ChallengerDown[i])
+                                Creature* creature = ObjectAccessor::GetCreature(*me, AffrayChallenger[i]);
+                                if ((!creature || !creature->IsAlive()) && !ChallengerDown[i])
                                 {
                                     Talk(SAY_TWIGGY_FLATHEAD_DOWN);
                                     ChallengerDown[i] = true;
@@ -456,41 +443,40 @@ public:
 
                     if (WaveTimer <= diff)
                     {
-                        if (Wave < 6 && AffrayChallenger[Wave] && !EventBigWill)
+                        if (Wave < 6 && !EventBigWill)
                         {
                             Talk(SAY_TWIGGY_FLATHEAD_FRAY);
                             Creature* creature = ObjectAccessor::GetCreature(*me, AffrayChallenger[Wave]);
-                            if (creature && (creature->IsAlive()))
+                            if (creature && creature->IsAlive())
                             {
                                 creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                                 creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
                                 creature->HandleEmoteCommand(EMOTE_ONESHOT_ROAR);
                                 creature->setFaction(14);
-                                creature->AI()->AttackStart(warrior);
-                                ++Wave;
-                                WaveTimer = 20000;
+                                creature->AI()->AttackStart(pWarrior);
                             }
+							++Wave;
+                            WaveTimer = 20000;
                         }
                         else if (Wave >= 6 && !EventBigWill)
-                        {
+						{
                             if (Creature* creature = me->SummonCreature(NPC_BIG_WILL, -1722, -4341, 6.12f, 6.26f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 480000))
                             {
                                 BigWill = creature->GetGUID();
-                                //creature->GetMotionMaster()->MovePoint(0, -1693, -4343, 4.32f);
-                                //creature->GetMotionMaster()->MovePoint(1, -1684, -4333, 2.78f);
                                 creature->GetMotionMaster()->MovePoint(2, -1682, -4329, 2.79f);
                                 creature->HandleEmoteCommand(EMOTE_STATE_READY_UNARMED);
                                 EventBigWill = true;
-                                WaveTimer = 1000;
+                                WaveTimer = 10000;
                             }
                         }
-                        else if (Wave >= 6 && EventBigWill && BigWill)
+                        else if (Wave >= 6 && EventBigWill)
                         {
                             Creature* creature = ObjectAccessor::GetCreature(*me, BigWill);
                             if (!creature || !creature->IsAlive())
                             {
                                 Talk(SAY_TWIGGY_FLATHEAD_OVER);
-                                Reset();
+                                EnterEvadeMode();
+								return;
                             }
                             else if (creature) // Makes BIG WILL attackable.
                             {
@@ -498,10 +484,13 @@ public:
                                 creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
                                 creature->HandleEmoteCommand(EMOTE_ONESHOT_ROAR);
                                 creature->setFaction(14);
-                                creature->AI()->AttackStart(warrior);
+                                creature->AI()->AttackStart(pWarrior);
                             }
+							WaveTimer = 2000;
                         }
-                    } else WaveTimer -= diff;
+                    }
+					else
+						WaveTimer -= diff;
                 }
             }
         }
@@ -548,7 +537,7 @@ public:
         uint32 PostEventTimer;
         uint32 PostEventCount;
 
-        void Reset() override
+        void Reset()
         {
             if (!HasEscortState(STATE_ESCORT_ESCORTING))
             {
@@ -561,7 +550,7 @@ public:
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             switch (waypointId)
             {
@@ -584,7 +573,7 @@ public:
             }
         }
 
-        void WaypointStart(uint32 PointId) override
+        void WaypointStart(uint32 PointId)
         {
             Player* player = GetPlayerForEscort();
 
@@ -603,7 +592,7 @@ public:
             }
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             if (summoned->GetEntry() == NPC_PILOT_WIZZ)
                 me->SetStandState(UNIT_STAND_STATE_DEAD);
@@ -612,7 +601,7 @@ public:
                 summoned->AI()->AttackStart(me);
         }
 
-        void UpdateEscortAI(uint32 Diff) override
+        void UpdateEscortAI(uint32 Diff)
         {
             if (!UpdateVictim())
             {
@@ -654,7 +643,7 @@ public:
         }
     };
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
         if (quest->GetQuestId() == QUEST_ESCAPE)
         {
@@ -666,7 +655,7 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_wizzlecrank_shredderAI(creature);
     }

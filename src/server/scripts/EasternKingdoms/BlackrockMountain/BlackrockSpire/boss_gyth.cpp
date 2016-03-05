@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -53,21 +53,13 @@ public:
 
     struct boss_gythAI : public BossAI
     {
-        boss_gythAI(Creature* creature) : BossAI(creature, DATA_GYTH)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            SummonedRend = false;
-        }
+        boss_gythAI(Creature* creature) : BossAI(creature, DATA_GYTH) { }
 
         bool SummonedRend;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            SummonedRend = false;
             if (instance->GetBossState(DATA_GYTH) == IN_PROGRESS)
             {
                 instance->SetBossState(DATA_GYTH, DONE);
@@ -75,7 +67,7 @@ public:
             }
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             _EnterCombat();
 
@@ -85,12 +77,12 @@ public:
             events.ScheduleEvent(EVENT_KNOCK_AWAY, urand(12000, 18000));
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             instance->SetBossState(DATA_GYTH, DONE);
         }
 
-        void SetData(uint32 /*type*/, uint32 data) override
+        void SetData(uint32 /*type*/, uint32 data)
         {
             switch (data)
             {
@@ -102,7 +94,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
 
             if (!SummonedRend && HealthBelowPct(5))
@@ -168,7 +160,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_gythAI>(creature);
     }

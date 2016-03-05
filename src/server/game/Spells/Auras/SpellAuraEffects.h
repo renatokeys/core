@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,20 +24,21 @@ class AuraEffect;
 class Aura;
 
 #include "SpellAuras.h"
+#include "Spell.h"
 
 typedef void(AuraEffect::*pAuraEffectHandler)(AuraApplication const* aurApp, uint8 mode, bool apply) const;
 
 class AuraEffect
 {
     friend void Aura::_InitEffects(uint8 effMask, Unit* caster, int32 *baseAmount);
-    friend Aura* Unit::_TryStackingOrRefreshingExistingAura(SpellInfo const* newAura, uint8 effMask, Unit* caster, int32* baseAmount, Item* castItem, ObjectGuid casterGUID);
+    friend Aura* Unit::_TryStackingOrRefreshingExistingAura(SpellInfo const* newAura, uint8 effMask, Unit* caster, int32* baseAmount, Item* castItem, uint64 casterGUID, bool noPeriodicReset);
     friend Aura::~Aura();
     private:
         ~AuraEffect();
         explicit AuraEffect(Aura* base, uint8 effIndex, int32 *baseAmount, Unit* caster);
     public:
         Unit* GetCaster() const { return GetBase()->GetCaster(); }
-        ObjectGuid GetCasterGUID() const { return GetBase()->GetCasterGUID(); }
+        uint64 GetCasterGUID() const { return GetBase()->GetCasterGUID(); }
         Aura* GetBase() const { return m_base; }
         void GetTargetList(std::list<Unit*> & targetList) const;
         void GetApplicationList(std::list<AuraApplication*> & applicationList) const;
@@ -52,7 +53,8 @@ class AuraEffect
         int32 GetMiscValueB() const { return m_spellInfo->Effects[m_effIndex].MiscValueB; }
         int32 GetMiscValue() const { return m_spellInfo->Effects[m_effIndex].MiscValue; }
         AuraType GetAuraType() const { return (AuraType)m_spellInfo->Effects[m_effIndex].ApplyAuraName; }
-        int32 GetAmount() const { return m_amount; }
+		int32 GetAmount() const { return m_isAuraEnabled ? m_amount : 0; }
+		int32 GetForcedAmount() const { return m_amount; }
         void SetAmount(int32 amount) { m_amount = amount; m_canBeRecalculated = false;}
 
         int32 GetPeriodicTimer() const { return m_periodicTimer; }
@@ -60,6 +62,7 @@ class AuraEffect
 
         int32 CalculateAmount(Unit* caster);
         void CalculatePeriodic(Unit* caster, bool create = false, bool load = false);
+		void CalculatePeriodicData();
         void CalculateSpellMod();
         void ChangeAmount(int32 newAmount, bool mark = true, bool onStackOrReapply = false);
         void RecalculateAmount() { if (!CanBeRecalculated()) return; ChangeAmount(CalculateAmount(GetCaster()), false); }
@@ -69,13 +72,6 @@ class AuraEffect
         void HandleEffect(AuraApplication * aurApp, uint8 mode, bool apply);
         void HandleEffect(Unit* target, uint8 mode, bool apply);
         void ApplySpellMod(Unit* target, bool apply);
-
-        void  SetBonusAmount(int32 val) { m_bonusAmount = val; }
-        int32 GetBonusAmount() const { return m_bonusAmount; }
-        void  SetCritChance(float val) { m_critChance = val; }
-        float GetCritChance() const { return m_critChance; }
-        void  SetDonePct(float val) { m_donePct = val; }
-        float GetDonePct() const { return m_donePct; }
 
         void Update(uint32 diff, Unit* caster);
         void UpdatePeriodic(Unit* caster);
@@ -98,16 +94,39 @@ class AuraEffect
 
         // add/remove SPELL_AURA_MOD_SHAPESHIFT (36) linked auras
         void HandleShapeshiftBoosts(Unit* target, bool apply) const;
+
+		// xinef: storing initial crit chance
+		float GetCritChance() const { return m_critChance; }
+		void SetCritChance(float crit) { m_critChance = crit; }
+		uint8 GetCasterLevel() const { return m_casterLevel; }
+		bool CanApplyResilience() const { return m_applyResilience; }
+		float GetPctMods() const { return m_pctMods; }
+
+		// xinef: stacking
+		uint32 GetAuraGroup() const { return m_auraGroup; }
+		int32 GetOldAmount() const { return m_oldAmount; }
+		void SetOldAmount(int32 amount) { m_oldAmount = amount; }
+		void SetEnabled(bool enabled) { m_isAuraEnabled = enabled; }
+
     private:
         Aura* const m_base;
 
         SpellInfo const* const m_spellInfo;
         int32 const m_baseAmount;
 
+		bool m_applyResilience;
+		uint8 m_casterLevel;
         int32 m_amount;
-        int32 m_bonusAmount;
-        float m_critChance;
-        float m_donePct;
+		float m_critChance;
+		float m_pctMods;
+
+		// xinef: stacking
+		uint32 m_auraGroup;
+		int32 m_oldAmount;
+		bool m_isAuraEnabled;
+		// xinef: channel information for channel triggering
+		ChannelTargetData* m_channelData;
+
 
         SpellModifier* m_spellmod;
 
@@ -119,7 +138,7 @@ class AuraEffect
         bool m_canBeRecalculated;
         bool m_isPeriodic;
     private:
-        bool CanPeriodicTickCrit(Unit const* caster) const;
+        float CalcPeriodicCritChance(Unit const* caster, Unit const* target) const;
 
     public:
         // aura effect apply/remove handlers

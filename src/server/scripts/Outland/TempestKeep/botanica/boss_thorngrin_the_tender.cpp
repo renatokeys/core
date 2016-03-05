@@ -1,18 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
+REWRITTEN BY XINEF
  */
 
 #include "ScriptMgr.h"
@@ -28,13 +15,14 @@ enum Says
     SAY_50_PERCENT_HP           = 4,
     SAY_CAST_HELLFIRE           = 5,
     SAY_DEATH                   = 6,
-    EMOTE_ENRAGE                = 7
+    EMOTE_ENRAGE                = 7,
+	SAY_INTRO					= 8
 };
 
 enum Spells
 {
     SPELL_SACRIFICE             = 34661,
-    SPELL_HELLFIRE              = 34659,
+    SPELL_HELLFIRE				= 34659,
     SPELL_ENRAGE                = 34670
 };
 
@@ -42,7 +30,9 @@ enum Events
 {
     EVENT_SACRIFICE             = 1,
     EVENT_HELLFIRE              = 2,
-    EVENT_ENRAGE                = 3
+    EVENT_ENRAGE                = 3,
+	EVENT_HEALTH_CHECK_50		= 4,
+	EVENT_HEALTH_CHECK_20		= 5
 };
 
 class boss_thorngrin_the_tender : public CreatureScript
@@ -52,102 +42,106 @@ class boss_thorngrin_the_tender : public CreatureScript
         struct boss_thorngrin_the_tenderAI : public BossAI
         {
             boss_thorngrin_the_tenderAI(Creature* creature) : BossAI(creature, DATA_THORNGRIN_THE_TENDER)
-            {
-                Initialize();
-            }
+			{
+				me->m_SightDistance = 100.0f;
+				_intro = false;
+			}
 
-            void Initialize()
-            {
-                _phase1 = true;
-                _phase2 = true;
-            }
-
-            void Reset() override
+            void Reset()
             {
                 _Reset();
-                Initialize();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+			void MoveInLineOfSight(Unit* who)
+			{
+				if (!_intro && who->GetTypeId() == TYPEID_PLAYER)
+				{
+					_intro = true;
+					Talk(SAY_INTRO);
+				}
+				BossAI::MoveInLineOfSight(who);
+			}
+
+
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 Talk(SAY_AGGRO);
-                events.ScheduleEvent(EVENT_SACRIFICE, 5700);
-                events.ScheduleEvent(EVENT_HELLFIRE, IsHeroic() ? urand(17400, 19300) : 18000);
-                events.ScheduleEvent(EVENT_ENRAGE, 12000);
+                events.ScheduleEvent(EVENT_SACRIFICE, 6000);
+                events.ScheduleEvent(EVENT_HELLFIRE, 18000);
+                events.ScheduleEvent(EVENT_ENRAGE, 15000);
+				events.ScheduleEvent(EVENT_HEALTH_CHECK_50, 500);
+				events.ScheduleEvent(EVENT_HEALTH_CHECK_20, 500);
             }
 
-            void KilledUnit(Unit* /*victim*/) override
+            void KilledUnit(Unit* victim)
             {
-                Talk(SAY_KILL);
+				if (victim->GetTypeId() == TYPEID_PLAYER)
+					Talk(SAY_KILL);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 _JustDied();
                 Talk(SAY_DEATH);
             }
 
-            void DamageTaken(Unit* /*killer*/, uint32 &damage) override
-            {
-                if (me->HealthBelowPctDamaged(50, damage) && _phase1)
-                {
-                    _phase1 = false;
-                    Talk(SAY_50_PERCENT_HP);
-                }
-                if (me->HealthBelowPctDamaged(20, damage) && _phase2)
-                {
-                    _phase2 = false;
-                    Talk(SAY_20_PERCENT_HP);
-                }
-            }
-
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
 
                 events.Update(diff);
-
                 if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
-                while (uint32 eventId = events.ExecuteEvent())
+                switch (events.ExecuteEvent())
                 {
-                    switch (eventId)
-                    {
-                        case EVENT_SACRIFICE:
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1, 0.0f, true))
-                            {
-                                Talk(SAY_CAST_SACRIFICE);
-                                DoCast(target, SPELL_SACRIFICE, true);
-                            }
-                            events.ScheduleEvent(EVENT_SACRIFICE, 29400);
-                            break;
-                        case EVENT_HELLFIRE:
-                            Talk(SAY_CAST_HELLFIRE);
-                            DoCastVictim(SPELL_HELLFIRE, true);
-                            events.ScheduleEvent(EVENT_HELLFIRE, IsHeroic() ? urand(17400, 19300) : 18000);
-                            break;
-                        case EVENT_ENRAGE:
-                            Talk(EMOTE_ENRAGE);
-                            DoCast(me, SPELL_ENRAGE);
-                            events.ScheduleEvent(EVENT_ENRAGE, 33000);
-                            break;
-                        default:
-                            break;
-                    }
+                    case EVENT_SACRIFICE:
+                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1, 0.0f, true))
+                        {
+                            Talk(SAY_CAST_SACRIFICE);
+							me->CastSpell(target, SPELL_SACRIFICE, false);
+                        }
+                        events.ScheduleEvent(EVENT_SACRIFICE, 30000);
+                        break;
+                    case EVENT_HELLFIRE:
+						if (roll_chance_i(50))
+							Talk(SAY_CAST_HELLFIRE);
+						me->CastSpell(me, SPELL_HELLFIRE, false);
+                        events.ScheduleEvent(EVENT_HELLFIRE, 22000);
+                        break;
+                    case EVENT_ENRAGE:
+                        Talk(EMOTE_ENRAGE);
+						me->CastSpell(me, SPELL_ENRAGE, false);
+                        events.ScheduleEvent(EVENT_ENRAGE, 30000);
+                        break;
+					case EVENT_HEALTH_CHECK_50:
+						if (me->HealthBelowPct(50))
+						{
+							Talk(SAY_50_PERCENT_HP);
+							break;
+						}
+						events.ScheduleEvent(EVENT_HEALTH_CHECK_50, 500);
+						break;
+					case EVENT_HEALTH_CHECK_20:
+						if (me->HealthBelowPct(20))
+						{
+							Talk(SAY_20_PERCENT_HP);
+							break;
+						}
+						events.ScheduleEvent(EVENT_HEALTH_CHECK_20, 500);
+						break;
                 }
 
                 DoMeleeAttackIfReady();
             }
 
         private:
-            bool _phase1;
-            bool _phase2;
+			bool _intro;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new boss_thorngrin_the_tenderAI(creature);
         }

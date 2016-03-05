@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,24 +24,18 @@
 
 enum Spells
 {
-    SPELL_SMELT_DARK_IRON       = 14891,
-    SPELL_LEARN_SMELT           = 14894,
+    SPELL_SMELT_DARK_IRON                         = 14891,
+    SPELL_LEARN_SMELT                             = 14894,
 };
 
 enum Quests
 {
-    QUEST_SPECTRAL_CHALICE      = 4083
+    QUEST_SPECTRAL_CHALICE                        = 4083
 };
 
 enum Misc
 {
-    DATA_SKILLPOINT_MIN         = 230
-};
-
-enum Phases
-{
-    PHASE_ONE                   = 1,
-    PHASE_TWO                   = 2
+    DATA_SKILLPOINT_MIN                           = 230
 };
 
 #define GOSSIP_ITEM_TEACH_1 "Teach me the art of smelting dark iron"
@@ -54,7 +48,7 @@ class boss_gloomrel : public CreatureScript
 public:
     boss_gloomrel() : CreatureScript("boss_gloomrel") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         switch (action)
@@ -76,14 +70,14 @@ public:
                 if (InstanceScript* instance = creature->GetInstanceScript())
                 {
                     //are 5 minutes expected? go template may have data to despawn when used at quest
-                    instance->DoRespawnGameObject(instance->GetGuidData(DATA_GO_CHALICE), MINUTE*5);
+                    instance->DoRespawnGameObject(instance->GetData64(DATA_GO_CHALICE), MINUTE*5);
                 }
                 break;
         }
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (player->GetQuestRewardStatus(QUEST_SPECTRAL_CHALICE) == 1 && player->GetSkillValue(SKILL_MINING) >= DATA_SKILLPOINT_MIN && !player->HasSpell(SPELL_SMELT_DARK_IRON))
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_TEACH_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
@@ -105,157 +99,149 @@ enum DoomrelSpells
     SPELL_SUMMON_VOIDWALKERS                               = 15092
 };
 
-enum DoomrelEvents
-{
-    EVENT_SHADOW_BOLT_VOLLEY                               = 1,
-    EVENT_IMMOLATE                                         = 2,
-    EVENT_CURSE_OF_WEAKNESS                                = 3,
-    EVENT_DEMONARMOR                                       = 4,
-    EVENT_SUMMON_VOIDWALKERS                               = 5
-};
-
 #define GOSSIP_ITEM_CHALLENGE   "Your bondage is at an end, Doom'rel. I challenge you!"
 #define GOSSIP_SELECT_DOOMREL   "[PH] Continue..."
 
 class boss_doomrel : public CreatureScript
 {
-    public:
-        boss_doomrel() : CreatureScript("boss_doomrel") { }
+public:
+    boss_doomrel() : CreatureScript("boss_doomrel") { }
 
-        bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
+    {
+        player->PlayerTalkClass->ClearMenus();
+        switch (action)
         {
-            player->PlayerTalkClass->ClearMenus();
-            switch (action)
-            {
-                case GOSSIP_ACTION_INFO_DEF+1:
-                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SELECT_DOOMREL, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
-                    player->SEND_GOSSIP_MENU(2605, creature->GetGUID());
-                    break;
-                case GOSSIP_ACTION_INFO_DEF+2:
-                    player->CLOSE_GOSSIP_MENU();
-                    //start event here
-                    creature->setFaction(FACTION_HOSTILE);
-                    creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
-                    creature->AI()->AttackStart(player);
-                    InstanceScript* instance = creature->GetInstanceScript();
-                    if (instance)
-                        instance->SetGuidData(DATA_EVENSTARTER, player->GetGUID());
-                    break;
-            }
-            return true;
+            case GOSSIP_ACTION_INFO_DEF+1:
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SELECT_DOOMREL, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+                player->SEND_GOSSIP_MENU(2605, creature->GetGUID());
+                break;
+            case GOSSIP_ACTION_INFO_DEF+2:
+                player->CLOSE_GOSSIP_MENU();
+                //start event here
+                creature->setFaction(FACTION_HOSTILE);
+                creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
+                creature->AI()->AttackStart(player);
+                InstanceScript* instance = creature->GetInstanceScript();
+                if (instance)
+                    instance->SetData64(DATA_EVENSTARTER, player->GetGUID());
+                break;
+        }
+        return true;
+    }
+
+    bool OnGossipHello(Player* player, Creature* creature)
+    {
+        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_CHALLENGE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+        player->SEND_GOSSIP_MENU(2601, creature->GetGUID());
+
+        return true;
+    }
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return GetInstanceAI<boss_doomrelAI>(creature);
+    }
+
+    struct boss_doomrelAI : public ScriptedAI
+    {
+        boss_doomrelAI(Creature* creature) : ScriptedAI(creature)
+        {
+            instance = creature->GetInstanceScript();
         }
 
-        bool OnGossipHello(Player* player, Creature* creature) override
-        {
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_CHALLENGE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-            player->SEND_GOSSIP_MENU(2601, creature->GetGUID());
+        InstanceScript* instance;
+        uint32 ShadowVolley_Timer;
+        uint32 Immolate_Timer;
+        uint32 CurseOfWeakness_Timer;
+        uint32 DemonArmor_Timer;
+        bool Voidwalkers;
 
-            return true;
+        void Reset()
+        {
+            ShadowVolley_Timer = 10000;
+            Immolate_Timer = 18000;
+            CurseOfWeakness_Timer = 5000;
+            DemonArmor_Timer = 16000;
+            Voidwalkers = false;
+
+            me->setFaction(FACTION_FRIEND);
+
+            // was set before event start, so set again
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
+
+            if (instance->GetData(DATA_GHOSTKILL) >= 7)
+                me->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_NONE);
+            else
+                me->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
         }
 
-        struct boss_doomrelAI : public ScriptedAI
+        void EnterCombat(Unit* /*who*/)
         {
-            boss_doomrelAI(Creature* creature) : ScriptedAI(creature)
-            {
-                Initialize();
-                _instance = creature->GetInstanceScript();
-            }
-
-            void Initialize()
-            {
-                _voidwalkers = false;
-            }
-
-            void Reset() override
-            {
-                Initialize();
-
-                me->setFaction(FACTION_FRIEND);
-
-                // was set before event start, so set again
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
-
-                if (_instance->GetData(DATA_GHOSTKILL) >= 7)
-                    me->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_NONE);
-                else
-                    me->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
-            }
-
-            void EnterCombat(Unit* /*who*/) override
-            {
-                _events.ScheduleEvent(EVENT_SHADOW_BOLT_VOLLEY, 10000);
-                _events.ScheduleEvent(EVENT_IMMOLATE, 18000);
-                _events.ScheduleEvent(EVENT_CURSE_OF_WEAKNESS, 5000);
-                _events.ScheduleEvent(EVENT_DEMONARMOR, 16000);
-            }
-
-            void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) override
-            {
-                if (!_voidwalkers && !HealthAbovePct(50))
-                {
-                    DoCastVictim(SPELL_SUMMON_VOIDWALKERS, true);
-                    _voidwalkers = true;
-                }
-            }
-
-            void EnterEvadeMode(EvadeReason why) override
-            {
-                ScriptedAI::EnterEvadeMode(why);
-
-                _instance->SetGuidData(DATA_EVENSTARTER, ObjectGuid::Empty);
-            }
-
-            void JustDied(Unit* /*killer*/) override
-            {
-                _instance->SetData(DATA_GHOSTKILL, 1);
-            }
-
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
-
-                _events.Update(diff);
-
-                while (uint32 eventId = _events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        case EVENT_SHADOW_BOLT_VOLLEY:
-                            DoCastVictim(SPELL_SHADOWBOLTVOLLEY);
-                            _events.ScheduleEvent(EVENT_SHADOW_BOLT_VOLLEY, 12000);
-                            break;
-                        case EVENT_IMMOLATE:
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true))
-                                DoCast(target, SPELL_IMMOLATE);
-                            _events.ScheduleEvent(EVENT_IMMOLATE, 25000);
-                            break;
-                        case EVENT_CURSE_OF_WEAKNESS:
-                            DoCastVictim(SPELL_CURSEOFWEAKNESS);
-                            _events.ScheduleEvent(EVENT_CURSE_OF_WEAKNESS, 45000);
-                            break;
-                        case EVENT_DEMONARMOR:
-                            DoCast(me, SPELL_DEMONARMOR);
-                            _events.ScheduleEvent(EVENT_DEMONARMOR, 300000);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-
-                DoMeleeAttackIfReady();
-            }
-
-        private:
-            InstanceScript* _instance;
-            EventMap _events;
-            bool _voidwalkers;
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetInstanceAI<boss_doomrelAI>(creature);
         }
+
+        void EnterEvadeMode()
+        {
+            me->RemoveAllAuras();
+            me->DeleteThreatList();
+            me->CombatStop(true);
+            me->LoadCreaturesAddon(true);
+            if (me->IsAlive())
+                me->GetMotionMaster()->MoveTargetedHome();
+            me->SetLootRecipient(NULL);
+            instance->SetData64(DATA_EVENSTARTER, 0);
+        }
+
+        void JustDied(Unit* /*killer*/)
+        {
+            instance->SetData(DATA_GHOSTKILL, 1);
+        }
+
+        void UpdateAI(uint32 diff)
+        {
+            if (!UpdateVictim())
+                return;
+
+            //ShadowVolley_Timer
+            if (ShadowVolley_Timer <= diff)
+            {
+                DoCastVictim(SPELL_SHADOWBOLTVOLLEY);
+                ShadowVolley_Timer = 12000;
+            } else ShadowVolley_Timer -= diff;
+
+            //Immolate_Timer
+            if (Immolate_Timer <= diff)
+            {
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    DoCast(target, SPELL_IMMOLATE);
+
+                Immolate_Timer = 25000;
+            } else Immolate_Timer -= diff;
+
+            //CurseOfWeakness_Timer
+            if (CurseOfWeakness_Timer <= diff)
+            {
+                DoCastVictim(SPELL_CURSEOFWEAKNESS);
+                CurseOfWeakness_Timer = 45000;
+            } else CurseOfWeakness_Timer -= diff;
+
+            //DemonArmor_Timer
+            if (DemonArmor_Timer <= diff)
+            {
+                DoCast(me, SPELL_DEMONARMOR);
+                DemonArmor_Timer = 300000;
+            } else DemonArmor_Timer -= diff;
+
+            //Summon Voidwalkers
+            if (!Voidwalkers && HealthBelowPct(51))
+            {
+                DoCastVictim(SPELL_SUMMON_VOIDWALKERS, true);
+                Voidwalkers = true;
+            }
+
+            DoMeleeAttackIfReady();
+        }
+    };
 };
 
 void AddSC_boss_tomb_of_seven()

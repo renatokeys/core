@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,16 +22,17 @@
 #include "Log.h"
 #include "Opcodes.h"
 #include "ByteBuffer.h"
+#include <openssl/md5.h>
+#include <openssl/sha.h>
 #include "World.h"
+#include "Player.h"
 #include "Util.h"
 #include "Warden.h"
 #include "AccountMgr.h"
 
-#include <openssl/sha.h>
-
 Warden::Warden() : _session(NULL), _inputCrypto(16), _outputCrypto(16), _checkTimer(10000/*10 sec*/), _clientResponseTimer(0),
                    _dataSent(false), _previousTimestamp(0), _module(NULL), _initialized(false)
-{
+{ 
     memset(_inputKey, 0, sizeof(_inputKey));
     memset(_outputKey, 0, sizeof(_outputKey));
     memset(_seed, 0, sizeof(_seed));
@@ -47,7 +48,7 @@ Warden::~Warden()
 
 void Warden::SendModuleToClient()
 {
-    TC_LOG_DEBUG("warden", "Send module to client");
+    ;//sLog->outDebug(LOG_FILTER_WARDEN, "Send module to client");
 
     // Create packet structure
     WardenModuleTransfer packet;
@@ -73,7 +74,7 @@ void Warden::SendModuleToClient()
 
 void Warden::RequestModule()
 {
-    TC_LOG_DEBUG("warden", "Request module");
+    ;//sLog->outDebug(LOG_FILTER_WARDEN, "Request module");
 
     // Create packet structure
     WardenModuleUse request;
@@ -95,23 +96,17 @@ void Warden::Update()
 {
     if (_initialized)
     {
-        uint32 currentTimestamp = getMSTime();
-        uint32 diff = currentTimestamp - _previousTimestamp;
+        uint32 currentTimestamp = World::GetGameTimeMS();
+        uint32 diff = getMSTimeDiff(_previousTimestamp, currentTimestamp);
         _previousTimestamp = currentTimestamp;
 
         if (_dataSent)
         {
             uint32 maxClientResponseDelay = sWorld->getIntConfig(CONFIG_WARDEN_CLIENT_RESPONSE_DELAY);
-
             if (maxClientResponseDelay > 0)
             {
-                // Kick player if client response delays more than set in config
                 if (_clientResponseTimer > maxClientResponseDelay * IN_MILLISECONDS)
-                {
-                    TC_LOG_WARN("warden", "%s (latency: %u, IP: %s) exceeded Warden module response delay for more than %s - disconnecting client",
-                                   _session->GetPlayerInfo().c_str(), _session->GetLatency(), _session->GetRemoteAddress().c_str(), secsToTimeString(maxClientResponseDelay, true).c_str());
                     _session->KickPlayer();
-                }
                 else
                     _clientResponseTimer += diff;
             }
@@ -119,9 +114,7 @@ void Warden::Update()
         else
         {
             if (diff >= _checkTimer)
-            {
                 RequestData();
-            }
             else
                 _checkTimer -= diff;
         }
@@ -144,12 +137,12 @@ bool Warden::IsValidCheckSum(uint32 checksum, const uint8* data, const uint16 le
 
     if (checksum != newChecksum)
     {
-        TC_LOG_DEBUG("warden", "CHECKSUM IS NOT VALID");
+        ;//sLog->outDebug(LOG_FILTER_WARDEN, "CHECKSUM IS NOT VALID");
         return false;
     }
     else
     {
-        TC_LOG_DEBUG("warden", "CHECKSUM IS VALID");
+        ;//sLog->outDebug(LOG_FILTER_WARDEN, "CHECKSUM IS VALID");
         return true;
     }
 }
@@ -180,7 +173,7 @@ uint32 Warden::BuildChecksum(const uint8* data, uint32 length)
     return checkSum;
 }
 
-std::string Warden::Penalty(WardenCheck* check /*= NULL*/)
+std::string Warden::Penalty(WardenCheck* check /*= NULL*/, uint16 checkFailed /*= 0*/)
 {
     WardenActions action;
 
@@ -188,6 +181,40 @@ std::string Warden::Penalty(WardenCheck* check /*= NULL*/)
         action = check->Action;
     else
         action = WardenActions(sWorld->getIntConfig(CONFIG_WARDEN_CLIENT_FAIL_ACTION));
+
+	std::string banReason = "Anticheat violation";
+	bool longBan = false; // 14d = 1209600s
+	if (checkFailed)
+		switch (checkFailed)
+		{
+			case 47: banReason += " (FrameXML Signature Check)"; break;
+			case 51: banReason += " (Lua DoString)"; break;
+			case 59: banReason += " (Lua Protection Patch)"; break;
+			case 72: banReason += " (Movement State related)"; break;
+			case 118: banReason += " (Wall Climb)"; break;
+			case 121: banReason += " (No Fall Damage Patch)"; break;
+			case 193: banReason += " (Follow Unit Check)"; break;
+			case 209: banReason += " (WoWEmuHacker Injection)"; longBan = true; break;
+			case 237: banReason += " (AddChatMessage)"; break;
+			case 246: banReason += " (Language Patch)"; break;
+			case 260: banReason += " (Jump Momentum)"; break;
+			case 288: banReason += " (Language Patch)"; break;
+			case 308: banReason += " (SendChatMessage)"; break;
+			case 312: banReason += " (Jump Physics)"; break;
+			case 314: banReason += " (GetCharacterInfo)"; break;
+			case 329: banReason += " (Wall Climb)"; break;
+			case 343: banReason += " (Login Password Pointer)"; break;
+			case 349: banReason += " (Language Patch)"; break;
+			case 712: banReason += " (WS2_32.Send)"; break;
+			case 780: banReason += " (Lua Protection Remover)"; break;
+			case 781: banReason += " (Walk on Water Patch)"; break;
+			case 782: banReason += " (Collision M2 Special)"; longBan = true; break;
+			case 783: banReason += " (Collision M2 Regular)"; longBan = true; break;
+			case 784: banReason += " (Collision WMD)"; longBan = true; break;
+			case 785: banReason += " (Multi-Jump Patch)"; break;
+			case 786: banReason += " (WPE PRO)"; longBan = true; break;
+			case 787: banReason += " (rEdoX Packet Editor)"; break;
+		}
 
     switch (action)
     {
@@ -204,13 +231,7 @@ std::string Warden::Penalty(WardenCheck* check /*= NULL*/)
             duration << sWorld->getIntConfig(CONFIG_WARDEN_CLIENT_BAN_DURATION) << "s";
             std::string accountName;
             AccountMgr::GetName(_session->GetAccountId(), accountName);
-            std::stringstream banReason;
-            banReason << "Warden Anticheat Violation";
-            // Check can be NULL, for example if the client sent a wrong signature in the warden packet (CHECKSUM FAIL)
-            if (check)
-                banReason << ": " << check->Comment << " (CheckId: " << check->CheckId << ")";
-
-            sWorld->BanAccount(BAN_ACCOUNT, accountName, duration.str(), banReason.str(),"Server");
+            sWorld->BanAccount(BAN_ACCOUNT, accountName, ((longBan && false /*ZOMG!*/) ? "1209600s" : duration.str()), banReason, "Server");
 
             return "Ban";
         }
@@ -228,7 +249,7 @@ void WorldSession::HandleWardenDataOpcode(WorldPacket& recvData)
     _warden->DecryptData(recvData.contents(), recvData.size());
     uint8 opcode;
     recvData >> opcode;
-    TC_LOG_DEBUG("warden", "Got packet, opcode %02X, size %u", opcode, uint32(recvData.size()));
+    ;//sLog->outDebug(LOG_FILTER_WARDEN, "Got packet, opcode %02X, size %u", opcode, uint32(recvData.size()));
     recvData.hexlike();
 
     switch (opcode)
@@ -243,17 +264,17 @@ void WorldSession::HandleWardenDataOpcode(WorldPacket& recvData)
             _warden->HandleData(recvData);
             break;
         case WARDEN_CMSG_MEM_CHECKS_RESULT:
-            TC_LOG_DEBUG("warden", "NYI WARDEN_CMSG_MEM_CHECKS_RESULT received!");
+            ;//sLog->outDebug(LOG_FILTER_WARDEN, "NYI WARDEN_CMSG_MEM_CHECKS_RESULT received!");
             break;
         case WARDEN_CMSG_HASH_RESULT:
             _warden->HandleHashResult(recvData);
             _warden->InitializeModule();
             break;
         case WARDEN_CMSG_MODULE_FAILED:
-            TC_LOG_DEBUG("warden", "NYI WARDEN_CMSG_MODULE_FAILED received!");
+            ;//sLog->outDebug(LOG_FILTER_WARDEN, "NYI WARDEN_CMSG_MODULE_FAILED received!");
             break;
         default:
-            TC_LOG_DEBUG("warden", "Got unknown warden opcode %02X of size %u.", opcode, uint32(recvData.size() - 1));
+            ;//sLog->outDebug(LOG_FILTER_WARDEN, "Got unknown warden opcode %02X of size %u.", opcode, uint32(recvData.size() - 1));
             break;
     }
 }

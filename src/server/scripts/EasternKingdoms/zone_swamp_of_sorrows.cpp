@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -46,22 +46,22 @@ public:
     {
         npc_galen_goodwardAI(Creature* creature) : npc_escortAI(creature)
         {
-            galensCageGUID.Clear();
+            galensCageGUID = 0;
             Reset();
         }
 
-        void Reset() override
+        void Reset()
         {
             periodicSay = 6000;
         }
 
-        void EnterCombat(Unit* who) override
+        void EnterCombat(Unit* who)
         {
             if (HasEscortState(STATE_ESCORT_ESCORTING))
                 Talk(SAY_ATTACKED, who);
         }
 
-        void sQuestAccept(Player* player, Quest const* quest) override
+        void sQuestAccept(Player* player, Quest const* quest)
         {
             if (quest->GetQuestId() == QUEST_GALENS_ESCAPE)
             {
@@ -70,7 +70,7 @@ public:
             }
         }
 
-        void WaypointStart(uint32 uiPointId) override
+        void WaypointStart(uint32 uiPointId)
         {
             switch (uiPointId)
             {
@@ -94,7 +94,7 @@ public:
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             switch (waypointId)
             {
@@ -115,7 +115,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             npc_escortAI::UpdateAI(diff);
 
@@ -135,11 +135,11 @@ public:
         }
 
     private:
-        ObjectGuid galensCageGUID;
+        uint64 galensCageGUID;
         uint32 periodicSay;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_galen_goodwardAI(creature);
     }

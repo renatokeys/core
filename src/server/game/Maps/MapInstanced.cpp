@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,14 +27,14 @@
 #include "Group.h"
 #include "Player.h"
 
-MapInstanced::MapInstanced(uint32 id, time_t expiry) : Map(id, expiry, 0, DUNGEON_DIFFICULTY_NORMAL)
+MapInstanced::MapInstanced(uint32 id) : Map(id, 0, DUNGEON_DIFFICULTY_NORMAL)
 {
-    // fill with zero
-    memset(&GridMapReference, 0, MAX_NUMBER_OF_GRIDS*MAX_NUMBER_OF_GRIDS*sizeof(uint16));
+    // initialize instanced maps list
+    m_InstancedMaps.clear();
 }
 
 void MapInstanced::InitVisibilityDistance()
-{
+{ 
     if (m_InstancedMaps.empty())
         return;
     //initialize visibility distances for all instance copies
@@ -44,10 +44,10 @@ void MapInstanced::InitVisibilityDistance()
     }
 }
 
-void MapInstanced::Update(const uint32 t)
+void MapInstanced::Update(const uint32 t, const uint32 s_diff, bool /*thread*/)
 {
     // take care of loaded GridMaps (when unused, unload it!)
-    Map::Update(t);
+    Map::Update(t, s_diff, false);
 
     // update the instanced maps
     InstancedMaps::iterator i = m_InstancedMaps.begin();
@@ -65,16 +65,16 @@ void MapInstanced::Update(const uint32 t)
         {
             // update only here, because it may schedule some bad things before delete
             if (sMapMgr->GetMapUpdater()->activated())
-                sMapMgr->GetMapUpdater()->schedule_update(*i->second, t);
+                sMapMgr->GetMapUpdater()->schedule_update(*i->second, t, s_diff);
             else
-                i->second->Update(t);
+                i->second->Update(t, s_diff);
             ++i;
         }
     }
 }
 
 void MapInstanced::DelayedUpdate(const uint32 diff)
-{
+{ 
     for (InstancedMaps::iterator i = m_InstancedMaps.begin(); i != m_InstancedMaps.end(); ++i)
         i->second->DelayedUpdate(diff);
 
@@ -83,14 +83,14 @@ void MapInstanced::DelayedUpdate(const uint32 diff)
 
 /*
 void MapInstanced::RelocationNotify()
-{
+{ 
     for (InstancedMaps::iterator i = m_InstancedMaps.begin(); i != m_InstancedMaps.end(); ++i)
         i->second->RelocationNotify();
 }
 */
 
 void MapInstanced::UnloadAll()
-{
+{ 
     // Unload instanced maps
     for (InstancedMaps::iterator i = m_InstancedMaps.begin(); i != m_InstancedMaps.end(); ++i)
         i->second->UnloadAll();
@@ -110,87 +110,70 @@ void MapInstanced::UnloadAll()
 - create the instance if it's not created already
 - the player is not actually added to the instance (only in InstanceMap::Add)
 */
-Map* MapInstanced::CreateInstanceForPlayer(const uint32 mapId, Player* player, uint32 loginInstanceId)
-{
+Map* MapInstanced::CreateInstanceForPlayer(const uint32 mapId, Player* player)
+{ 
     if (GetId() != mapId || !player)
-        return nullptr;
+        return NULL;
 
-    Map* map = nullptr;
-    uint32 newInstanceId = 0;                       // instanceId of the resulting map
+    Map* map = NULL;
 
     if (IsBattlegroundOrArena())
     {
         // instantiate or find existing bg map for player
         // the instance id is set in battlegroundid
-        newInstanceId = player->GetBattlegroundId();
+        uint32 newInstanceId = player->GetBattlegroundId();
         if (!newInstanceId)
-            return nullptr;
+            return NULL;
 
         map = sMapMgr->FindMap(mapId, newInstanceId);
         if (!map)
         {
-            if (Battleground* bg = player->GetBattleground())
+            Battleground* bg = player->GetBattleground(true);
+            if (bg && bg->GetStatus() < STATUS_WAIT_LEAVE)
                 map = CreateBattleground(newInstanceId, bg);
             else
             {
-                player->TeleportToBGEntryPoint();
-                return nullptr;
+                player->TeleportToEntryPoint();
+                return NULL;
             }
         }
     }
     else
     {
-        InstancePlayerBind* pBind = player->GetBoundInstance(GetId(), player->GetDifficulty(IsRaid()));
-        InstanceSave* pSave = pBind ? pBind->save : nullptr;
+        Difficulty realdiff = player->GetDifficulty(IsRaid());
+        uint32 destInstId = sInstanceSaveMgr->PlayerGetDestinationInstanceId(player, GetId(), realdiff);
 
-        // priority:
-        // 1. player's permanent bind
-        // 2. player's current instance id if this is at login
-        // 3. group's current bind
-        // 4. player's current bind
-        if (!pBind || !pBind->perm)
+        if (destInstId)
         {
-            if (loginInstanceId) // if the player has a saved instance id on login, we either use this instance or relocate him out (return null)
-            {
-                map = FindInstanceMap(loginInstanceId);
-                return (map && map->GetId() == GetId()) ? map : nullptr; // is this check necessary? or does MapInstanced only find instances of itself?
-            }
+			InstanceSave* pSave = sInstanceSaveMgr->GetInstanceSave(destInstId);
+			ASSERT(pSave); // pussywizard: must exist
 
-            InstanceGroupBind* groupBind = nullptr;
-            Group* group = player->GetGroup();
-            // use the player's difficulty setting (it may not be the same as the group's)
-            if (group)
-            {
-                groupBind = group->GetBoundInstance(this);
-                if (groupBind)
-                {
-                    // solo saves should be reset when entering a group's instance
-                    player->UnbindInstance(GetId(), player->GetDifficulty(IsRaid()));
-                    pSave = groupBind->save;
-                }
-            }
-        }
-        if (pSave)
-        {
-            // solo/perm/group
-            newInstanceId = pSave->GetInstanceId();
-            map = FindInstanceMap(newInstanceId);
-            // it is possible that the save exists but the map doesn't
+            map = FindInstanceMap(destInstId);
             if (!map)
-                map = CreateInstance(newInstanceId, pSave, pSave->GetDifficulty());
+                map = CreateInstance(destInstId, pSave, realdiff);
+			else if ((mapId == 631 || mapId == 724) && !map->HavePlayers() && map->GetDifficulty() != realdiff)
+			{
+				if (player->isBeingLoaded()) // pussywizard: crashfix (assert(passengers.empty) fail in ~transport), could be added to a transport during loading from db
+					return NULL;
+
+				if (!map->AllTransportsEmpty())
+					map->AllTransportsRemovePassengers(); // pussywizard: gameobjects / summons (assert(passengers.empty) fail in ~transport)
+
+				for (InstancedMaps::iterator i = m_InstancedMaps.begin(); i != m_InstancedMaps.end(); ++i)
+					if (i->first == destInstId)
+					{
+						DestroyInstance(i);
+						map = CreateInstance(destInstId, pSave, realdiff);
+						break;
+					}
+			}
         }
         else
         {
-            // if no instanceId via group members or instance saves is found
-            // the instance will be created for the first time
-            newInstanceId = sMapMgr->GenerateInstanceId();
-
+            uint32 newInstanceId = sMapMgr->GenerateInstanceId();
+			ASSERT(!FindInstanceMap(newInstanceId)); // pussywizard: instance with new id can't exist
             Difficulty diff = player->GetGroup() ? player->GetGroup()->GetDifficulty(IsRaid()) : player->GetDifficulty(IsRaid());
-            //Seems it is now possible, but I do not know if it should be allowed
-            //ASSERT(!FindInstanceMap(NewInstanceId));
-            map = FindInstanceMap(newInstanceId);
-            if (!map)
-                map = CreateInstance(newInstanceId, NULL, diff);
+            map = CreateInstance(newInstanceId, NULL, diff);
         }
     }
 
@@ -198,48 +181,52 @@ Map* MapInstanced::CreateInstanceForPlayer(const uint32 mapId, Player* player, u
 }
 
 InstanceMap* MapInstanced::CreateInstance(uint32 InstanceId, InstanceSave* save, Difficulty difficulty)
-{
+{ 
     // load/create a map
-    std::lock_guard<std::mutex> lock(_mapLock);
+    TRINITY_GUARD(ACE_Thread_Mutex, Lock);
 
     // make sure we have a valid map id
     const MapEntry* entry = sMapStore.LookupEntry(GetId());
     if (!entry)
     {
-        TC_LOG_ERROR("maps", "CreateInstance: no entry for map %d", GetId());
-        ABORT();
+        sLog->outError("CreateInstance: no entry for map %d", GetId());
+        ASSERT(false);
     }
     const InstanceTemplate* iTemplate = sObjectMgr->GetInstanceTemplate(GetId());
     if (!iTemplate)
     {
-        TC_LOG_ERROR("maps", "CreateInstance: no instance template for map %d", GetId());
-        ABORT();
+        sLog->outError("CreateInstance: no instance template for map %d", GetId());
+        ASSERT(false);
     }
 
     // some instances only have one difficulty
     GetDownscaledMapDifficultyData(GetId(), difficulty);
 
-    TC_LOG_DEBUG("maps", "MapInstanced::CreateInstance: %s map instance %d for %d created with difficulty %s", save?"":"new ", InstanceId, GetId(), difficulty?"heroic":"normal");
+    ;//sLog->outDebug(LOG_FILTER_MAPS, "MapInstanced::CreateInstance: %s map instance %d for %d created with difficulty %s", save?"":"new ", InstanceId, GetId(), difficulty?"heroic":"normal");
 
-    InstanceMap* map = new InstanceMap(GetId(), GetGridExpiry(), InstanceId, difficulty, this);
+    InstanceMap* map = new InstanceMap(GetId(), InstanceId, difficulty, this);
     ASSERT(map->IsDungeon());
 
     map->LoadRespawnTimes();
-    map->LoadCorpseData();
 
-    bool load_data = save != NULL;
-    map->CreateInstanceData(load_data);
+	if (save)
+		map->CreateInstanceScript(true, save->GetInstanceData(), save->GetCompletedEncounterMask());
+	else
+		map->CreateInstanceScript(false, "", 0);
+
+	if (!save) // this is for sure a dungeon (assert above), no need to check here
+		sInstanceSaveMgr->AddInstanceSave(GetId(), InstanceId, difficulty);
 
     m_InstancedMaps[InstanceId] = map;
     return map;
 }
 
 BattlegroundMap* MapInstanced::CreateBattleground(uint32 InstanceId, Battleground* bg)
-{
+{ 
     // load/create a map
-    std::lock_guard<std::mutex> lock(_mapLock);
+    TRINITY_GUARD(ACE_Thread_Mutex, Lock);
 
-    TC_LOG_DEBUG("maps", "MapInstanced::CreateBattleground: map bg %d for %d created.", InstanceId, GetId());
+    ;//sLog->outDebug(LOG_FILTER_MAPS, "MapInstanced::CreateBattleground: map bg %d for %d created.", InstanceId, GetId());
 
     PvPDifficultyEntry const* bracketEntry = GetBattlegroundBracketByLevel(bg->GetMapId(), bg->GetMinLevel());
 
@@ -250,7 +237,7 @@ BattlegroundMap* MapInstanced::CreateBattleground(uint32 InstanceId, Battlegroun
     else
         spawnMode = REGULAR_DIFFICULTY;
 
-    BattlegroundMap* map = new BattlegroundMap(GetId(), GetGridExpiry(), InstanceId, this, spawnMode);
+    BattlegroundMap* map = new BattlegroundMap(GetId(), InstanceId, this, spawnMode);
     ASSERT(map->IsBattlegroundOrArena());
     map->SetBG(bg);
     bg->SetBgMap(map);
@@ -261,7 +248,7 @@ BattlegroundMap* MapInstanced::CreateBattleground(uint32 InstanceId, Battlegroun
 
 // increments the iterator after erase
 bool MapInstanced::DestroyInstance(InstancedMaps::iterator &itr)
-{
+{ 
     itr->second->RemoveAllPlayers();
     if (itr->second->HavePlayers())
     {
@@ -270,19 +257,10 @@ bool MapInstanced::DestroyInstance(InstancedMaps::iterator &itr)
     }
 
     itr->second->UnloadAll();
-    // should only unload VMaps if this is the last instance and grid unloading is enabled
-    if (m_InstancedMaps.size() <= 1 && sWorld->getBoolConfig(CONFIG_GRID_UNLOAD))
-    {
-        VMAP::VMapFactory::createOrGetVMapManager()->unloadMap(itr->second->GetId());
-        MMAP::MMapFactory::createOrGetMMapManager()->unloadMap(itr->second->GetId());
-        // in that case, unload grids of the base map, too
-        // so in the next map creation, (EnsureGridCreated actually) VMaps will be reloaded
-        Map::UnloadAll();
-    }
 
     // Free up the instance id and allow it to be reused for bgs and arenas (other instances are handled in the InstanceSaveMgr)
-    if (itr->second->IsBattlegroundOrArena())
-        sMapMgr->FreeInstanceId(itr->second->GetInstanceId());
+    //if (itr->second->IsBattlegroundOrArena())
+    //    sMapMgr->FreeInstanceId(itr->second->GetInstanceId());
 
     // erase map
     delete itr->second;
@@ -291,8 +269,8 @@ bool MapInstanced::DestroyInstance(InstancedMaps::iterator &itr)
     return true;
 }
 
-Map::EnterState MapInstanced::CannotEnter(Player* /*player*/)
-{
-    //ABORT();
-    return CAN_ENTER;
+bool MapInstanced::CanEnter(Player* /*player*/, bool /*loginCheck*/)
+{ 
+    //ASSERT(false);
+    return true;
 }

@@ -1,6 +1,6 @@
  /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -66,10 +66,47 @@ class instance_zulaman : public InstanceMapScript
 
         struct instance_zulaman_InstanceMapScript : public InstanceScript
         {
-            instance_zulaman_InstanceMapScript(Map* map) : InstanceScript(map)
+            instance_zulaman_InstanceMapScript(Map* map) : InstanceScript(map) {}
+
+            uint64 HarkorsSatchelGUID;
+            uint64 TanzarsTrunkGUID;
+            uint64 AshlisBagGUID;
+            uint64 KrazsPackageGUID;
+            uint64 StrangeGongGUID;
+            uint64 HarrisonJonesGUID;
+
+            uint64 HexLordGateGUID;
+            uint64 ZulJinGateGUID;
+            uint64 MassiveGateGUID;
+            uint64 AkilzonDoorGUID;
+            uint64 ZulJinDoorGUID;
+            uint64 HalazziDoorGUID;
+
+            uint32 QuestTimer;
+            uint16 BossKilled;
+            uint16 QuestMinute;
+            uint16 ChestLooted;
+
+            uint32 m_auiEncounter[MAX_ENCOUNTER];
+            uint32 RandVendor[RAND_VENDOR];
+
+            void Initialize()
             {
-                SetHeaders(DataHeader);
                 memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
+
+                HarkorsSatchelGUID = 0;
+                TanzarsTrunkGUID = 0;
+                AshlisBagGUID = 0;
+                KrazsPackageGUID = 0;
+                StrangeGongGUID = 0;
+                HexLordGateGUID = 0;
+                ZulJinGateGUID = 0;
+                MassiveGateGUID = 0;
+                AkilzonDoorGUID = 0;
+                HalazziDoorGUID = 0;
+                ZulJinDoorGUID = 0;
+
+                HarrisonJonesGUID = 0;
 
                 QuestTimer = 0;
                 QuestMinute = 0;
@@ -82,29 +119,7 @@ class instance_zulaman : public InstanceMapScript
                 m_auiEncounter[DATA_GONGEVENT] = NOT_STARTED;
             }
 
-            ObjectGuid HarkorsSatchelGUID;
-            ObjectGuid TanzarsTrunkGUID;
-            ObjectGuid AshlisBagGUID;
-            ObjectGuid KrazsPackageGUID;
-            ObjectGuid StrangeGongGUID;
-            ObjectGuid HarrisonJonesGUID;
-
-            ObjectGuid HexLordGateGUID;
-            ObjectGuid ZulJinGateGUID;
-            ObjectGuid MassiveGateGUID;
-            ObjectGuid AkilzonDoorGUID;
-            ObjectGuid ZulJinDoorGUID;
-            ObjectGuid HalazziDoorGUID;
-
-            uint32 QuestTimer;
-            uint16 BossKilled;
-            uint16 QuestMinute;
-            uint16 ChestLooted;
-
-            uint32 m_auiEncounter[MAX_ENCOUNTER];
-            uint32 RandVendor[RAND_VENDOR];
-
-            bool IsEncounterInProgress() const override
+            bool IsEncounterInProgress() const
             {
                 for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
                     if (m_auiEncounter[i] == IN_PROGRESS)
@@ -113,13 +128,13 @@ class instance_zulaman : public InstanceMapScript
                 return false;
             }
 
-            void OnPlayerEnter(Player* /*player*/) override
+            void OnPlayerEnter(Player* /*player*/)
             {
                 if (!HarrisonJonesGUID)
                     instance->SummonCreature(NPC_HARRISON_JONES, HarrisonJonesLoc);
             }
 
-            void OnCreatureCreate(Creature* creature) override
+            void OnCreatureCreate(Creature* creature)
             {
                 switch (creature->GetEntry())
                 {
@@ -136,7 +151,7 @@ class instance_zulaman : public InstanceMapScript
                 }
             }
 
-            void OnGameObjectCreate(GameObject* go) override
+            void OnGameObjectCreate(GameObject* go)
             {
                 switch (go->GetEntry())
                 {
@@ -186,7 +201,7 @@ class instance_zulaman : public InstanceMapScript
                     HandleGameObject(ZulJinGateGUID, true);
             }
 
-            std::string GetSaveData() override
+            std::string GetSaveData()
             {
                 OUT_SAVE_INST_DATA;
 
@@ -197,26 +212,26 @@ class instance_zulaman : public InstanceMapScript
                 return ss.str();
             }
 
-            void Load(const char* load) override
+            void Load(const char* load)
             {
                 if (!load)
                     return;
 
                 std::istringstream ss(load);
-                //TC_LOG_ERROR("scripts", "Zul'aman loaded, %s.", ss.str().c_str());
+                //sLog->outError("Zul'aman loaded, %s.", ss.str().c_str());
                 char dataHead; // S
                 uint16 data1, data2, data3;
                 ss >> dataHead >> data1 >> data2 >> data3;
-                //TC_LOG_ERROR("scripts", "Zul'aman loaded, %d %d %d.", data1, data2, data3);
+                //sLog->outError("Zul'aman loaded, %d %d %d.", data1, data2, data3);
                 if (dataHead == 'S')
                 {
                     BossKilled = data1;
                     ChestLooted = data2;
                     QuestMinute = data3;
-                } else TC_LOG_ERROR("scripts", "Zul'aman: corrupted save data.");
+                } else sLog->outError("Zul'aman: corrupted save data.");
             }
 
-            void SetData(uint32 type, uint32 data) override
+            void SetData(uint32 type, uint32 data)
             {
                 switch (type)
                 {
@@ -298,7 +313,7 @@ class instance_zulaman : public InstanceMapScript
                 }
             }
 
-            uint32 GetData(uint32 type) const override
+            uint32 GetData(uint32 type) const
             {
                 switch (type)
                 {
@@ -316,7 +331,7 @@ class instance_zulaman : public InstanceMapScript
                 }
             }
 
-            void Update(uint32 diff) override
+            void Update(uint32 diff)
             {
                 if (QuestMinute)
                 {
@@ -335,7 +350,7 @@ class instance_zulaman : public InstanceMapScript
                 }
             }
 
-            ObjectGuid GetGuidData(uint32 type) const override
+            uint64 GetData64(uint32 type) const
             {
                 switch (type)
                 {
@@ -345,12 +360,12 @@ class instance_zulaman : public InstanceMapScript
                         return MassiveGateGUID;
                 }
 
-                return ObjectGuid::Empty;
+                return 0;
             }
 
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* map) const override
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
             return new instance_zulaman_InstanceMapScript(map);
         }

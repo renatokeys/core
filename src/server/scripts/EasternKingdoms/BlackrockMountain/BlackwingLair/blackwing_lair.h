@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,22 +21,17 @@
 uint32 const EncounterCount     = 8;
 
 #define BRLScriptName "instance_blackwing_lair"
-#define DataHeader    "BWL"
 
 enum BWLEncounter
 {
-    // Encounter States/Boss GUIDs
-    DATA_RAZORGORE_THE_UNTAMED  = 0,
-    DATA_VAELASTRAZ_THE_CORRUPT = 1,
-    DATA_BROODLORD_LASHLAYER    = 2,
-    DATA_FIREMAW                = 3,
-    DATA_EBONROC                = 4,
-    DATA_FLAMEGOR               = 5,
-    DATA_CHROMAGGUS             = 6,
-    DATA_NEFARIAN               = 7,
-
-    // Additional Data
-    DATA_LORD_VICTOR_NEFARIUS   = 8
+    BOSS_RAZORGORE              = 0,
+    BOSS_VAELASTRAZ             = 1,
+    BOSS_BROODLORD              = 2,
+    BOSS_FIREMAW                = 3,
+    BOSS_EBONROC                = 4,
+    BOSS_FLAMEGOR               = 5,
+    BOSS_CHROMAGGUS             = 6,
+    BOSS_NEFARIAN               = 7
 };
 
 enum CreatureIds
@@ -48,7 +43,7 @@ enum CreatureIds
     NPC_BLACKWING_WARLOCK       = 12459,
     NPC_VAELASTRAZ              = 13020,
     NPC_BROODLORD               = 12017,
-    NPC_FIREMAW                 = 11983,
+    NPC_FIRENAW                 = 11983,
     NPC_EBONROC                 = 14601,
     NPC_FLAMEGOR                = 11981,
     NPC_CHROMAGGUS              = 14020,
@@ -56,14 +51,17 @@ enum CreatureIds
     NPC_NEFARIAN                = 11583
 };
 
-enum GameObjectIds
+enum BWLData64
 {
-    GO_BLACK_DRAGON_EGG         = 177807,
-    GO_PORTCULLIS               = 176965,
-    GO_DRAKE_RIDER_PORTCULLIS   = 175185,
-    GO_ALTERAC_VALLEY_GATE      = 180424,
-    GO_GATE                     = 185483,
-    GO_VACCUUM_EXIT_GATE        = 181125
+    DATA_RAZORGORE_THE_UNTAMED = 1,
+    DATA_VAELASTRAZ_THE_CORRUPT,
+    DATA_BROODLORD_LASHLAYER,
+    DATA_FIRENAW,
+    DATA_EBONROC,
+    DATA_FLAMEGOR,
+    DATA_CHROMAGGUS,
+    DATA_LORD_VICTOR_NEFARIUS,
+    DATA_NEFARIAN
 };
 
 enum BWLEvents

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +24,11 @@
 
 namespace Movement
 {
+#if defined( __GNUC__ )
+#pragma pack(1)
+#else
 #pragma pack(push, 1)
+#endif
 
     class MoveSplineFlag
     {
@@ -79,9 +83,9 @@ namespace Movement
 
         // Constant interface
 
-        bool isSmooth() const { return (raw() & Mask_CatmullRom) != 0; }
+        bool isSmooth() const { return raw() & Mask_CatmullRom; }
         bool isLinear() const { return !isSmooth(); }
-        bool isFacing() const { return (raw() & Mask_Final_Facing) != 0; }
+        bool isFacing() const { return raw() & Mask_Final_Facing; }
 
         uint8 getAnimationId() const { return animId; }
         bool hasAllFlags(uint32 f) const { return (raw() & f) == f; }
@@ -132,7 +136,11 @@ namespace Movement
         bool unknown12           : 1;
         bool unknown13           : 1;
     };
+#if defined( __GNUC__ )
+#pragma pack()
+#else
 #pragma pack(pop)
+#endif
 }
 
 #endif // TRINITYSERVER_MOVESPLINEFLAG_H

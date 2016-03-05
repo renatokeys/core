@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,6 +20,7 @@
 #define TRINITY_POOLHANDLER_H
 
 #include "Define.h"
+#include <ace/Singleton.h>
 #include "Creature.h"
 #include "GameObject.h"
 #include "QuestDef.h"
@@ -31,16 +32,16 @@ struct PoolTemplateData
 
 struct PoolObject
 {
-    ObjectGuid::LowType  guid;
+    uint32  guid;
     float   chance;
-    PoolObject(ObjectGuid::LowType _guid, float _chance) : guid(_guid), chance(std::fabs(_chance)) { }
+    PoolObject(uint32 _guid, float _chance): guid(_guid), chance(fabs(_chance)) {}
 };
 
 class Pool                                                  // for Pool of Pool case
 {
 };
 
-typedef std::set<ObjectGuid::LowType> ActivePoolObjects;
+typedef UNORDERED_SET<uint32> ActivePoolObjects;
 typedef std::map<uint32, uint32> ActivePoolPools;
 
 class ActivePoolData
@@ -72,13 +73,13 @@ class PoolGroup
     public:
         explicit PoolGroup() : poolId(0) { }
         void SetPoolId(uint32 pool_id) { poolId = pool_id; }
-        ~PoolGroup() { };
+        ~PoolGroup() {};
         bool isEmpty() const { return ExplicitlyChanced.empty() && EqualChanced.empty(); }
         void AddEntry(PoolObject& poolitem, uint32 maxentries);
         bool CheckPool() const;
         PoolObject* RollOne(ActivePoolData& spawns, uint32 triggerFrom);
-        void DespawnObject(ActivePoolData& spawns, ObjectGuid::LowType guid=0);
-        void Despawn1Object(ObjectGuid::LowType guid);
+        void DespawnObject(ActivePoolData& spawns, uint32 guid=0);
+        void Despawn1Object(uint32 guid);
         void SpawnObject(ActivePoolData& spawns, uint32 limit, uint32 triggerFrom);
 
         void Spawn1Object(PoolObject* obj);
@@ -103,20 +104,16 @@ typedef std::pair<PooledQuestRelation::iterator, PooledQuestRelation::iterator> 
 
 class PoolMgr
 {
+    friend class ACE_Singleton<PoolMgr, ACE_Null_Mutex>;
+
     private:
         PoolMgr();
-        ~PoolMgr() { };
+        ~PoolMgr() {};
 
     public:
-        static PoolMgr* instance()
-        {
-            static PoolMgr instance;
-            return &instance;
-        }
-
         void LoadFromDB();
         void LoadQuestPools();
-        void SaveQuestsToDB();
+        void SaveQuestsToDB(bool daily, bool weekly, bool other);
 
         void Initialize();
 
@@ -167,7 +164,7 @@ class PoolMgr
         ActivePoolData mSpawnedData;
 };
 
-#define sPoolMgr PoolMgr::instance()
+#define sPoolMgr ACE_Singleton<PoolMgr, ACE_Null_Mutex>::instance()
 
 // Method that tell if the creature is part of a pool and return the pool id if yes
 template<>
@@ -193,9 +190,9 @@ inline uint32 PoolMgr::IsPartOfAPool<GameObject>(uint32 db_guid) const
 
 // Method that tell if the quest is part of another pool and return the pool id if yes
 template<>
-inline uint32 PoolMgr::IsPartOfAPool<Quest>(uint32 pool_id) const
+inline uint32 PoolMgr::IsPartOfAPool<Quest>(uint32 questId) const
 {
-    SearchMap::const_iterator itr = mQuestSearchMap.find(pool_id);
+    SearchMap::const_iterator itr = mQuestSearchMap.find(questId);
     if (itr != mQuestSearchMap.end())
         return itr->second;
 

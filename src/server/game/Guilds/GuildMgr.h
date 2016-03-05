@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,36 +22,32 @@
 
 class GuildMgr
 {
+    friend class ACE_Singleton<GuildMgr, ACE_Null_Mutex>;
+
 private:
     GuildMgr();
     ~GuildMgr();
 
 public:
-    static GuildMgr* instance()
-    {
-        static GuildMgr instance;
-        return &instance;
-    }
-
-    Guild* GetGuildByLeader(ObjectGuid guid) const;
-    Guild* GetGuildById(ObjectGuid::LowType guildId) const;
+    Guild* GetGuildByLeader(uint64 guid) const;
+    Guild* GetGuildById(uint32 guildId) const;
     Guild* GetGuildByName(std::string const& guildName) const;
-    std::string GetGuildNameById(ObjectGuid::LowType guildId) const;
+    std::string GetGuildNameById(uint32 guildId) const;
 
     void LoadGuilds();
     void AddGuild(Guild* guild);
-    void RemoveGuild(ObjectGuid::LowType guildId);
+    void RemoveGuild(uint32 guildId);
 
-    ObjectGuid::LowType GenerateGuildId();
-    void SetNextGuildId(ObjectGuid::LowType Id) { NextGuildId = Id; }
+    uint32 GenerateGuildId();
+    void SetNextGuildId(uint32 Id) { NextGuildId = Id; }
 
     void ResetTimes();
 protected:
-    typedef std::unordered_map<ObjectGuid::LowType, Guild*> GuildContainer;
-    ObjectGuid::LowType NextGuildId;
+    typedef UNORDERED_MAP<uint32, Guild*> GuildContainer;
+    uint32 NextGuildId;
     GuildContainer GuildStore;
 };
 
-#define sGuildMgr GuildMgr::instance()
+#define sGuildMgr ACE_Singleton<GuildMgr, ACE_Null_Mutex>::instance()
 
 #endif

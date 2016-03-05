@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,6 +19,8 @@
 #include "ThreatManager.h"
 #include "Unit.h"
 #include "Creature.h"
+#include "CreatureAI.h"
+#include "Map.h"
 #include "Player.h"
 #include "ObjectAccessor.h"
 #include "UnitEvents.h"
@@ -96,7 +98,6 @@ HostileReference::HostileReference(Unit* refUnit, ThreatManager* threatManager, 
     link(refUnit, threatManager);
     iUnitGuid = refUnit->GetGUID();
     iOnline = true;
-    iAccessible = true;
 }
 
 //============================================================
@@ -155,6 +156,11 @@ void HostileReference::addThreat(float modThreat)
 
 void HostileReference::addThreatPercent(int32 percent)
 {
+	// Xinef: Do not allow to modify threat by percent if threat is negative (forced to big value < 0 by spells adding temporary threat)
+	// Xinef: When the temporary effect ends, temporary threat is added back which results in huge additional amount of threat
+	if (iThreat <= 0)
+		return;
+
     float tmpThreat = iThreat;
     AddPct(tmpThreat, percent);
     addThreat(tmpThreat - iThreat);
@@ -166,7 +172,6 @@ void HostileReference::addThreatPercent(int32 percent)
 void HostileReference::updateOnlineStatus()
 {
     bool online = false;
-    bool accessible = false;
 
     if (!isValid())
         if (Unit* target = ObjectAccessor::GetUnit(*GetSourceUnit(), getUnitGuid()))
@@ -178,7 +183,7 @@ void HostileReference::updateOnlineStatus()
     // target is not in flight
     if (isValid()
         && (getTarget()->GetTypeId() != TYPEID_PLAYER || !getTarget()->ToPlayer()->IsGameMaster())
-        && !getTarget()->HasUnitState(UNIT_STATE_IN_FLIGHT)
+        && !getTarget()->IsInFlight()
         && getTarget()->IsInMap(GetSourceUnit())
         && getTarget()->InSamePhase(GetSourceUnit())
         )
@@ -190,10 +195,8 @@ void HostileReference::updateOnlineStatus()
             if (creature->IsWithinCombatRange(getTarget(), creature->m_CombatDistance))
                 online = true;                              // not accessible but stays online
         }
-        else
-            accessible = true;
     }
-    setAccessibleState(accessible);
+
     setOnlineOfflineState(online);
 }
 
@@ -205,23 +208,8 @@ void HostileReference::setOnlineOfflineState(bool isOnline)
     if (iOnline != isOnline)
     {
         iOnline = isOnline;
-        if (!iOnline)
-            setAccessibleState(false);                      // if not online that not accessable as well
 
         ThreatRefStatusChangeEvent event(UEV_THREAT_REF_ONLINE_STATUS, this);
-        fireStatusChanged(event);
-    }
-}
-
-//============================================================
-
-void HostileReference::setAccessibleState(bool isAccessible)
-{
-    if (iAccessible != isAccessible)
-    {
-        iAccessible = isAccessible;
-
-        ThreatRefStatusChangeEvent event(UEV_THREAT_REF_ASSECCIBLE_STATUS, this);
         fireStatusChanged(event);
     }
 }
@@ -267,10 +255,10 @@ HostileReference* ThreatContainer::getReferenceByTarget(Unit* victim) const
     if (!victim)
         return NULL;
 
-    ObjectGuid guid = victim->GetGUID();
+    uint64 const guid = victim->GetGUID();
     for (ThreatContainer::StorageType::const_iterator i = iThreatList.begin(); i != iThreatList.end(); ++i)
     {
-        HostileReference* ref = (*i);
+        HostileReference *ref = (*i);
         if (ref && ref->getUnitGuid() == guid)
             return ref;
     }
@@ -314,81 +302,104 @@ void ThreatContainer::update()
 
 HostileReference* ThreatContainer::selectNextVictim(Creature* attacker, HostileReference* currentVictim) const
 {
-    HostileReference* currentRef = NULL;
-    bool found = false;
-    bool noPriorityTargetFound = false;
+	// pussywizard: pretty much remade this whole function
 
-    ThreatContainer::StorageType::const_iterator lastRef = iThreatList.end();
-    --lastRef;
+	HostileReference* currentRef = NULL;
+	bool found = false;
+	bool noPriorityTargetFound = false;
+	uint32 currTime = sWorld->GetGameTime();
 
-    for (ThreatContainer::StorageType::const_iterator iter = iThreatList.begin(); iter != iThreatList.end() && !found;)
-    {
-        currentRef = (*iter);
+	// pussywizard: currentVictim is needed to compare if threat was exceeded by 10%/30% for melee/range targets (only then switching current target)
+	if (currentVictim)
+	{
+		Unit* cvUnit = currentVictim->getTarget();
+		if (!attacker->_CanDetectFeignDeathOf(cvUnit) || !attacker->CanCreatureAttack(cvUnit) || attacker->isTargetNotAcceptableByMMaps(cvUnit->GetGUID(), currTime, cvUnit)) // pussywizard: if currentVictim is not valid => don't compare the threat with it, just take the highest threat valid target
+			currentVictim = NULL;
+		else if (cvUnit->IsImmunedToDamageOrSchool(attacker->GetMeleeDamageSchoolMask()) || cvUnit->HasNegativeAuraWithInterruptFlag(AURA_INTERRUPT_FLAG_TAKE_DAMAGE)) // pussywizard: no 10%/30% if currentVictim is immune to damage or has auras breakable by damage
+			currentVictim = NULL;
+	}
 
-        Unit* target = currentRef->getTarget();
-        ASSERT(target);                                     // if the ref has status online the target must be there !
+	ThreatContainer::StorageType::const_iterator lastRef = iThreatList.end();
+	--lastRef;
 
-        // some units are prefered in comparison to others
-        if (!noPriorityTargetFound && (target->IsImmunedToDamage(attacker->GetMeleeDamageSchoolMask()) || target->HasNegativeAuraWithInterruptFlag(AURA_INTERRUPT_FLAG_TAKE_DAMAGE)))
-        {
-            if (iter != lastRef)
-            {
-                // current victim is a second choice target, so don't compare threat with it below
-                if (currentRef == currentVictim)
-                    currentVictim = NULL;
-                ++iter;
-                continue;
-            }
-            else
-            {
-                // if we reached to this point, everyone in the threatlist is a second choice target. In such a situation the target with the highest threat should be attacked.
-                noPriorityTargetFound = true;
-                iter = iThreatList.begin();
-                continue;
-            }
-        }
+	// pussywizard: iterate from highest to lowest threat
+	for (ThreatContainer::StorageType::const_iterator iter = iThreatList.begin(); iter != iThreatList.end() && !found;)
+	{
+		currentRef = (*iter);
 
-        if (attacker->CanCreatureAttack(target))           // skip non attackable currently targets
-        {
-            if (currentVictim)                              // select 1.3/1.1 better target in comparison current target
-            {
-                // list sorted and and we check current target, then this is best case
-                if (currentVictim == currentRef || currentRef->getThreat() <= 1.1f * currentVictim->getThreat())
-                {
-                    if (currentVictim != currentRef && attacker->CanCreatureAttack(currentVictim->getTarget()))
-                        currentRef = currentVictim;            // for second case, if currentvictim is attackable
+		Unit* target = currentRef->getTarget();
+		ASSERT(target); // if the ref has status online the target must be there !
 
-                    found = true;
-                    break;
-                }
+		// pussywizard: don't go to threat comparison if this ref is immune to damage or has aura breakable on damage (second choice target)
+		// pussywizard: if this is the last entry on the threat list, then all targets are second choice, set bool to true and loop threat list again, ignoring this section
+		if (!noPriorityTargetFound && (target->IsImmunedToDamageOrSchool(attacker->GetMeleeDamageSchoolMask()) || target->HasNegativeAuraWithInterruptFlag(AURA_INTERRUPT_FLAG_TAKE_DAMAGE) || target->HasAuraTypeWithCaster(SPELL_AURA_IGNORED, attacker->GetGUID())))
+		{
+			if (iter != lastRef)
+			{
+				++iter;
+				continue;
+			}
+			else
+			{
+				noPriorityTargetFound = true;
+				iter = iThreatList.begin();
+				continue;
+			}
+		}
 
-                if (currentRef->getThreat() > 1.3f * currentVictim->getThreat() ||
-                    (currentRef->getThreat() > 1.1f * currentVictim->getThreat() &&
-                    attacker->IsWithinMeleeRange(target)))
-                {                                           //implement 110% threat rule for targets in melee range
-                    found = true;                           //and 130% rule for targets in ranged distances
-                    break;                                  //for selecting alive targets
-                }
-            }
-            else                                            // select any
-            {
-                found = true;
-                break;
-            }
-        }
-        ++iter;
-    }
-    if (!found)
-        currentRef = NULL;
+		// pussywizard: skip not valid targets
+		if (attacker->_CanDetectFeignDeathOf(target) && attacker->CanCreatureAttack(target) && !attacker->isTargetNotAcceptableByMMaps(target->GetGUID(), currTime, target))
+		{
+			if (currentVictim) // pussywizard: if not NULL then target must have 10%/30% more threat
+			{
+				if (currentVictim == currentRef) // pussywizard: nothing found previously was good and enough, currentRef passed all necessary tests, so end now
+				{
+					found = true;
+					break;
+				}
 
-    return currentRef;
+				// pussywizard: implement 110% threat rule for targets in melee range and 130% rule for targets in ranged distances
+				if (currentRef->getThreat() > 1.3f * currentVictim->getThreat()) // pussywizard: enough in all cases, end
+				{
+					found = true;
+					break;
+				}
+				else if (currentRef->getThreat() > 1.1f * currentVictim->getThreat()) // pussywizard: enought only if target in melee range
+				{
+					if (attacker->IsWithinMeleeRange(target))
+					{
+						found = true;
+						break;
+					}
+				}
+				else // pussywizard: nothing found previously was good and enough, this and next entries on the list have less than 110% threat, and currentVictim is present and valid as checked before the loop (otherwise it's NULL), so end now
+				{
+					currentRef = currentVictim;
+					found = true;
+					break;
+				}
+			}
+			else // pussywizard: no currentVictim, first passing all checks is chosen (highest threat, list is sorted)
+			{
+				found = true;
+				break;
+			}
+		}
+		++iter;
+	}
+	if (!found)
+		currentRef = NULL;
+
+	return currentRef;
 }
 
 //============================================================
 //=================== ThreatManager ==========================
 //============================================================
 
-ThreatManager::ThreatManager(Unit* owner) : iCurrentVictim(NULL), iOwner(owner), iUpdateTimer(THREAT_UPDATE_INTERVAL) { }
+ThreatManager::ThreatManager(Unit* owner) : iCurrentVictim(NULL), iOwner(owner), iUpdateTimer(THREAT_UPDATE_INTERVAL)
+{
+}
 
 //============================================================
 
@@ -421,7 +432,8 @@ void ThreatManager::doAddThreat(Unit* victim, float threat)
         {
             float redirectThreat = CalculatePct(threat, redirectThreadPct);
             threat -= redirectThreat;
-            _addThreat(redirectTarget, redirectThreat);
+			if (ThreatCalcHelper::isValidProcess(redirectTarget, GetOwner()))
+				_addThreat(redirectTarget, redirectThreat);
         }
     }
 
@@ -473,6 +485,19 @@ float ThreatManager::getThreat(Unit* victim, bool alsoSearchOfflineList)
         ref = iThreatOfflineContainer.getReferenceByTarget(victim);
     if (ref)
         threat = ref->getThreat();
+    return threat;
+}
+
+//============================================================
+
+float ThreatManager::getThreatWithoutTemp(Unit* victim, bool alsoSearchOfflineList)
+{
+    float threat = 0.0f;
+    HostileReference* ref = iThreatContainer.getReferenceByTarget(victim);
+    if (!ref && alsoSearchOfflineList)
+        ref = iThreatOfflineContainer.getReferenceByTarget(victim);
+    if (ref)
+        threat = ref->getThreat() - ref->getTempThreatModifier();;
     return threat;
 }
 
@@ -533,7 +558,10 @@ void ThreatManager::processThreatEvent(ThreatRefStatusChangeEvent* threatRefStat
                     setCurrentVictim(NULL);
                     setDirty(true);
                 }
-                iOwner->SendRemoveFromThreatListOpcode(hostilRef);
+                if (GetOwner() && GetOwner()->IsInWorld())
+                    if (Unit* target = ObjectAccessor::GetUnit(*GetOwner(), hostilRef->getUnitGuid()))
+                        if (GetOwner()->IsInMap(target))
+                            GetOwner()->SendRemoveFromThreatListOpcode(hostilRef);
                 iThreatContainer.remove(hostilRef);
                 iThreatOfflineContainer.addReference(hostilRef);
             }

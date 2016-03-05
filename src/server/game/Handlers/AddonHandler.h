@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,23 +21,20 @@
 
 #include "Common.h"
 #include "Config.h"
+#include <ace/Singleton.h>
 #include "WorldPacket.h"
 
 class AddonHandler
 {
+    /* Construction */
+    friend class ACE_Singleton<AddonHandler, ACE_Null_Mutex>;
+    AddonHandler();
+
     public:
-        static AddonHandler* instance()
-        {
-            static AddonHandler instance;
-            return &instance;
-        }
-
+        ~AddonHandler();
+                                                            //build addon packet
         bool BuildAddonPacket(WorldPacket* Source, WorldPacket* Target);
-
-    private:
-        AddonHandler() { }
-        ~AddonHandler() { }
 };
-#define sAddOnHandler AddonHandler::instance()
+#define sAddOnHandler ACE_Singleton<AddonHandler, ACE_Null_Mutex>::instance()
 #endif
 

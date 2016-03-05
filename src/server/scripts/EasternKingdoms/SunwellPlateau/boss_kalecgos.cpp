@@ -1,27 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss_Kalecgos
-SD%Complete: 95
-SDComment:
-SDCategory: Sunwell_Plateau
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -37,404 +16,344 @@ enum Yells
     SAY_SATH_SPELL1                             = 3,
     SAY_SATH_SPELL2                             = 4,
 
+
     SAY_EVIL_AGGRO                              = 0,
     SAY_EVIL_SLAY                               = 1,
     SAY_GOOD_PLRWIN                             = 2,
     SAY_EVIL_ENRAGE                             = 3,
+	SAY_SATH_ENRAGE_ME							= 4,
+	SAY_KALEC_ENRAGE_SATH						= 5,
 
     SAY_GOOD_AGGRO                              = 0,
     SAY_GOOD_NEAR_DEATH                         = 1,
-    SAY_GOOD_NEAR_DEATH2                        = 2
+    SAY_GOOD_NEAR_DEATH2                        = 2,
+	SAY_GOOD_MADRIGOSA							= 3
 };
 
 enum Spells
 {
-    AURA_SUNWELL_RADIANCE                       = 45769,
-    AURA_SPECTRAL_EXHAUSTION                    = 44867,
-    AURA_SPECTRAL_REALM                         = 46021,
-    AURA_SPECTRAL_INVISIBILITY                  = 44801,
-    AURA_DEMONIC_VISUAL                         = 44800,
+    SPELL_SPECTRAL_EXHAUSTION			= 44867,
+    SPELL_SPECTRAL_BLAST				= 44869,
+	SPELL_SPECTRAL_BLAST_PORTAL			= 44866,
+	SPELL_SPECTRAL_BLAST_AA				= 46648,
+    SPELL_TELEPORT_SPECTRAL				= 46019,
 
-    SPELL_SPECTRAL_BLAST                        = 44869,
-    SPELL_TELEPORT_SPECTRAL                     = 46019,
-    SPELL_ARCANE_BUFFET                         = 45018,
-    SPELL_FROST_BREATH                          = 44799,
-    SPELL_TAIL_LASH                             = 45122,
+	SPELL_TELEPORT_NORMAL_REALM			= 46020,
+	SPELL_SPECTRAL_REALM				= 46021,
+	SPELL_SPECTRAL_INVISIBILITY			= 44801,
+	SPELL_DEMONIC_VISUAL				= 44800,
 
-    SPELL_BANISH                                = 44836,
-    SPELL_TRANSFORM_KALEC                       = 44670,
-    SPELL_ENRAGE                                = 44807,
+    SPELL_ARCANE_BUFFET					= 45018,
+    SPELL_FROST_BREATH					= 44799,
+    SPELL_TAIL_LASH						= 45122,
 
-    SPELL_CORRUPTION_STRIKE                     = 45029,
-    SPELL_AGONY_CURSE                           = 45032,
-    SPELL_SHADOW_BOLT                           = 45031,
+    SPELL_BANISH						= 44836,
+    SPELL_TRANSFORM_KALEC				= 44670,
+    SPELL_CRAZED_RAGE					= 44807,
 
-    SPELL_HEROIC_STRIKE                         = 45026,
-    SPELL_REVITALIZE                            = 45027
+    SPELL_CORRUPTION_STRIKE				= 45029,
+    SPELL_CURSE_OF_BOUNDLESS_AGONY		= 45032,
+	SPELL_CURSE_OF_BOUNDLESS_AGONY_PLR	= 45034,
+    SPELL_SHADOW_BOLT					= 45031,
+
+    SPELL_HEROIC_STRIKE					= 45026,
+    SPELL_REVITALIZE					= 45027
 };
 
 enum SWPActions
 {
-    DO_ENRAGE                                   =  1,
-    DO_BANISH                                   =  2
+    ACTION_ENRAGE						= 1,
+    ACTION_BANISH						= 2,
+	ACTION_SATH_BANISH					= 3,
+	ACTION_KALEC_DIED					= 4,
+	ACTION_ENRAGE_OTHER					= 5,
 };
 
-#define GO_FAILED   "You are unable to use this currently."
+enum kalEvents
+{
+	EVENT_ARCANE_BUFFET					= 1,
+	EVENT_FROST_BREATH					= 2,
+	EVENT_WILD_MAGIC					= 3,
+	EVENT_TAIL_LASH						= 4,
+	EVENT_SPECTRAL_BLAST				= 5,
+	EVENT_CHECK_HEALTH					= 6,
+	EVENT_CHECK_HEALTH2					= 7,
+	EVENT_CHECK_POS						= 8,
+	EVENT_SPAWN_SPECTRALS				= 9,
 
-#define EMOTE_UNABLE_TO_FIND    "is unable to find Kalecgos"
+	EVENT_SPELL_REVITALIZE				= 10,
+	EVENT_SPELL_HEROIC_STRIKE			= 11,
+	EVENT_SHADOW_BOLT					= 12,
+	EVENT_AGONY_CURSE					= 13,
+	EVENT_CORRUPTION_STRIKE				= 14,
 
-#define FLY_X           1679
-#define FLY_Y           900
-#define FLY_Z           82
-
-#define CENTER_X        1705
-#define CENTER_Y        930
-#define RADIUS          30
+	EVENT_TALK_GOOD_1					= 20,
+	EVENT_TALK_GOOD_2					= 21,
+	EVENT_TALK_GOOD_3					= 22,
+	EVENT_TALK_GOOD_4					= 23,
+	EVENT_TALK_GOOD_5					= 24,
+	EVENT_TALK_BAD_1					= 25,
+	EVENT_TALK_BAD_2					= 26,
+	EVENT_TALK_BAD_3					= 27
+};
 
 #define DRAGON_REALM_Z  53.079f
-#define DEMON_REALM_Z   -74.558f
-
-#define MAX_PLAYERS_IN_SPECTRAL_REALM 0 //over this, teleport object won't work, 0 disables check
-
-uint32 WildMagic[] = { 44978, 45001, 45002, 45004, 45006, 45010 };
 
 class boss_kalecgos : public CreatureScript
 {
 public:
     boss_kalecgos() : CreatureScript("boss_kalecgos") { }
 
-    struct boss_kalecgosAI : public ScriptedAI
+    struct boss_kalecgosAI : public BossAI
     {
-        boss_kalecgosAI(Creature* creature) : ScriptedAI(creature)
+        boss_kalecgosAI(Creature* creature) : BossAI(creature, DATA_KALECGOS)
         {
-            Initialize();
-            instance = creature->GetInstanceScript();
-            bJustReset = false;
-            me->setActive(true);
         }
 
-        void Initialize()
-        {
-            SathGUID.Clear();
-            ArcaneBuffetTimer = 8000;
-            FrostBreathTimer = 15000;
-            WildMagicTimer = 10000;
-            TailLashTimer = 25000;
-            SpectralBlastTimer = urand(20000, 25000);
-            CheckTimer = 1000;
-            ResetTimer = 30000;
+		bool sathBanished;
+		EventMap events2;
 
-            TalkTimer = 0;
-            TalkSequence = 0;
-            isFriendly = false;
-            isEnraged = false;
-            isBanished = false;
+		bool CanAIAttack(Unit const* target) const
+		{
+			return target->GetPositionZ() > 50.0f;
+		}
+
+		void JustReachedHome()
+		{
+			BossAI::JustReachedHome();
+			me->SetVisible(true);
+		}
+
+        void Reset()
+        {
+			BossAI::Reset();
+			me->SetHealth(me->GetMaxHealth());
+            me->SetStandState(UNIT_STAND_STATE_SLEEP);
+			me->SetDisableGravity(false);
+			me->SetReactState(REACT_AGGRESSIVE);
+			me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE + UNIT_FLAG_NOT_SELECTABLE);
+			events2.Reset();
+
+			sathBanished = false;
+			ClearPlayerAuras();
         }
 
-        InstanceScript* instance;
+		void ClearPlayerAuras() const
+		{
+			instance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CURSE_OF_BOUNDLESS_AGONY);
+			instance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CURSE_OF_BOUNDLESS_AGONY_PLR);
+			instance->DoRemoveAurasDueToSpellOnPlayers(SPELL_SPECTRAL_REALM);
+		}
 
-        uint32 ArcaneBuffetTimer;
-        uint32 FrostBreathTimer;
-        uint32 WildMagicTimer;
-        uint32 SpectralBlastTimer;
-        uint32 TailLashTimer;
-        uint32 CheckTimer;
-        uint32 TalkTimer;
-        uint32 TalkSequence;
-        uint32 ResetTimer;
-
-        bool isFriendly;
-        bool isEnraged;
-        bool isBanished;
-        bool bJustReset;
-
-        ObjectGuid SathGUID;
-
-        void Reset() override
+        void DoAction(int32 param)
         {
-            SathGUID = instance->GetGuidData(DATA_SATHROVARR);
-            instance->SetBossState(DATA_KALECGOS, NOT_STARTED);
+            if (param == ACTION_ENRAGE || param == ACTION_ENRAGE_OTHER)
+			{
+				Talk(param == ACTION_ENRAGE ? SAY_KALEC_ENRAGE_SATH : SAY_SATH_ENRAGE_ME);
+				me->CastSpell(me, SPELL_CRAZED_RAGE, true);
+				events.CancelEvent(EVENT_CHECK_HEALTH);
+				return;
+			}
+			else if (param == ACTION_BANISH)
+			{
+                me->CastSpell(me, SPELL_BANISH, true);
+				events.Reset();
+			}
+			else if (param == ACTION_SATH_BANISH)
+				sathBanished = true;
+			else if (param == ACTION_KALEC_DIED)
+			{
+				events.Reset();
+				events2.ScheduleEvent(EVENT_TALK_BAD_1, 0);
+				ClearPlayerAuras();
+				return;
+			}
 
-            if (Creature* Sath = ObjectAccessor::GetCreature(*me, SathGUID))
-                Sath->AI()->EnterEvadeMode();
-
-            me->setFaction(14);
-            if (!bJustReset) //first reset at create
-            {
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE + UNIT_FLAG_NOT_SELECTABLE);
-                me->SetDisableGravity(false);
-                me->SetVisible(true);
-                me->SetStandState(UNIT_STAND_STATE_SLEEP);
-            }
-            me->SetFullHealth(); //dunno why it does not resets health at evade..
+			if (me->HasAura(SPELL_BANISH) && sathBanished)
+			{
+				events.Reset();
+				events2.ScheduleEvent(EVENT_TALK_GOOD_1, 1000);
+				ClearPlayerAuras();
+				if (Creature* Sath = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_SATHROVARR)))
+				{
+					Sath->RemoveAllAuras();
+					Sath->GetMotionMaster()->MovementExpired();
+					Sath->SetReactState(REACT_PASSIVE);
+					Sath->NearTeleportTo(1696.20f, 915.0f, DRAGON_REALM_Z, Sath->GetOrientation());
+				}
+			}
         }
 
-        void EnterEvadeMode(EvadeReason why) override
+		void JustDied(Unit* who)
+		{
+			BossAI::JustDied(who);
+		}
+
+		void EnterCombat(Unit* who)
+		{
+			BossAI::EnterCombat(who);
+			events.ScheduleEvent(EVENT_ARCANE_BUFFET, 6000);
+			events.ScheduleEvent(EVENT_FROST_BREATH, 15000);
+			events.ScheduleEvent(EVENT_WILD_MAGIC, 10000);
+			events.ScheduleEvent(EVENT_TAIL_LASH, 25000);
+			events.ScheduleEvent(EVENT_SPECTRAL_BLAST, 20000);
+			events.ScheduleEvent(EVENT_CHECK_POS, 5000);
+			events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+			events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
+			events.ScheduleEvent(EVENT_SPAWN_SPECTRALS, 16000);
+
+            me->SetStandState(UNIT_STAND_STATE_STAND);
+            Talk(SAY_EVIL_AGGRO);
+		}
+
+        void DamageTaken(Unit* attacker, uint32& damage, DamageEffectType, SpellSchoolMask)
         {
-            bJustReset = true;
-            me->SetVisible(false);
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE + UNIT_FLAG_NOT_SELECTABLE);
-            ScriptedAI::EnterEvadeMode(why);
-        }
-
-        void DoAction(int32 param) override
-        {
-            switch (param)
-            {
-                case DO_ENRAGE:
-                    isEnraged = true;
-                    me->CastSpell(me, SPELL_ENRAGE, true);
-                    break;
-                case DO_BANISH:
-                    isBanished = true;
-                    me->CastSpell(me, SPELL_BANISH, true);
-                    break;
-            }
-        }
-
-        void UpdateAI(uint32 diff) override
-        {
-            if (TalkTimer)
-            {
-                if (!TalkSequence)
-                {
-                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE + UNIT_FLAG_NOT_SELECTABLE);
-                    me->InterruptNonMeleeSpells(true);
-                    me->RemoveAllAuras();
-                    me->DeleteThreatList();
-                    me->CombatStop();
-                    ++TalkSequence;
-                }
-                if (TalkTimer <= diff)
-                {
-                    if (isFriendly)
-                        GoodEnding();
-                    else
-                        BadEnding();
-                    ++TalkSequence;
-                } else TalkTimer -= diff;
-            }
-            else
-            {
-                if (bJustReset)
-                {
-                    if (ResetTimer <= diff)
-                    {
-                        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE|UNIT_FLAG_NOT_SELECTABLE);
-                        me->SetDisableGravity(false);
-                        me->SetVisible(true);
-                        me->SetStandState(UNIT_STAND_STATE_SLEEP);
-                        ResetTimer = 10000;
-                        bJustReset = false;
-                    } else ResetTimer -= diff;
-                    return;
-                }
-
-                if (!UpdateVictim())
-                    return;
-
-                if (CheckTimer <= diff)
-                {
-                    if (me->GetDistance(CENTER_X, CENTER_Y, DRAGON_REALM_Z) >= 75)
-                    {
-                        EnterEvadeMode(EVADE_REASON_BOUNDARY);
-                        return;
-                    }
-                    if (HealthBelowPct(10) && !isEnraged)
-                    {
-                        if (Creature* Sath = ObjectAccessor::GetCreature(*me, SathGUID))
-                            Sath->AI()->DoAction(DO_ENRAGE);
-                        DoAction(DO_ENRAGE);
-                    }
-                    if (!isBanished && HealthBelowPct(1))
-                    {
-                        if (Creature* Sath = ObjectAccessor::GetCreature(*me, SathGUID))
-                        {
-                            if (Sath->HasAura(SPELL_BANISH))
-                            {
-                                Sath->DealDamage(Sath, Sath->GetHealth());
-                                return;
-                            }
-                            else
-                                DoAction(DO_BANISH);
-                        }
-                        else
-                        {
-                            TC_LOG_ERROR("scripts", "Didn't find Shathrowar. Kalecgos event reseted.");
-                            EnterEvadeMode(EVADE_REASON_OTHER);
-                            return;
-                        }
-                    }
-                    CheckTimer = 1000;
-                } else CheckTimer -= diff;
-
-                if (ArcaneBuffetTimer <= diff)
-                {
-                    DoCastAOE(SPELL_ARCANE_BUFFET);
-                    ArcaneBuffetTimer = 8000;
-                } else ArcaneBuffetTimer -= diff;
-
-                if (FrostBreathTimer <= diff)
-                {
-                    DoCastAOE(SPELL_FROST_BREATH);
-                    FrostBreathTimer = 15000;
-                } else FrostBreathTimer -= diff;
-
-                if (TailLashTimer <= diff)
-                {
-                    DoCastAOE(SPELL_TAIL_LASH);
-                    TailLashTimer = 15000;
-                } else TailLashTimer -= diff;
-
-                if (WildMagicTimer <= diff)
-                {
-                    DoCastAOE(WildMagic[rand32() % 6]);
-                    WildMagicTimer = 20000;
-                } else WildMagicTimer -= diff;
-
-                if (SpectralBlastTimer <= diff)
-                {
-                    ThreatContainer::StorageType const& m_threatlist = me->getThreatManager().getThreatList();
-                    std::list<Unit*> targetList;
-                    for (ThreatContainer::StorageType::const_iterator itr = m_threatlist.begin(); itr!= m_threatlist.end(); ++itr)
-                    {
-                        Unit* target = (*itr)->getTarget();
-                        if (target
-                                && target->GetTypeId() == TYPEID_PLAYER
-                                && (!target->GetVictim() || target->GetGUID() != me->EnsureVictim()->GetGUID())
-                                && target->GetPositionZ() > me->GetPositionZ() - 5
-                                && !target->HasAura(AURA_SPECTRAL_EXHAUSTION))
-                        {
-                            targetList.push_back(target);
-                        }
-                    }
-                    if (targetList.empty())
-                    {
-                        SpectralBlastTimer = 1000;
-                        return;
-                    }
-
-                    std::list<Unit*>::const_iterator i = targetList.begin();
-                    advance(i, rand32() % targetList.size());
-                    if ((*i))
-                    {
-                        (*i)->CastSpell((*i), SPELL_SPECTRAL_BLAST, true);
-                        SpectralBlastTimer = 20000 + rand32() % 5000;
-                    } else SpectralBlastTimer = 1000;
-                } else SpectralBlastTimer -= diff;
-
-                DoMeleeAttackIfReady();
-            }
-        }
-
-        void MoveInLineOfSight(Unit* who) override
-        {
-            if (bJustReset)//boss is invisible, don't attack
-                return;
-
-            if (!me->GetVictim() && me->IsValidAttackTarget(who))
-            {
-                float attackRadius = me->GetAttackDistance(who);
-                if (me->IsWithinDistInMap(who, attackRadius))
-                    AttackStart(who);
-            }
-        }
-
-        void DamageTaken(Unit* done_by, uint32 &damage) override
-        {
-            if (damage >= me->GetHealth() && done_by != me)
+            if (damage >= me->GetHealth() && attacker != me)
                 damage = 0;
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void KilledUnit(Unit* victim)
         {
-            me->SetStandState(UNIT_STAND_STATE_STAND);
-            Talk(SAY_EVIL_AGGRO);
-            DoZoneInCombat();
-
-            instance->SetBossState(DATA_KALECGOS, IN_PROGRESS);
+			if (victim->GetTypeId() == TYPEID_PLAYER && roll_chance_i(50))
+				Talk(SAY_EVIL_SLAY);
         }
 
-        void KilledUnit(Unit* /*victim*/) override
+        void UpdateAI(uint32 diff)
         {
-            Talk(SAY_EVIL_SLAY);
-        }
+			events2.Update(diff);
+			switch (events2.ExecuteEvent())
+			{
+				case EVENT_TALK_GOOD_1:
+					me->SetRegeneratingHealth(false);
+					me->RemoveAllAuras();
+					me->SetReactState(REACT_PASSIVE);
+					me->CombatStop();
+					me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+					me->setFaction(35);
+					events2.ScheduleEvent(EVENT_TALK_GOOD_2, 1000);
+					break;
+				case EVENT_TALK_GOOD_2:
+					if (Creature* Sath = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_SATHROVARR)))
+					{
+						summons.Despawn(Sath);
+						Unit::Kill(me, Sath);
+					}
+					events2.ScheduleEvent(EVENT_TALK_GOOD_3, 8000);
+					break;
+				case EVENT_TALK_GOOD_3:
+					Talk(SAY_GOOD_PLRWIN);
+					events2.ScheduleEvent(EVENT_TALK_GOOD_4, 10000);
+					break;
+				case EVENT_TALK_GOOD_4:
+					me->SetDisableGravity(true);
+					me->HandleEmoteCommand(EMOTE_ONESHOT_LIFTOFF);
+					events2.ScheduleEvent(EVENT_TALK_GOOD_5, 10000);
+					break;
+				case EVENT_TALK_GOOD_5:
+					me->SetVisible(false);
+					Unit::Kill(me, me);
+					break;
+				case EVENT_TALK_BAD_1:
+					me->SetReactState(REACT_PASSIVE);
+					me->CombatStop();
+					me->RemoveAllAuras();
+					me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+					Talk(SAY_EVIL_ENRAGE);
+					events2.ScheduleEvent(EVENT_TALK_BAD_2, 3000);
+					break;
+				case EVENT_TALK_BAD_2:
+					me->SetDisableGravity(true);
+					me->HandleEmoteCommand(EMOTE_ONESHOT_LIFTOFF);
+					events2.ScheduleEvent(EVENT_TALK_BAD_3, 15000);
+					break;
+				case EVENT_TALK_BAD_3:
+					me->SetVisible(false);
+					EnterEvadeMode();
+					break;
+			}
 
-        void MovementInform(uint32 type, uint32 /*id*/) override
-        {
-            if (type != POINT_MOTION_TYPE)
-                return;
-            me->SetVisible(false);
-            if (isFriendly)
-            {
-                me->setDeathState(JUST_DIED);
+			if (!events2.Empty())
+				return;
 
-                Map::PlayerList const& players = me->GetMap()->GetPlayers();
-                if (!players.isEmpty())
-                {
-                    for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
-                    {
-                        Player* player = itr->GetSource();
-                        if (player)
-                            me->GetMap()->ToInstanceMap()->PermBindAllPlayers(player);
-                    }
-                }
-            }
-            else
-            {
-                me->GetMotionMaster()->MoveTargetedHome();
-                TalkTimer = 1000;
-            }
-        }
+			if (!UpdateVictim())
+				return;
 
-        void GoodEnding()
-        {
-            switch (TalkSequence)
-            {
-                case 1:
-                    me->setFaction(35);
-                    TalkTimer = 1000;
-                    break;
-                case 2:
-                    Talk(SAY_GOOD_PLRWIN);
-                    TalkTimer = 10000;
-                    break;
-                case 3:
-                    me->SetDisableGravity(true);
-                    me->GetMotionMaster()->MovePoint(0, FLY_X, FLY_Y, FLY_Z);
-                    TalkTimer = 600000;
-                    break;
-                default:
-                    break;
-            }
-        }
+			events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
 
-        void BadEnding()
-        {
-            switch (TalkSequence)
-            {
-                case 1:
-                    Talk(SAY_EVIL_ENRAGE);
-                    TalkTimer = 3000;
-                    break;
-                case 2:
-                    me->SetDisableGravity(true);
-                    me->GetMotionMaster()->MovePoint(0, FLY_X, FLY_Y, FLY_Z);
-                    TalkTimer = 15000;
-                    break;
-                case 3:
-                    EnterEvadeMode(EVADE_REASON_OTHER);
-                    break;
-                default:
-                    break;
-            }
-        }
+			switch (events.ExecuteEvent())
+			{
+				case EVENT_SPAWN_SPECTRALS:
+					me->SummonCreature(NPC_KALEC, 1702.21f, 931.7f, -74.56f, 5.07f, TEMPSUMMON_MANUAL_DESPAWN);
+					me->SummonCreature(NPC_SATHROVARR, 1704.62f, 927.78f, -73.9f, 2.0f, TEMPSUMMON_MANUAL_DESPAWN);
+					break;
+				case EVENT_ARCANE_BUFFET:
+					me->CastSpell(me, SPELL_ARCANE_BUFFET, false);
+					events.ScheduleEvent(EVENT_ARCANE_BUFFET, 8000);
+					break;
+				case EVENT_FROST_BREATH:
+					me->CastSpell(me->GetVictim(), SPELL_FROST_BREATH, false);
+					events.ScheduleEvent(EVENT_FROST_BREATH, 15000);
+					break;
+				case EVENT_TAIL_LASH:
+					me->CastSpell(me->GetVictim(), SPELL_TAIL_LASH, false);
+					events.ScheduleEvent(EVENT_TAIL_LASH, 15000);
+					break;
+				case EVENT_WILD_MAGIC:
+					me->CastCustomSpell(RAND(44978, 45001, 45002, 45004, 45006, 45010), SPELLVALUE_MAX_TARGETS, 1, me, false);
+					events.ScheduleEvent(EVENT_WILD_MAGIC, 20000);
+					break;
+				case EVENT_SPECTRAL_BLAST:
+					me->CastSpell(me, SPELL_SPECTRAL_BLAST, false);
+					events.ScheduleEvent(EVENT_SPECTRAL_BLAST, urand(15000, 25000));
+					break;
+				case EVENT_CHECK_POS:
+					if (me->GetDistance(me->GetHomePosition()) > 50.0f)
+					{
+						EnterEvadeMode();
+						return;
+					}
+					events.ScheduleEvent(EVENT_CHECK_POS, 5000);
+					break;
+				case EVENT_CHECK_HEALTH:
+					if (me->HealthBelowPct(10))
+					{
+						if (Creature* Sath = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_SATHROVARR)))
+                            Sath->AI()->DoAction(ACTION_ENRAGE_OTHER);
+                        DoAction(ACTION_ENRAGE);
+						break;
+					}
+					events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+					break;
+				case EVENT_CHECK_HEALTH2:
+					if (me->HealthBelowPct(1))
+					{
+                        DoAction(ACTION_BANISH);
+						break;
+					}
+					events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
+					break;
+			}
+
+			DoMeleeAttackIfReady();
+		}
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return GetSunwellPlateauAI<boss_kalecgosAI>(creature);
+        return GetInstanceAI<boss_kalecgosAI>(creature);
     }
+};
+
+enum Kalec
+{
+	SPELL_OPEN_BRUTALLUS_BACK_DOOR = 46650,
+	MODEL_KALECGOS_DRAGON		= 23487,
+
+	EVENT_KALEC_SCENE_1			= 101,
+	EVENT_KALEC_SCENE_2			= 102,
+	EVENT_KALEC_SCENE_3			= 103
 };
 
 class boss_kalec : public CreatureScript
@@ -442,136 +361,116 @@ class boss_kalec : public CreatureScript
 public:
     boss_kalec() : CreatureScript("boss_kalec") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_kalecAI>(creature);
     }
 
     struct boss_kalecAI : public ScriptedAI
     {
-        InstanceScript* instance;
+        boss_kalecAI(Creature* creature) : ScriptedAI(creature) { }
 
-        uint32 RevitalizeTimer;
-        uint32 HeroicStrikeTimer;
-        uint32 YellTimer;
-        uint32 YellSequence;
+		EventMap events;
+		EventMap events2;
 
-        ObjectGuid SathGUID;
-
-        bool isEnraged; // if demon is enraged
-
-        boss_kalecAI(Creature* creature) : ScriptedAI(creature)
+        void Reset()
         {
-            Initialize();
-            instance = creature->GetInstanceScript();
+			events.Reset();
+			events2.Reset();
+			if (me->GetPositionY() < 750.0f)
+			{
+				me->SetSpeed(MOVE_RUN, 2.4f);
+				me->SetDisplayId(MODEL_KALECGOS_DRAGON);
+				me->SetDisableGravity(true);
+				me->GetMotionMaster()->MovePoint(0, 1483.30f, 657.99f, 28.0f, false, true);
+				events2.ScheduleEvent(EVENT_KALEC_SCENE_1, 9000);
+				events2.ScheduleEvent(EVENT_KALEC_SCENE_2, 16000);
+				events2.ScheduleEvent(EVENT_KALEC_SCENE_3, 22000);
+			}
+			else
+				me->CastSpell(me, SPELL_SPECTRAL_INVISIBILITY, true);
         }
 
-        void Initialize()
+        void DamageTaken(Unit* who, uint32& damage, DamageEffectType, SpellSchoolMask)
         {
-            RevitalizeTimer = 5000;
-            HeroicStrikeTimer = 3000;
-            YellTimer = 5000;
-            YellSequence = 0;
-
-            isEnraged = false;
-        }
-
-        void Reset() override
-        {
-            SathGUID = instance->GetGuidData(DATA_SATHROVARR);
-
-            Initialize();
-        }
-
-        void DamageTaken(Unit* done_by, uint32 &damage) override
-        {
-            if (done_by->GetGUID() != SathGUID)
+			if (!who || who->GetEntry() != NPC_SATHROVARR)
                 damage = 0;
-            else if (isEnraged)
-                damage *= 3;
         }
 
-        void UpdateAI(uint32 diff) override
+		void EnterCombat(Unit*)
+		{
+			events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+			events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
+			events.ScheduleEvent(EVENT_SPELL_REVITALIZE, 5000);
+			events.ScheduleEvent(EVENT_SPELL_HEROIC_STRIKE, 3000);
+            Talk(SAY_GOOD_AGGRO);
+		}
+
+		void JustDied(Unit*)
+		{
+			if (InstanceScript* instance = me->GetInstanceScript())
+				if (Creature* kalecgos = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_KALECGOS)))
+					kalecgos->AI()->DoAction(ACTION_KALEC_DIED);
+		}
+
+        void UpdateAI(uint32 diff)
         {
-            if (!me->HasAura(AURA_SPECTRAL_INVISIBILITY))
-                me->CastSpell(me, AURA_SPECTRAL_INVISIBILITY, true);
+			events2.Update(diff);
+			switch (events2.ExecuteEvent())
+			{
+				case EVENT_KALEC_SCENE_1:
+					Talk(SAY_GOOD_MADRIGOSA);
+					me->GetMotionMaster()->MovePoint(0, 1509.0f, 560.0f, 30.0f, false, true);
+					break;
+				case EVENT_KALEC_SCENE_2:
+					me->CastSpell(me, SPELL_OPEN_BRUTALLUS_BACK_DOOR, true);
+					me->GetInstanceScript()->SetBossState(DATA_FELMYST_DOORS, NOT_STARTED);
+					me->GetInstanceScript()->SetBossState(DATA_FELMYST_DOORS, DONE);
+					break;
+				case EVENT_KALEC_SCENE_3:
+					me->GetMotionMaster()->MovePoint(0, 1400.0f, 630.0f, 90.0f, false, true);
+					me->DespawnOrUnsummon(6000);
+					break;
+			}
 
             if (!UpdateVictim())
                 return;
 
-            if (YellTimer <= diff)
-            {
-                switch (YellSequence)
-                {
-                    case 0:
-                        Talk(SAY_GOOD_AGGRO);
-                        ++YellSequence;
-                        break;
-                    case 1:
-                        if (HealthBelowPct(50))
-                        {
-                            Talk(SAY_GOOD_NEAR_DEATH);
-                            ++YellSequence;
-                        }
-                        break;
-                    case 2:
-                        if (HealthBelowPct(10))
-                        {
-                            Talk(SAY_GOOD_NEAR_DEATH2);
-                            ++YellSequence;
-                        }
-                        break;
-                    default:
-                        break;
-                }
-                YellTimer = 5000;
-            }
+			events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
 
-            if (RevitalizeTimer <= diff)
-            {
-                DoCast(me, SPELL_REVITALIZE);
-                RevitalizeTimer = 5000;
-            } else RevitalizeTimer -= diff;
-
-            if (HeroicStrikeTimer <= diff)
-            {
-                DoCastVictim(SPELL_HEROIC_STRIKE);
-                HeroicStrikeTimer = 2000;
-            } else HeroicStrikeTimer -= diff;
+			switch (events.ExecuteEvent())
+			{
+				case EVENT_CHECK_HEALTH:
+					if (me->HealthBelowPct(50))
+					{
+						Talk(SAY_GOOD_NEAR_DEATH);
+						break;
+					}
+					events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+					break;
+				case EVENT_CHECK_HEALTH2:
+					if (me->HealthBelowPct(10))
+					{
+						Talk(SAY_GOOD_NEAR_DEATH2);
+						break;
+					}
+					events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
+					break;
+				case EVENT_SPELL_REVITALIZE:
+					me->CastSpell(me, SPELL_REVITALIZE, false);
+					events.ScheduleEvent(EVENT_SPELL_REVITALIZE, 10000);
+					break;
+				case EVENT_SPELL_HEROIC_STRIKE:
+					me->CastSpell(me->GetVictim(), SPELL_HEROIC_STRIKE, false);
+					events.ScheduleEvent(EVENT_SPELL_HEROIC_STRIKE, 5000);
+					break;
+			}
 
             DoMeleeAttackIfReady();
         }
     };
-};
-
-class kalecgos_teleporter : public GameObjectScript
-{
-public:
-    kalecgos_teleporter() : GameObjectScript("kalecgos_teleporter") { }
-
-    bool OnGossipHello(Player* player, GameObject* go) override
-    {
-#if MAX_PLAYERS_IN_SPECTRAL_REALM > 0
-        uint8 SpectralPlayers = 0;
-        Map::PlayerList const &PlayerList = go->GetMap()->GetPlayers();
-        for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
-        {
-            if (i->GetSource() && i->GetSource()->GetPositionZ() < DEMON_REALM_Z + 5)
-                ++SpectralPlayers;
-        }
-
-        if (player->HasAura(AURA_SPECTRAL_EXHAUSTION) || SpectralPlayers >= MAX_PLAYERS_IN_SPECTRAL_REALM)
-        {
-            player->GetSession()->SendNotification(GO_FAILED);
-            return true;
-        }
-#else
-        (void)go;
-#endif
-
-        player->CastSpell(player, SPELL_TELEPORT_SPECTRAL, true);
-        return true;
-    }
 };
 
 class boss_sathrovarr : public CreatureScript
@@ -579,7 +478,7 @@ class boss_sathrovarr : public CreatureScript
 public:
     boss_sathrovarr() : CreatureScript("boss_sathrovarr") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_sathrovarrAI>(creature);
     }
@@ -588,225 +487,269 @@ public:
     {
         boss_sathrovarrAI(Creature* creature) : ScriptedAI(creature)
         {
-            Initialize();
             instance = creature->GetInstanceScript();
         }
 
-        void Initialize()
-        {
-            ShadowBoltTimer = urand(7, 10) * 1000;
-            AgonyCurseTimer = 20000;
-            CorruptionStrikeTimer = 13000;
-            CheckTimer = 1000;
-            ResetThreat = 1000;
-            isEnraged = false;
-            isBanished = false;
-        }
-
         InstanceScript* instance;
+		EventMap events;
 
-        uint32 CorruptionStrikeTimer;
-        uint32 AgonyCurseTimer;
-        uint32 ShadowBoltTimer;
-        uint32 CheckTimer;
-        uint32 ResetThreat;
+		bool CanAIAttack(Unit const* target) const
+		{
+			return target->GetPositionZ() < 50.0f;
+		}
 
-        ObjectGuid KalecGUID;
-        ObjectGuid KalecgosGUID;
-
-        bool isEnraged;
-        bool isBanished;
-
-        void Reset() override
+        void Reset()
         {
-            me->SetFullHealth();//dunno why it does not resets health at evade..
-            me->setActive(true);
-            KalecgosGUID = instance->GetGuidData(DATA_KALECGOS_DRAGON);
-            instance->SetBossState(DATA_KALECGOS, NOT_STARTED);
-            if (KalecGUID)
-            {
-                if (Creature* Kalec = ObjectAccessor::GetCreature(*me, KalecGUID))
-                    Kalec->setDeathState(JUST_DIED);
-                KalecGUID.Clear();
-            }
+			events.Reset();
+            me->CastSpell(me, SPELL_DEMONIC_VISUAL, true);
+			me->CastSpell(me, SPELL_SPECTRAL_INVISIBILITY, true);
 
-            Initialize();
-
-            me->CastSpell(me, AURA_DEMONIC_VISUAL, true);
-            TeleportAllPlayersBack();
+			events.ScheduleEvent(EVENT_SHADOW_BOLT, 7000);
+			events.ScheduleEvent(EVENT_AGONY_CURSE, 20000);
+			events.ScheduleEvent(EVENT_CORRUPTION_STRIKE, 13000);
+			events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+			events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
-            if (Creature* Kalec = me->SummonCreature(NPC_KALEC, me->GetPositionX() + 10, me->GetPositionY() + 5, me->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 0))
-            {
-                KalecGUID = Kalec->GetGUID();
-                me->CombatStart(Kalec);
-                me->AddThreat(Kalec, 100.0f);
-                Kalec->setActive(true);
-            }
             Talk(SAY_SATH_AGGRO);
         }
 
-        void DamageTaken(Unit* done_by, uint32 &damage) override
+        void DamageTaken(Unit* who, uint32& damage, DamageEffectType, SpellSchoolMask)
         {
-            if (damage >= me->GetHealth() && done_by != me)
+            if (damage >= me->GetHealth() && who != me)
                 damage = 0;
         }
 
-        void KilledUnit(Unit* target) override
+        void KilledUnit(Unit* target)
         {
-            if (target->GetGUID() == KalecGUID)
-            {
-                TeleportAllPlayersBack();
-                if (Creature* Kalecgos = ObjectAccessor::GetCreature(*me, KalecgosGUID))
-                {
-                    ENSURE_AI(boss_kalecgos::boss_kalecgosAI, Kalecgos->AI())->TalkTimer = 1;
-                    ENSURE_AI(boss_kalecgos::boss_kalecgosAI, Kalecgos->AI())->isFriendly = false;
-                }
-                EnterEvadeMode();
-                return;
-            }
-            Talk(SAY_SATH_SLAY);
+			if (target->GetTypeId() == TYPEID_PLAYER)
+				Talk(SAY_SATH_SLAY);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             Talk(SAY_SATH_DEATH);
-            me->SetPosition(me->GetPositionX(), me->GetPositionY(), DRAGON_REALM_Z, me->GetOrientation());
-            TeleportAllPlayersBack();
-            if (Creature* Kalecgos = ObjectAccessor::GetCreature(*me, KalecgosGUID))
-            {
-                ENSURE_AI(boss_kalecgos::boss_kalecgosAI, Kalecgos->AI())->TalkTimer = 1;
-                ENSURE_AI(boss_kalecgos::boss_kalecgosAI, Kalecgos->AI())->isFriendly = true;
-            }
-
-            instance->SetBossState(DATA_KALECGOS, DONE);
         }
 
-        void TeleportAllPlayersBack()
+        void DoAction(int32 param)
         {
-            Map::PlayerList const &playerList = me->GetMap()->GetPlayers();
-            Position const& homePos = me->GetHomePosition();
-            for (Map::PlayerList::const_iterator itr = playerList.begin(); itr != playerList.end(); ++itr)
-            {
-                Player* player = itr->GetSource();
-                if (player->IsInDist(&homePos, 50.0f) && player->GetPositionZ() <= DEMON_REALM_Z + 10.f)
-                {
-                    player->RemoveAura(AURA_SPECTRAL_REALM);
-                    player->TeleportTo(me->GetMap()->GetId(), player->GetPositionX(),
-                        player->GetPositionY(), DRAGON_REALM_Z + 5, player->GetOrientation());
-                }
-            }
+            if (param == ACTION_ENRAGE || param == ACTION_ENRAGE_OTHER)
+			{
+				me->CastSpell(me, SPELL_CRAZED_RAGE, true);
+				events.CancelEvent(EVENT_CHECK_HEALTH);
+			}
+            else if (param == ACTION_BANISH)
+			{
+				me->CastSpell(me, SPELL_BANISH, true);
+				events.Reset();
+			}
         }
 
-        void DoAction(int32 param) override
+        void UpdateAI(uint32 diff)
         {
-            switch (param)
-            {
-                case DO_ENRAGE:
-                    isEnraged = true;
-                    me->CastSpell(me, SPELL_ENRAGE, true);
-                    break;
-                case DO_BANISH:
-                    isBanished = true;
-                    me->CastSpell(me, SPELL_BANISH, true);
-                    break;
-            }
-        }
-
-        void UpdateAI(uint32 diff) override
-        {
-            if (!me->HasAura(AURA_SPECTRAL_INVISIBILITY))
-                me->CastSpell(me, AURA_SPECTRAL_INVISIBILITY, true);
-
             if (!UpdateVictim())
                 return;
 
-            if (CheckTimer <= diff)
-            {
-                Creature* Kalec = ObjectAccessor::GetCreature(*me, KalecGUID);
-                if (!Kalec || !Kalec->IsAlive())
-                {
-                    if (Creature* Kalecgos = ObjectAccessor::GetCreature(*me, KalecgosGUID))
-                        Kalecgos->AI()->EnterEvadeMode();
-                    return;
-                }
+			events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
 
-                if (HealthBelowPct(10) && !isEnraged)
-                {
-                    if (Creature* Kalecgos = ObjectAccessor::GetCreature(*me, KalecgosGUID))
-                        Kalecgos->AI()->DoAction(DO_ENRAGE);
-                    DoAction(DO_ENRAGE);
-                }
-
-                Creature* Kalecgos = ObjectAccessor::GetCreature(*me, KalecgosGUID);
-                if (Kalecgos && !Kalecgos->IsInCombat())
-                {
-                    EnterEvadeMode();
-                    return;
-                }
-
-                if (!isBanished && HealthBelowPct(1))
-                {
-                    if (Kalecgos)
-                    {
-                        if (Kalecgos->HasAura(SPELL_BANISH))
-                        {
-                            me->DealDamage(me, me->GetHealth());
-                            return;
-                        }
-                        DoAction(DO_BANISH);
-                    }
-                    else
-                    {
-                        me->TextEmote(EMOTE_UNABLE_TO_FIND);
-                        EnterEvadeMode();
-                        return;
-                    }
-                }
-                CheckTimer = 1000;
-            } else CheckTimer -= diff;
-
-            if (ResetThreat <= diff)
-            {
-                ThreatContainer::StorageType threatlist = me->getThreatManager().getThreatList();
-                for (ThreatContainer::StorageType::const_iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
-                {
-                    if (Unit* unit = ObjectAccessor::GetUnit(*me, (*itr)->getUnitGuid()))
-                        if (unit->GetPositionZ() > me->GetPositionZ() + 5)
-                            me->getThreatManager().modifyThreatPercent(unit, -100);
-                }
-                ResetThreat = 1000;
-            } else ResetThreat -= diff;
-
-            if (ShadowBoltTimer <= diff)
-            {
-                if (!(rand32() % 5))
-                    Talk(SAY_SATH_SPELL1);
-                DoCast(me, SPELL_SHADOW_BOLT);
-                ShadowBoltTimer = 7000 + (rand32() % 3000);
-            } else ShadowBoltTimer -= diff;
-
-            if (AgonyCurseTimer <= diff)
-            {
-                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1);
-                if (!target)
-                    target = me->GetVictim();
-                DoCast(target, SPELL_AGONY_CURSE);
-                AgonyCurseTimer = 20000;
-            } else AgonyCurseTimer -= diff;
-
-            if (CorruptionStrikeTimer <= diff)
-            {
-                if (!(rand32() % 5))Talk(SAY_SATH_SPELL2);
-                DoCastVictim(SPELL_CORRUPTION_STRIKE);
-                CorruptionStrikeTimer = 13000;
-            } else CorruptionStrikeTimer -= diff;
+			switch (events.ExecuteEvent())
+			{
+				case EVENT_SHADOW_BOLT:
+					if (roll_chance_i(20))
+						Talk(SAY_SATH_SPELL1);
+					me->CastSpell(me->GetVictim(), SPELL_SHADOW_BOLT, false);
+					events.ScheduleEvent(EVENT_SHADOW_BOLT, 9000);
+					break;
+				case EVENT_AGONY_CURSE:
+					me->CastCustomSpell(SPELL_CURSE_OF_BOUNDLESS_AGONY, SPELLVALUE_MAX_TARGETS, 1, me, false);
+					events.ScheduleEvent(EVENT_AGONY_CURSE, 30000);
+					break;
+				case EVENT_CORRUPTION_STRIKE:
+					if (roll_chance_i(20))
+						Talk(SAY_SATH_SPELL2);
+					me->CastSpell(me->GetVictim(), SPELL_CORRUPTION_STRIKE, false);
+					events.ScheduleEvent(EVENT_CORRUPTION_STRIKE, 9000);
+					break;
+				case EVENT_CHECK_HEALTH:
+					if (me->HealthBelowPct(10))
+					{
+						if (InstanceScript* instance = me->GetInstanceScript())
+							if (Creature* kalecgos = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_KALECGOS)))
+								kalecgos->AI()->DoAction(ACTION_ENRAGE_OTHER);
+                        DoAction(ACTION_ENRAGE);
+						break;
+					}
+					events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+					break;
+				case EVENT_CHECK_HEALTH2:
+					if (me->HealthBelowPct(1))
+					{
+						if (Creature* kalecgos = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_KALECGOS)))
+                            kalecgos->AI()->DoAction(ACTION_SATH_BANISH);
+						DoAction(ACTION_BANISH);
+						break;
+					}
+					events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
+					break;
+			}
 
             DoMeleeAttackIfReady();
         }
     };
+};
+
+class SpectralBlastCheck
+{
+	public:
+		SpectralBlastCheck(Unit* victim) : _victim(victim) { }
+
+		bool operator()(WorldObject* unit)
+		{
+			return unit->GetPositionZ() < 50.0f || unit->ToUnit()->HasAura(SPELL_SPECTRAL_EXHAUSTION) || unit->GetGUID() == _victim->GetGUID();
+		}
+	private:
+		Unit* _victim;
+};
+
+class spell_kalecgos_spectral_blast_dummy : public SpellScriptLoader
+{
+public:
+	spell_kalecgos_spectral_blast_dummy() : SpellScriptLoader("spell_kalecgos_spectral_blast_dummy") { }
+
+	class spell_kalecgos_spectral_blast_dummy_SpellScript : public SpellScript
+	{
+		PrepareSpellScript(spell_kalecgos_spectral_blast_dummy_SpellScript);
+
+		void FilterTargets(std::list<WorldObject*>& targets)
+		{
+			targets.remove_if(SpectralBlastCheck(GetCaster()->GetVictim()));
+			Trinity::Containers::RandomResizeList(targets, 1);
+		}			
+		
+		void HandleDummy(SpellEffIndex effIndex)
+		{
+			PreventHitDefaultEffect(effIndex);
+			if (Unit* target = GetHitUnit())
+			{
+				target->CastSpell(target, SPELL_SPECTRAL_BLAST_PORTAL, true);
+				target->CastSpell(target, SPELL_SPECTRAL_BLAST_AA, true);
+				target->CastSpell(target, SPELL_TELEPORT_SPECTRAL, true);
+			}
+		}
+
+		void Register()
+		{
+			OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_kalecgos_spectral_blast_dummy_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
+			OnEffectHitTarget += SpellEffectFn(spell_kalecgos_spectral_blast_dummy_SpellScript::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+		}
+	};
+
+	SpellScript* GetSpellScript() const
+	{
+		return new spell_kalecgos_spectral_blast_dummy_SpellScript();
+	}
+};
+
+class spell_kalecgos_curse_of_boundless_agony : public SpellScriptLoader
+{
+    public:
+        spell_kalecgos_curse_of_boundless_agony() : SpellScriptLoader("spell_kalecgos_curse_of_boundless_agony") { }
+
+        class spell_kalecgos_curse_of_boundless_agony_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_kalecgos_curse_of_boundless_agony_AuraScript);
+
+            void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+            {
+				if (InstanceScript* instance = GetUnitOwner()->GetInstanceScript())
+					if (instance->IsEncounterInProgress())
+						GetUnitOwner()->CastCustomSpell(SPELL_CURSE_OF_BOUNDLESS_AGONY_PLR, SPELLVALUE_MAX_TARGETS, 1, GetUnitOwner(), true);
+            }
+
+            void OnPeriodic(AuraEffect const* aurEff)
+            {
+				if (aurEff->GetTickNumber() > 1 && aurEff->GetTickNumber()%5 == 1)
+					GetAura()->GetEffect(aurEff->GetEffIndex())->SetAmount(aurEff->GetAmount()*2);
+            }
+
+            void Register()
+            {
+				AfterEffectRemove += AuraEffectRemoveFn(spell_kalecgos_curse_of_boundless_agony_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE, AURA_EFFECT_HANDLE_REAL);
+				OnEffectPeriodic += AuraEffectPeriodicFn(spell_kalecgos_curse_of_boundless_agony_AuraScript::OnPeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_kalecgos_curse_of_boundless_agony_AuraScript();
+        }
+};
+
+class spell_kalecgos_spectral_realm_dummy : public SpellScriptLoader
+{
+    public:
+        spell_kalecgos_spectral_realm_dummy() : SpellScriptLoader("spell_kalecgos_spectral_realm_dummy") { }
+
+        class spell_kalecgos_spectral_realm_dummy_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_kalecgos_spectral_realm_dummy_SpellScript);
+
+            SpellCastResult CheckCast()
+            {
+				if (GetCaster()->HasAura(SPELL_SPECTRAL_EXHAUSTION))
+					return SPELL_FAILED_CASTER_AURASTATE;
+
+                return SPELL_CAST_OK;
+            }
+
+            void HandleScriptEffect(SpellEffIndex effIndex)
+            {
+				PreventHitDefaultEffect(effIndex);
+				GetCaster()->CastSpell(GetCaster(), SPELL_TELEPORT_SPECTRAL, true);
+            }
+
+            void Register()
+            {
+                OnCheckCast += SpellCheckCastFn(spell_kalecgos_spectral_realm_dummy_SpellScript::CheckCast);
+                OnEffectHitTarget += SpellEffectFn(spell_kalecgos_spectral_realm_dummy_SpellScript::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_kalecgos_spectral_realm_dummy_SpellScript();
+        }
+};
+
+class spell_kalecgos_spectral_realm : public SpellScriptLoader
+{
+    public:
+        spell_kalecgos_spectral_realm() : SpellScriptLoader("spell_kalecgos_spectral_realm") { }
+
+        class spell_kalecgos_spectral_realm_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_kalecgos_spectral_realm_AuraScript);
+
+            void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+            {
+				GetUnitOwner()->CastSpell(GetUnitOwner(), SPELL_SPECTRAL_EXHAUSTION, true);
+				GetUnitOwner()->CastSpell(GetUnitOwner(), SPELL_TELEPORT_NORMAL_REALM, true);
+            }
+
+            void Register()
+            {
+				OnEffectRemove += AuraEffectRemoveFn(spell_kalecgos_spectral_realm_AuraScript::OnRemove, EFFECT_1, SPELL_AURA_MOD_INVISIBILITY, AURA_EFFECT_HANDLE_REAL);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_kalecgos_spectral_realm_AuraScript();
+        }
 };
 
 void AddSC_boss_kalecgos()
@@ -814,5 +757,8 @@ void AddSC_boss_kalecgos()
     new boss_kalecgos();
     new boss_sathrovarr();
     new boss_kalec();
-    new kalecgos_teleporter();
+	new spell_kalecgos_spectral_blast_dummy();
+	new spell_kalecgos_curse_of_boundless_agony();
+	new spell_kalecgos_spectral_realm_dummy();
+	new spell_kalecgos_spectral_realm();
 }

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,6 +20,7 @@
 #define TRINITY_MOVEMENTGENERATOR_H
 
 #include "Define.h"
+#include <ace/Singleton.h>
 #include "ObjectRegistry.h"
 #include "FactoryHolder.h"
 #include "Common.h"
@@ -39,37 +40,39 @@ class MovementGenerator
 
         virtual bool Update(Unit*, uint32 time_diff) = 0;
 
-        virtual MovementGeneratorType GetMovementGeneratorType() const = 0;
+        virtual MovementGeneratorType GetMovementGeneratorType() = 0;
+
+		virtual uint32 GetSplineId() const { return 0; }  // Xinef: Escort system
 
         virtual void unitSpeedChanged() { }
 
         // used by Evade code for select point to evade with expected restart default movement
-        virtual bool GetResetPosition(Unit*, float& /*x*/, float& /*y*/, float& /*z*/) { return false; }
+        virtual bool GetResetPosition(float& /*x*/, float& /*y*/, float& /*z*/) { return false; }
 };
 
 template<class T, class D>
 class MovementGeneratorMedium : public MovementGenerator
 {
     public:
-        void Initialize(Unit* u) override
+        void Initialize(Unit* u)
         {
             //u->AssertIsType<T>();
             (static_cast<D*>(this))->DoInitialize(static_cast<T*>(u));
         }
 
-        void Finalize(Unit* u) override
+        void Finalize(Unit* u)
         {
             //u->AssertIsType<T>();
             (static_cast<D*>(this))->DoFinalize(static_cast<T*>(u));
         }
 
-        void Reset(Unit* u) override
+        void Reset(Unit* u)
         {
             //u->AssertIsType<T>();
             (static_cast<D*>(this))->DoReset(static_cast<T*>(u));
         }
 
-        bool Update(Unit* u, uint32 time_diff) override
+        bool Update(Unit* u, uint32 time_diff)
         {
             //u->AssertIsType<T>();
             return (static_cast<D*>(this))->DoUpdate(static_cast<T*>(u), time_diff);
@@ -78,17 +81,18 @@ class MovementGeneratorMedium : public MovementGenerator
 
 struct SelectableMovement : public FactoryHolder<MovementGenerator, MovementGeneratorType>
 {
-    SelectableMovement(MovementGeneratorType mgt) : FactoryHolder<MovementGenerator, MovementGeneratorType>(mgt) { }
+    SelectableMovement(MovementGeneratorType mgt) : FactoryHolder<MovementGenerator, MovementGeneratorType>(mgt) {}
 };
 
 template<class REAL_MOVEMENT>
 struct MovementGeneratorFactory : public SelectableMovement
 {
-    MovementGeneratorFactory(MovementGeneratorType mgt) : SelectableMovement(mgt) { }
+    MovementGeneratorFactory(MovementGeneratorType mgt) : SelectableMovement(mgt) {}
 
-    MovementGenerator* Create(void *) const override;
+    MovementGenerator* Create(void *) const;
 };
 
 typedef FactoryHolder<MovementGenerator, MovementGeneratorType> MovementGeneratorCreator;
 typedef FactoryHolder<MovementGenerator, MovementGeneratorType>::FactoryHolderRegistry MovementGeneratorRegistry;
+typedef FactoryHolder<MovementGenerator, MovementGeneratorType>::FactoryHolderRepository MovementGeneratorRepository;
 #endif

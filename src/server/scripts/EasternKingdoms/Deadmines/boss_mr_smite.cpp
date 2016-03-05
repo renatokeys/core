@@ -1,230 +1,145 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss Mr.Smite
-SD%Complete:
-SDComment: Timers and say taken from acid script
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
-#include "deadmines.h"
 
-enum Spells
+enum Spels
 {
-    SPELL_TRASH             = 3391,
     SPELL_SMITE_STOMP       = 6432,
     SPELL_SMITE_SLAM        = 6435,
-    SPELL_NIMBLE_REFLEXES   = 6264
-};
 
-enum Equips
-{
-    EQUIP_SWORD             = 5191,
-    EQUIP_AXE               = 5196,
-    EQUIP_MACE              = 7230
-};
+    EQUIP_SWORD             = 1,
+	EQUIP_TWO_SWORDS		= 2,
+    EQUIP_MACE              = 3,
 
-enum Texts
-{
-    SAY_PHASE_1             = 2,
-    SAY_PHASE_2             = 3
+	EVENT_CHECK_HEALTH1		= 1,
+	EVENT_CHECK_HEALTH2		= 2,
+	EVENT_SMITE_SLAM		= 3,
+	EVENT_SWAP_WEAPON1		= 4,
+	EVENT_SWAP_WEAPON2		= 5,
+	EVENT_RESTORE_COMBAT	= 6,
+	EVENT_KNEEL				= 7,
+
+	SAY_SWAP1				= 2,
+	SAY_SWAP2				= 3
 };
 
 class boss_mr_smite : public CreatureScript
 {
-public:
-    boss_mr_smite() : CreatureScript("boss_mr_smite") { }
+	public:
+		boss_mr_smite() : CreatureScript("boss_mr_smite") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return GetInstanceAI<boss_mr_smiteAI>(creature);
-    }
+		CreatureAI* GetAI(Creature* creature) const
+		{
+			return GetInstanceAI<boss_mr_smiteAI>(creature);
+		}
 
-    struct boss_mr_smiteAI : public ScriptedAI
-    {
-        boss_mr_smiteAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-            instance = creature->GetInstanceScript();
-        }
+		struct boss_mr_smiteAI : public ScriptedAI
+		{
+			boss_mr_smiteAI(Creature* creature) : ScriptedAI(creature)
+			{
+			}
 
-        void Initialize()
-        {
-            uiTrashTimer = urand(5000, 9000);
-            uiSlamTimer = 9000;
-            uiNimbleReflexesTimer = urand(15500, 31600);
+			EventMap events;
 
-            uiHealth = 0;
+			void Reset()
+			{
+				me->LoadEquipment(EQUIP_SWORD);
+				me->SetCanDualWield(false);
+				me->SetStandState(UNIT_STAND_STATE_STAND);
+				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED);
+				me->SetReactState(REACT_AGGRESSIVE);
+			}
 
-            uiPhase = 0;
-            uiTimer = 0;
+			void EnterCombat(Unit* /*who*/)
+			{
+				events.ScheduleEvent(EVENT_CHECK_HEALTH1, 500);
+				events.ScheduleEvent(EVENT_CHECK_HEALTH2, 500);
+				events.ScheduleEvent(EVENT_SMITE_SLAM, 3000);
+			}
 
-            uiIsMoving = false;
-        }
+			void UpdateAI(uint32 diff)
+			{
+				if (!UpdateVictim())
+					return;
 
-        InstanceScript* instance;
+				events.Update(diff);
+				switch (events.ExecuteEvent())
+				{
+					case EVENT_SMITE_SLAM:
+						me->CastSpell(me->GetVictim(), SPELL_SMITE_SLAM, false);
+						events.ScheduleEvent(EVENT_SMITE_SLAM, 15000);
+						break;
+					case EVENT_CHECK_HEALTH1:
+						if (me->HealthBelowPct(67))
+						{
+							me->CastSpell(me, SPELL_SMITE_STOMP, false);
+							events.DelayEvents(10000);
+							me->GetMotionMaster()->Clear();
+							me->GetMotionMaster()->MovePoint(EQUIP_TWO_SWORDS, 1.859f, -780.72f, 9.831f);
+							Talk(SAY_SWAP1);
+							me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED);
+							me->SetReactState(REACT_PASSIVE);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH1, 500);
+						break;
+					case EVENT_CHECK_HEALTH2:
+						if (me->HealthBelowPct(34))
+						{
+							me->CastSpell(me, SPELL_SMITE_STOMP, false);
+							events.DelayEvents(10000);
+							me->GetMotionMaster()->Clear();
+							me->GetMotionMaster()->MovePoint(EQUIP_MACE, 1.859f, -780.72f, 9.831f);
+							Talk(SAY_SWAP2);
+							me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED);
+							me->SetReactState(REACT_PASSIVE);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH2, 500);
+						break;
+					case EVENT_SWAP_WEAPON1:
+						me->LoadEquipment(EQUIP_TWO_SWORDS);
+						me->SetCanDualWield(true);
+						break;
+					case EVENT_SWAP_WEAPON2:
+						me->LoadEquipment(EQUIP_MACE);
+						me->SetCanDualWield(false);
+						break;
+					case EVENT_RESTORE_COMBAT:
+						me->SetReactState(REACT_AGGRESSIVE);
+						me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED);
+						me->SetStandState(UNIT_STAND_STATE_STAND);
+						if (me->GetVictim())
+						{
+							me->GetMotionMaster()->MoveChase(me->GetVictim());
+							me->SetTarget(me->GetVictim()->GetGUID());
+						}
+						break;
+					case EVENT_KNEEL:
+						me->SendMeleeAttackStop(me->GetVictim());
+						me->SetStandState(UNIT_STAND_STATE_KNEEL);
+						break;
+				}
 
-        uint32 uiTrashTimer;
-        uint32 uiSlamTimer;
-        uint32 uiNimbleReflexesTimer;
+				DoMeleeAttackIfReady();
+			}
 
-        uint8 uiHealth;
+			void MovementInform(uint32 type, uint32 point)
+			{
+				if (type != POINT_MOTION_TYPE)
+					return;
 
-        uint32 uiPhase;
-        uint32 uiTimer;
-
-        bool uiIsMoving;
-
-        void Reset() override
-        {
-            Initialize();
-
-            SetEquipmentSlots(false, EQUIP_SWORD, EQUIP_UNEQUIP, EQUIP_NO_CHANGE);
-            me->SetStandState(UNIT_STAND_STATE_STAND);
-            me->SetReactState(REACT_AGGRESSIVE);
-        }
-
-        void EnterCombat(Unit* /*who*/) override
-        {
-        }
-
-        bool bCheckChances()
-        {
-            uint32 uiChances = urand(0, 99);
-            if (uiChances <= 15)
-                return false;
-            else
-                return true;
-        }
-
-        void UpdateAI(uint32 uiDiff) override
-        {
-            if (!UpdateVictim())
-                return;
-
-            if (!uiIsMoving) // halt abilities in between phases
-            {
-                if (uiTrashTimer <= uiDiff)
-                {
-                    if (bCheckChances())
-                        DoCast(me, SPELL_TRASH);
-                    uiTrashTimer = urand(6000, 15500);
-                }
-                else uiTrashTimer -= uiDiff;
-
-                if (uiSlamTimer <= uiDiff)
-                {
-                    if (bCheckChances())
-                        DoCastVictim(SPELL_SMITE_SLAM);
-                    uiSlamTimer = 11000;
-                }
-                else uiSlamTimer -= uiDiff;
-
-                if (uiNimbleReflexesTimer <= uiDiff)
-                {
-                    if (bCheckChances())
-                        DoCast(me, SPELL_NIMBLE_REFLEXES);
-                    uiNimbleReflexesTimer = urand(27300, 60100);
-                }
-                else uiNimbleReflexesTimer -= uiDiff;
-            }
-
-            if ((uiHealth == 0 && !HealthAbovePct(66)) || (uiHealth == 1 && !HealthAbovePct(33)))
-            {
-                ++uiHealth;
-                DoCastAOE(SPELL_SMITE_STOMP, false);
-                SetCombatMovement(false);
-                me->AttackStop();
-                me->InterruptNonMeleeSpells(false);
-                me->SetReactState(REACT_PASSIVE);
-                uiTimer = 2500;
-                uiPhase = 1;
-
-                switch (uiHealth)
-                {
-                    case 1:
-                        Talk(SAY_PHASE_1);
-                        break;
-                    case 2:
-                        Talk(SAY_PHASE_2);
-                        break;
-                }
-            }
-
-            if (uiPhase)
-            {
-                if (uiTimer <= uiDiff)
-                {
-                    switch (uiPhase)
-                    {
-                        case 1:
-                        {
-                            if (uiIsMoving)
-                                break;
-
-                            if (GameObject* go = ObjectAccessor::GetGameObject(*me, instance->GetGuidData(DATA_SMITE_CHEST)))
-                            {
-                                me->GetMotionMaster()->Clear();
-                                me->GetMotionMaster()->MovePoint(1, go->GetPositionX() - 1.5f, go->GetPositionY() + 1.4f, go->GetPositionZ());
-                                uiIsMoving = true;
-                            }
-                            break;
-                        }
-                        case 2:
-                            if (uiHealth == 1)
-                                SetEquipmentSlots(false, EQUIP_AXE, EQUIP_AXE, EQUIP_NO_CHANGE);
-                            else
-                                SetEquipmentSlots(false, EQUIP_MACE, EQUIP_UNEQUIP, EQUIP_NO_CHANGE);
-                            uiTimer = 500;
-                            uiPhase = 3;
-                            break;
-                        case 3:
-                            me->SetStandState(UNIT_STAND_STATE_STAND);
-                            uiTimer = 750;
-                            uiPhase = 4;
-                            break;
-                        case 4:
-                            me->SetReactState(REACT_AGGRESSIVE);
-                            SetCombatMovement(true);
-                            me->GetMotionMaster()->MoveChase(me->GetVictim(), me->m_CombatDistance);
-                            uiIsMoving = false;
-                            uiPhase = 0;
-                            break;
-                    }
-                } else uiTimer -= uiDiff;
-            }
-
-            DoMeleeAttackIfReady();
-        }
-
-        void MovementInform(uint32 uiType, uint32 /*uiId*/) override
-        {
-            if (uiType != POINT_MOTION_TYPE)
-                return;
-
-            me->SetFacingTo(5.47f);
-            me->SetStandState(UNIT_STAND_STATE_KNEEL);
-
-            uiTimer = 2000;
-            uiPhase = 2;
-        }
-    };
+				me->SetTarget(0);
+				me->SetFacingTo(5.558f);
+				me->SetStandState(UNIT_STAND_STATE_KNEEL);
+				events.ScheduleEvent(point == EQUIP_TWO_SWORDS ? EVENT_SWAP_WEAPON1 : EVENT_SWAP_WEAPON2, 1500);
+				events.ScheduleEvent(EVENT_RESTORE_COMBAT, 3000);
+				events.ScheduleEvent(EVENT_KNEEL, 0);
+			}
+		};
 };
 
 void AddSC_boss_mr_smite()

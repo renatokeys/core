@@ -1,144 +1,116 @@
 {
-   [1] std::atomic
+   [1] ACE_Future::ready() race in WorldSession::ProcessQueryCallbacks(), a lock is used anyway in ACE_Future::get()/set()
    Helgrind:Race
-   fun:_ZNSt13__atomic_baseIlE5storeElSt12memory_order
-   fun:_ZNSt13__atomic_baseIlEaSEl
+   ...
+   fun:_ZN14ACE_Future_RepIN7Trinity7AutoPtrI17PreparedResultSet16ACE_Thread_MutexEEE3setERKS4_R10ACE_FutureIS4_E
+   fun:_ZN10ACE_FutureIN7Trinity7AutoPtrI17PreparedResultSet16ACE_Thread_MutexEEE3setERKS4_
+   fun:_ZN21PreparedStatementTask7ExecuteEv
 }
 {
-   [1] std::atomic
+   [1] ACE_Future::ready() race in WorldSession::ProcessQueryCallbacks(), a lock is used anyway in ACE_Future::get()/set()
    Helgrind:Race
-   fun:_ZNKSt13__atomic_baseIlE4loadESt12memory_order
-   fun:_ZNKSt13__atomic_baseIlEcvlEv
+   ...
+   fun:_ZN14ACE_Future_RepIP14SQLQueryHolderE3setERKS1_R10ACE_FutureIS1_E
+   fun:_ZN10ACE_FutureIP14SQLQueryHolderE3setERKS1_
+   fun:_ZN18SQLQueryHolderTask7ExecuteEv
 }
 {
-   [1] std::atomic
+   [2] ACE_Future::ready() race in WorldSession::ProcessQueryCallbacks(), a lock is used anyway in ACE_Future::get()/set()
    Helgrind:Race
-   fun:_ZNSt13__atomic_baseIbE5storeEbSt12memory_order
-   fun:_ZNSt13__atomic_baseIbEaSEb
+   ...
+   fun:_ZNK14ACE_Future_RepIP14SQLQueryHolderE5readyEv
+   fun:_ZNK10ACE_FutureIP14SQLQueryHolderE5readyEv
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [3] ACE_Future::attach()/detach() false positive in WorldSession::HandleCharEnumOpcode()
    Helgrind:Race
-   fun:_ZNKSt13__atomic_baseIbE4loadESt12memory_order
-   fun:_ZNKSt11atomic_boolcvbEv
+   ...
+   fun:_ZN14ACE_Future_RepIN7Trinity7AutoPtrI17PreparedResultSet16ACE_Thread_MutexEEE6attachERPS5_
 }
 {
-   [1] std::atomic
+   [4] ACE_Future::get() race in WorldSession::ProcessQueryCallbacks() , a lock is used anyway in ACE_Future::get()/set(), the only case when this is a race is if the same ACE_Future is reused by another thread
    Helgrind:Race
-   fun:_ZNSt13__atomic_baseIiE5storeEiSt12memory_order
-   fun:_ZNSt13__atomic_baseIiEaSEi
+   ...
+   fun:_ZNK14ACE_Future_RepIP14SQLQueryHolderE3getERS1_P14ACE_Time_Value
+   fun:_ZNK10ACE_FutureIP14SQLQueryHolderE3getERS1_P14ACE_Time_Value
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [4] ACE_Future::get() race in WorldSession::ProcessQueryCallbacks() , a lock is used anyway in ACE_Future::get()/set(), the only case when this is a race is if the same ACE_Future is reused by another thread
    Helgrind:Race
-   fun:_ZNSt13__atomic_baseIiEmIEi
+   ...
+   fun:_ZNK10ACE_FutureIN7Trinity7AutoPtrI17PreparedResultSet16ACE_Thread_MutexEEE5readyEv
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [5] Race in WorldSession::ProcessQueryCallbacks(), added ASSERT(!m_result.ready())
    Helgrind:Race
-   fun:_ZNSt13__atomic_baseIjE5storeEjSt12memory_order
-   fun:_ZNSt13__atomic_baseIjEaSEj
+   ...
+   fun:_ZN6Player10LoadFromDBEjP14SQLQueryHolder
+   fun:_ZN12WorldSession17HandlePlayerLoginEP16LoginQueryHolder
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [5] Race in WorldSession::ProcessQueryCallbacks(), added ASSERT(!m_result.ready())
    Helgrind:Race
-   fun:_ZNKSt13__atomic_baseIjE4loadESt12memory_order
-   fun:_ZNKSt13__atomic_baseIjEcvjEv
+   ...
+   fun:_ZN14SQLQueryHolder17GetPreparedResultEm
+   fun:_ZN12WorldSession17HandlePlayerLoginEP16LoginQueryHolder
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [5] Race in WorldSession::ProcessQueryCallbacks(), added ASSERT(!m_result.ready())
    Helgrind:Race
-   fun:load
-   fun:_ZNKSt13__atomic_baseIjEcvjEv
+   ...
+   fun:_ZN12WorldSession15LoadAccountDataEN7Trinity7AutoPtrI17PreparedResultSet16ACE_Thread_MutexEEj
+   fun:_ZN12WorldSession17HandlePlayerLoginEP16LoginQueryHolder
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [5] Race in WorldSession::ProcessQueryCallbacks(), added ASSERT(!m_result.ready())
    Helgrind:Race
-   fun:store
-   fun:_ZNSt13__atomic_baseIiEaSEi
+   ...
+   fun:_ZNK17PreparedResultSet5FetchEv
+   fun:_ZN12WorldSession17HandlePlayerLoginEP16LoginQueryHolder
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [5] Race in WorldSession::ProcessQueryCallbacks(), added ASSERT(!m_result.ready())
    Helgrind:Race
-   fun:store
-   fun:_ZNSt13__atomic_baseIbEaSEb
+   ...
+   fun:_ZNK5Field9GetUInt32Ev
+   fun:_ZN12WorldSession17HandlePlayerLoginEP16LoginQueryHolder
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [5] Race in WorldSession::ProcessQueryCallbacks(), added ASSERT(!m_result.ready())
    Helgrind:Race
-   fun:load
-   fun:_ZNKSt11atomic_boolcvbEv
+   ...
+   fun:_ZNK5Field8GetUInt8Ev
+   fun:_ZN12WorldSession17HandlePlayerLoginEP16LoginQueryHolder
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [1] std::atomic
+   [6] False positive of possible race about ACE_Strong_Bound_Ptr
    Helgrind:Race
-   fun:store
-   fun:_ZNSt13__atomic_baseIjEaSEj
+   ...
+   fun:_ZN17PreparedResultSetD1Ev
+   fun:_ZN20ACE_Strong_Bound_PtrI17PreparedResultSet16ACE_Thread_MutexED1Ev
+   fun:_ZN7Trinity7AutoPtrI17PreparedResultSet16ACE_Thread_MutexED1Ev
+   fun:_ZN12WorldSession17HandlePlayerLoginEP16LoginQueryHolder
+   fun:_ZN12WorldSession21ProcessQueryCallbacksEv
 }
 {
-   [2] integer counters
+   [7] Race condition on bool in ACE, ignore
    Helgrind:Race
-   fun:_ZN4MMAP11MMapManager7loadMapERKSsjii
-   fun:_ZN3Map8LoadMMapEii
+   fun:_ZN11WorldSocket12handle_closeEim
+   fun:_ZN20ACE_Dev_Poll_Reactor16remove_handler_iEimP17ACE_Event_Handler
 }
 {
-   [2] integer counters
+   [7] Race condition on bool in ACE, ignore
    Helgrind:Race
-   fun:_ZN8Movement7counterIjLj4294967295EE8IncreaseEv
-}
-{
-   [2] integer counters
-   Helgrind:Race
-   fun:_ZN3G3D10BufferPool6mallocEm
-}
-{
-   [3] System libraries
-   Helgrind:Race
-   fun:__GI_mempcpy
-   fun:_IO_file_xsputn@@GLIBC_2.2.5
-   fun:vfprintf
-}
-{
-   [3] System libraries
-   Helgrind:Race
-   fun:__GI_mempcpy
-   fun:_IO_file_xsputn@@GLIBC_2.2.5
-   fun:fwrite
-}
-{
-   [4] integer assignments
-   Helgrind:Race
-   fun:_ZN3Log14LoadFromConfigEv
-   fun:_ZN5World18LoadConfigSettingsEb
-}
-{
-   [4] integer assignments
-   Helgrind:Race
-   fun:_ZN3Log22CreateLoggerFromConfigERKSs
-   fun:_ZN3Log21ReadLoggersFromConfigEv
-   fun:_ZN3Log14LoadFromConfigEv
-   fun:_ZN5World18LoadConfigSettingsEb
-}
-{
-   [4] integer assignments
-   Helgrind:Race
-   fun:_ZN5World18LoadConfigSettingsEb
-}
-{
-   [4] integer assignments
-   Helgrind:Race
-   fun:_ZNK5World12getIntConfigE15WorldIntConfigs
-}
-{
-   [4] integer assignments
-   Helgrind:Race
-   fun:_ZNK3Log9ShouldLogERKSs8LogLevel
-}
-{
-   [5] ignored static variables
-   Helgrind:Race
-   fun:_ZN3G3D7Vector3aSERKS0_
-   fun:_ZN3G3D18CollisionDetection41collisionLocationForMovingPointFixedAABoxERKNS_7Vector3ES3_RKNS_5AABoxERS1_RbS7_
-   fun:_ZN3G3D18CollisionDetection37collisionTimeForMovingPointFixedAABoxERKNS_7Vector3ES3_RKNS_5AABoxERS1_RbS7_
-   fun:_ZNK3G3D3Ray16intersectionTimeERKNS_5AABoxE
+   fun:_ZNK11WorldSocket8IsClosedEv
+   fun:_ZN12WorldSession6UpdateEjR12PacketFilter
+   fun:_ZN5World14UpdateSessionsEj
 }

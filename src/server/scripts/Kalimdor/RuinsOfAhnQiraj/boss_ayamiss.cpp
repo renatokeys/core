@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -80,23 +80,17 @@ class boss_ayamiss : public CreatureScript
         {
             boss_ayamissAI(Creature* creature) : BossAI(creature, DATA_AYAMISS)
             {
-                Initialize();
             }
 
-            void Initialize()
-            {
-                _phase = PHASE_AIR;
-                _enraged = false;
-            }
-
-            void Reset() override
+            void Reset()
             {
                 _Reset();
-                Initialize();
+                _phase = PHASE_AIR;
+                _enraged = false;
                 SetCombatMovement(false);
             }
 
-            void JustSummoned(Creature* who) override
+            void JustSummoned(Creature* who)
             {
                 switch (who->GetEntry())
                 {
@@ -113,7 +107,7 @@ class boss_ayamiss : public CreatureScript
                 }
             }
 
-            void MovementInform(uint32 type, uint32 id) override
+            void MovementInform(uint32 type, uint32 id)
             {
                 if (type == POINT_MOTION_TYPE)
                 {
@@ -129,13 +123,13 @@ class boss_ayamiss : public CreatureScript
                 }
             }
 
-            void EnterEvadeMode(EvadeReason why) override
+            void EnterEvadeMode()
             {
                 me->ClearUnitState(UNIT_STATE_ROOT);
-                BossAI::EnterEvadeMode(why);
+                BossAI::EnterEvadeMode();
             }
 
-            void EnterCombat(Unit* attacker) override
+            void EnterCombat(Unit* attacker)
             {
                 BossAI::EnterCombat(attacker);
 
@@ -150,7 +144,7 @@ class boss_ayamiss : public CreatureScript
                 me->GetMotionMaster()->MovePoint(POINT_AIR, AyamissAirPos);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -162,11 +156,9 @@ class boss_ayamiss : public CreatureScript
                     _phase = PHASE_GROUND;
                     SetCombatMovement(true);
                     me->SetCanFly(false);
-                    if (me->GetVictim())
-                    {
-                        Position VictimPos = me->EnsureVictim()->GetPosition();
-                        me->GetMotionMaster()->MovePoint(POINT_GROUND, VictimPos);
-                    }
+                    Position VictimPos;
+                    me->GetVictim()->GetPosition(&VictimPos);
+                    me->GetMotionMaster()->MovePoint(POINT_GROUND, VictimPos);
                     DoResetThreat();
                     events.ScheduleEvent(EVENT_LASH, urand(5000, 8000));
                     events.ScheduleEvent(EVENT_TRASH, urand(3000, 6000));
@@ -200,14 +192,14 @@ class boss_ayamiss : public CreatureScript
                             if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 0, true))
                             {
                                 DoCast(target, SPELL_PARALYZE);
-                                instance->SetGuidData(DATA_PARALYZED, target->GetGUID());
+                                instance->SetData64(DATA_PARALYZED, target->GetGUID());
                                 uint8 Index = urand(0, 1);
                                 me->SummonCreature(NPC_LARVA, LarvaPos[Index], TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 30000);
                             }
                             events.ScheduleEvent(EVENT_PARALYZE, 15000);
                             break;
                         case EVENT_SWARMER_ATTACK:
-                            for (GuidList::iterator i = _swarmers.begin(); i != _swarmers.end(); ++i)
+                            for (std::list<uint64>::iterator i = _swarmers.begin(); i != _swarmers.end(); ++i)
                                 if (Creature* swarmer = me->GetMap()->GetCreature(*i))
                                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM))
                                         swarmer->AI()->AttackStart(target);
@@ -216,12 +208,11 @@ class boss_ayamiss : public CreatureScript
                             events.ScheduleEvent(EVENT_SWARMER_ATTACK, 60000);
                             break;
                         case EVENT_SUMMON_SWARMER:
-                        {
-                            Position Pos = me->GetRandomPoint(SwarmerPos, 80.0f);
+                            Position Pos;
+                            me->GetRandomPoint(SwarmerPos, 80.0f, Pos);
                             me->SummonCreature(NPC_SWARMER, Pos);
                             events.ScheduleEvent(EVENT_SUMMON_SWARMER, 5000);
                             break;
-                        }
                         case EVENT_TRASH:
                             DoCastVictim(SPELL_TRASH);
                             events.ScheduleEvent(EVENT_TRASH, urand(5000, 7000));
@@ -234,12 +225,12 @@ class boss_ayamiss : public CreatureScript
                 }
             }
         private:
-            GuidList _swarmers;
+            std::list<uint64> _swarmers;
             uint8 _phase;
             bool _enraged;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<boss_ayamissAI>(creature);
         }
@@ -257,15 +248,15 @@ class npc_hive_zara_larva : public CreatureScript
                 _instance = me->GetInstanceScript();
             }
 
-            void MovementInform(uint32 type, uint32 id) override
+            void MovementInform(uint32 type, uint32 id)
             {
                 if (type == POINT_MOTION_TYPE)
                     if (id == POINT_PARALYZE)
-                        if (Player* target = ObjectAccessor::GetPlayer(*me, _instance->GetGuidData(DATA_PARALYZED)))
+                        if (Player* target = ObjectAccessor::GetPlayer(*me, _instance->GetData64(DATA_PARALYZED)))
                             DoCast(target, SPELL_FEED); // Omnomnom
             }
 
-            void MoveInLineOfSight(Unit* who) override
+            void MoveInLineOfSight(Unit* who)
 
             {
                 if (_instance->GetBossState(DATA_AYAMISS) == IN_PROGRESS)
@@ -274,7 +265,7 @@ class npc_hive_zara_larva : public CreatureScript
                 ScriptedAI::MoveInLineOfSight(who);
             }
 
-            void AttackStart(Unit* victim) override
+            void AttackStart(Unit* victim)
             {
                 if (_instance->GetBossState(DATA_AYAMISS) == IN_PROGRESS)
                     return;
@@ -282,7 +273,7 @@ class npc_hive_zara_larva : public CreatureScript
                 ScriptedAI::AttackStart(victim);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (_instance->GetBossState(DATA_AYAMISS) == IN_PROGRESS)
                     return;
@@ -293,7 +284,7 @@ class npc_hive_zara_larva : public CreatureScript
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<npc_hive_zara_larvaAI>(creature);
         }

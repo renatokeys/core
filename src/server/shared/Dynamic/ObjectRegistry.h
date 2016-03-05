@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,10 +20,12 @@
 #define TRINITY_OBJECTREGISTRY_H
 
 #include "Define.h"
+#include "Dynamic/UnorderedMap.h"
+#include <ace/Singleton.h>
 
 #include <string>
-#include <map>
 #include <vector>
+#include <map>
 
 /** ObjectRegistry holds all registry item of the same type
  */
@@ -31,13 +33,7 @@ template<class T, class Key = std::string>
 class ObjectRegistry
 {
     public:
-        typedef std::map<Key, T*> RegistryMapType;
-
-        static ObjectRegistry<T, Key>* instance()
-        {
-            static ObjectRegistry<T, Key> instance;
-            return &instance;
-        }
+        typedef std::map<Key, T *> RegistryMapType;
 
         /// Returns a registry item
         const T* GetRegistryItem(Key key) const
@@ -47,12 +43,12 @@ class ObjectRegistry
         }
 
         /// Inserts a registry item
-        bool InsertItem(T *obj, Key key, bool _override = false)
+        bool InsertItem(T *obj, Key key, bool override = false)
         {
             typename RegistryMapType::iterator iter = i_registeredObjects.find(key);
             if ( iter != i_registeredObjects.end() )
             {
-                if ( !_override )
+                if ( !override )
                     return false;
                 delete iter->second;
                 i_registeredObjects.erase(iter);

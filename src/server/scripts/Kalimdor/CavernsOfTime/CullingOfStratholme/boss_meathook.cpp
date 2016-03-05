@@ -1,19 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY XINEF, IT OWNS NOW!
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -21,9 +8,18 @@
 
 enum Spells
 {
-    SPELL_CONSTRICTING_CHAINS                   = 52696, //Encases the targets in chains, dealing 1800 Physical damage every 1 sec. and stunning the target for 5 sec.
-    SPELL_DISEASE_EXPULSION                     = 52666, //Meathook belches out a cloud of disease, dealing 1710 to 1890 Nature damage and interrupting the spell casting of nearby enemy targets for 4 sec.
-    SPELL_FRENZY                                = 58841 //Increases the caster's Physical damage by 10% for 30 sec.
+	SPELL_CONSTRICTING_CHAINS_N					= 52696,
+	SPELL_CONSTRICTING_CHAINS_H					= 58823,
+	SPELL_DISEASE_EXPULSION_N					= 52666,
+	SPELL_DISEASE_EXPULSION_H					= 58824,
+	SPELL_FRENZY								= 58841,
+};
+
+enum Events
+{
+	EVENT_SPELL_CONSTRICTING_CHAINS				= 1,
+	EVENT_SPELL_DISEASE_EXPULSION				= 2,
+	EVENT_SPELL_FRENZY							= 3,
 };
 
 enum Yells
@@ -34,73 +30,78 @@ enum Yells
     SAY_DEATH                                   = 3
 };
 
-enum Events
-{
-    EVENT_CHAIN                                 = 1,
-    EVENT_DISEASE,
-    EVENT_FRENZY
-};
-
 class boss_meathook : public CreatureScript
 {
-    public:
-        boss_meathook() : CreatureScript("boss_meathook") { }
+public:
+    boss_meathook() : CreatureScript("boss_meathook") { }
 
-        struct boss_meathookAI : public BossAI
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new boss_meathookAI (creature);
+    }
+
+    struct boss_meathookAI : public ScriptedAI
+    {
+        boss_meathookAI(Creature* c) : ScriptedAI(c)
         {
-            boss_meathookAI(Creature* creature) : BossAI(creature, DATA_MEATHOOK)
-            {
-                Talk(SAY_SPAWN);
-            }
-
-            void EnterCombat(Unit* /*who*/) override
-            {
-                Talk(SAY_AGGRO);
-                _EnterCombat();
-                events.ScheduleEvent(EVENT_CHAIN, urand(12000, 17000));
-                events.ScheduleEvent(EVENT_DISEASE, urand(2000, 4000));
-                events.ScheduleEvent(EVENT_FRENZY, urand(21000, 26000));
-            }
-
-            void ExecuteEvent(uint32 eventId) override
-            {
-                switch (eventId)
-                {
-                    case EVENT_CHAIN:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true))
-                            DoCast(target, SPELL_CONSTRICTING_CHAINS);
-                        events.ScheduleEvent(EVENT_CHAIN, urand(2000, 4000));
-                        break;
-                    case EVENT_DISEASE:
-                        DoCastAOE(SPELL_DISEASE_EXPULSION);
-                        events.ScheduleEvent(EVENT_DISEASE, urand(1500, 4000));
-                        break;
-                    case EVENT_FRENZY:
-                        DoCast(me, SPELL_FRENZY);
-                        events.ScheduleEvent(EVENT_FRENZY, urand(21000, 26000));
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            void JustDied(Unit* /*killer*/) override
-            {
-                Talk(SAY_DEATH);
-                _JustDied();
-            }
-
-            void KilledUnit(Unit* victim) override
-            {
-                if (victim->GetTypeId() == TYPEID_PLAYER)
-                    Talk(SAY_SLAY);
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetInstanceAI<boss_meathookAI>(creature);
+            Talk(SAY_SPAWN);
         }
+
+		EventMap events;
+		void Reset() { events.Reset(); }
+
+        void EnterCombat(Unit* /*who*/)
+        {
+            Talk(SAY_AGGRO);
+			events.RescheduleEvent(EVENT_SPELL_CONSTRICTING_CHAINS, 15000);
+			events.RescheduleEvent(EVENT_SPELL_DISEASE_EXPULSION, 4000);
+			events.RescheduleEvent(EVENT_SPELL_FRENZY, 20000);
+        }
+
+        void JustDied(Unit* /*killer*/)
+        {
+            Talk(SAY_DEATH);
+        }
+
+        void KilledUnit(Unit* victim)
+        {
+            if (!urand(0,1))
+                return;
+
+            Talk(SAY_SLAY);
+        }
+
+		void UpdateAI(uint32 diff)
+		{
+			if (!UpdateVictim())
+				return;
+
+			events.Update(diff);
+
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
+
+			switch (events.GetEvent())
+			{
+				case EVENT_SPELL_DISEASE_EXPULSION:
+					me->CastSpell(me, DUNGEON_MODE(SPELL_DISEASE_EXPULSION_N, SPELL_DISEASE_EXPULSION_H), false);
+					events.RepeatEvent(6000);
+					break;
+				case EVENT_SPELL_FRENZY:
+					me->CastSpell(me, SPELL_FRENZY, false);
+					events.RepeatEvent(20000);
+					break;
+				case EVENT_SPELL_CONSTRICTING_CHAINS:
+					if (Unit *pTarget = SelectTarget(SELECT_TARGET_BOTTOMAGGRO, 0, 50.0f, true))
+						me->CastSpell(pTarget, DUNGEON_MODE(SPELL_CONSTRICTING_CHAINS_N, SPELL_CONSTRICTING_CHAINS_H), false);
+					events.RepeatEvent(14000);
+					break;
+			}
+
+			DoMeleeAttackIfReady();
+		}
+    };
+
 };
 
 void AddSC_boss_meathook()

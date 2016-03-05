@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,18 +27,20 @@
 
 #include "MovementGenerator.h"
 #include "WaypointManager.h"
+
 #include "Player.h"
 
 #define FLIGHT_TRAVEL_UPDATE  100
-#define STOP_TIME_FOR_PLAYER  3 * MINUTE * IN_MILLISECONDS           // 3 Minutes
+#define STOP_TIME_FOR_PLAYER  2 * MINUTE * IN_MILLISECONDS           // 3 Minutes
 #define TIMEDIFF_NEXT_WP      250
 
 template<class T, class P>
 class PathMovementBase
 {
     public:
-        PathMovementBase() : i_path(), i_currentNode(0) { }
-        virtual ~PathMovementBase() { };
+        PathMovementBase() : i_path(), i_currentNode(0) {}
+        PathMovementBase(P path) : i_path(path), i_currentNode(0) {}
+        virtual ~PathMovementBase() {};
 
         uint32 GetCurrentNode() const { return i_currentNode; }
 
@@ -56,7 +58,7 @@ class WaypointMovementGenerator<Creature> : public MovementGeneratorMedium< Crea
 {
     public:
         WaypointMovementGenerator(uint32 _path_id = 0, bool _repeating = true)
-            : i_nextMoveTime(0), m_isArrivalDone(false), path_id(_path_id), repeating(_repeating)  { }
+            : PathMovementBase((WaypointPath const*)NULL), i_nextMoveTime(0), m_isArrivalDone(false), path_id(_path_id), repeating(_repeating)  {}
         ~WaypointMovementGenerator() { i_path = NULL; }
         void DoInitialize(Creature*);
         void DoFinalize(Creature*);
@@ -65,12 +67,10 @@ class WaypointMovementGenerator<Creature> : public MovementGeneratorMedium< Crea
 
         void MovementInform(Creature*);
 
-        MovementGeneratorType GetMovementGeneratorType() const override { return WAYPOINT_MOTION_TYPE; }
+        MovementGeneratorType GetMovementGeneratorType() { return WAYPOINT_MOTION_TYPE; }
 
         // now path movement implmementation
         void LoadPath(Creature*);
-
-        bool GetResetPos(Creature*, float& x, float& y, float& z);
 
     private:
 
@@ -113,13 +113,14 @@ class FlightPathMovementGenerator : public MovementGeneratorMedium< Player, Flig
             _endGridY = 0.0f;
             _endMapId = 0;
             _preloadTargetNode = 0;
+			_mapSwitch = false;
         }
         void LoadPath(Player* player);
         void DoInitialize(Player*);
         void DoReset(Player*);
         void DoFinalize(Player*);
         bool DoUpdate(Player*, uint32);
-        MovementGeneratorType GetMovementGeneratorType() const override { return FLIGHT_MOTION_TYPE; }
+        MovementGeneratorType GetMovementGeneratorType() { return FLIGHT_MOTION_TYPE; }
 
         TaxiPathNodeList const& GetPath() { return i_path; }
         uint32 GetPathAtMapEnd() const;
@@ -128,24 +129,16 @@ class FlightPathMovementGenerator : public MovementGeneratorMedium< Player, Flig
         void SkipCurrentNode() { ++i_currentNode; }
         void DoEventIfAny(Player* player, TaxiPathNodeEntry const* node, bool departure);
 
-        bool GetResetPos(Player*, float& x, float& y, float& z);
-
         void InitEndGridInfo();
         void PreloadEndGrid();
 
     private:
+        float _endGridX;                //! X coord of last node location
+        float _endGridY;                //! Y coord of last node location
+        uint32 _endMapId;               //! map Id of last node location
+        uint32 _preloadTargetNode;      //! node index where preloading starts
+		bool _mapSwitch;
 
-        float _endGridX;                            //! X coord of last node location
-        float _endGridY;                            //! Y coord of last node location
-        uint32 _endMapId;                           //! map Id of last node location
-        uint32 _preloadTargetNode;                  //! node index where preloading starts
-
-        struct TaxiNodeChangeInfo
-        {
-            uint32 PathIndex;
-            int32 Cost;
-        };
-
-        std::deque<TaxiNodeChangeInfo> _pointsForPathSwitch;    //! node indexes and costs where TaxiPath changes
+        std::deque<uint32> _pointsForPathSwitch;    //! node indexes and costs where TaxiPath changes
 };
 #endif

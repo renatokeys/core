@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -84,20 +84,10 @@ class npc_av_marshal_or_warmaster : public CreatureScript
 
         struct npc_av_marshal_or_warmasterAI : public ScriptedAI
         {
-            npc_av_marshal_or_warmasterAI(Creature* creature) : ScriptedAI(creature)
-            {
-                Initialize();
-            }
+            npc_av_marshal_or_warmasterAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Initialize()
+            void Reset()
             {
-                _hasAura = false;
-            }
-
-            void Reset() override
-            {
-                Initialize();
-
                 events.Reset();
                 events.ScheduleEvent(EVENT_CHARGE_TARGET, urand(2 * IN_MILLISECONDS, 12 * IN_MILLISECONDS));
                 events.ScheduleEvent(EVENT_CLEAVE, urand(1 * IN_MILLISECONDS, 11 * IN_MILLISECONDS));
@@ -105,14 +95,16 @@ class npc_av_marshal_or_warmaster : public CreatureScript
                 events.ScheduleEvent(EVENT_WHIRLWIND, urand(5 * IN_MILLISECONDS, 20 * IN_MILLISECONDS));
                 events.ScheduleEvent(EVENT_ENRAGE, urand(5 * IN_MILLISECONDS, 20 * IN_MILLISECONDS));
                 events.ScheduleEvent(EVENT_CHECK_RESET, 5000);
+
+                _hasAura = false;
             }
 
-            void JustRespawned() override
+            void JustRespawned()
             {
                 Reset();
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 // I have a feeling this isn't blizzlike, but owell, I'm only passing by and cleaning up.
                 if (!_hasAura)
@@ -178,7 +170,7 @@ class npc_av_marshal_or_warmaster : public CreatureScript
             bool _hasAura;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new npc_av_marshal_or_warmasterAI(creature);
         }

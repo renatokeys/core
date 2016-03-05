@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,8 +27,8 @@ class Unit;
 class FollowerReference : public Reference<Unit, TargetedMovementGeneratorBase>
 {
     protected:
-        void targetObjectBuildLink() override;
-        void targetObjectDestroyLink() override;
-        void sourceObjectDestroyLink() override;
+        void targetObjectBuildLink();
+        void targetObjectDestroyLink();
+        void sourceObjectDestroyLink();
 };
 #endif

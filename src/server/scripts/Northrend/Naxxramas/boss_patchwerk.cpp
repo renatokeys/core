@@ -1,31 +1,10 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY XINEF, IT OWNS NOW!
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "naxxramas.h"
-
-enum Spells
-{
-    SPELL_HATEFUL_STRIKE                        = 28308,
-    SPELL_FRENZY                                = 28131,
-    SPELL_BERSERK                               = 26662,
-    SPELL_SLIME_BOLT                            = 32309
-};
 
 enum Yells
 {
@@ -33,25 +12,29 @@ enum Yells
     SAY_SLAY                                    = 1,
     SAY_DEATH                                   = 2,
     EMOTE_BERSERK                               = 3,
-    EMOTE_FRENZY                                = 4
+    EMOTE_ENRAGE                                = 4
+};
+
+enum Spells
+{
+	SPELL_HATEFUL_STRIKE_10			= 41926,
+	SPELL_HATEFUL_STRIKE_25			= 59192,
+	SPELL_FRENZY					= 28131,
+	SPELL_BERSERK					= 26662,
+	SPELL_SLIME_BOLT				= 32309,
 };
 
 enum Events
 {
-    EVENT_NONE,
-    EVENT_BERSERK,
-    EVENT_HATEFUL,
-    EVENT_SLIME
+	EVENT_HEALTH_CHECK				= 1,
+	EVENT_SPELL_HATEFUL_STRIKE		= 2,
+	EVENT_SPELL_SLIME_BOLT			= 3,
+	EVENT_SPELL_BERSERK				= 4,
 };
 
 enum Misc
 {
-    ACHIEV_MAKE_QUICK_WERK_OF_HIM_STARTING_EVENT  = 10286
-};
-
-enum HatefulThreatAmounts
-{
-    HATEFUL_THREAT_AMT  = 1000,
+	ACHIEV_TIMED_START_EVENT		= 10286,
 };
 
 class boss_patchwerk : public CreatureScript
@@ -59,140 +42,144 @@ class boss_patchwerk : public CreatureScript
 public:
     boss_patchwerk() : CreatureScript("boss_patchwerk") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* pCreature) const
     {
-        return GetInstanceAI<boss_patchwerkAI>(creature);
+        return new boss_patchwerkAI (pCreature);
     }
 
-    struct boss_patchwerkAI : public BossAI
-    {
-        boss_patchwerkAI(Creature* creature) : BossAI(creature, BOSS_PATCHWERK)
-        {
-            Enraged = false;
-        }
+	struct boss_patchwerkAI : public ScriptedAI
+	{
+		boss_patchwerkAI(Creature *c) : ScriptedAI(c) 
+		{
+			pInstance = me->GetInstanceScript();
+		}
 
-        bool Enraged;
+		EventMap events;
+		InstanceScript* pInstance;
 
-        void Reset() override
-        {
-            _Reset();
+		void Reset()
+		{
+			events.Reset();
+			if (pInstance)
+				pInstance->SetData(EVENT_PATCHWERK, NOT_STARTED);
+		}
 
-            instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_MAKE_QUICK_WERK_OF_HIM_STARTING_EVENT);
-        }
+		void KilledUnit(Unit* who)
+		{
+			if (who->GetTypeId() != TYPEID_PLAYER)
+				return;
 
-        void KilledUnit(Unit* /*Victim*/) override
-        {
-            if (!(rand32() % 5))
-                Talk(SAY_SLAY);
-        }
+			if (!urand(0,3))
+				Talk(SAY_SLAY);
 
-        void JustDied(Unit* /*killer*/) override
-        {
-            _JustDied();
-            Talk(SAY_DEATH);
-        }
+			if (pInstance)
+				pInstance->SetData(DATA_IMMORTAL_FAIL, 0);
+		}
 
-        void EnterCombat(Unit* /*who*/) override
-        {
-            _EnterCombat();
-            Enraged = false;
-            Talk(SAY_AGGRO);
-            events.ScheduleEvent(EVENT_HATEFUL, 1 * IN_MILLISECONDS);
-            events.ScheduleEvent(EVENT_BERSERK, 6 * MINUTE * IN_MILLISECONDS);
+		void JustDied(Unit* Killer)
+		{
+			Talk(SAY_DEATH);
+			if (pInstance)
+				pInstance->SetData(EVENT_PATCHWERK, DONE);
+		}
 
-            instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_MAKE_QUICK_WERK_OF_HIM_STARTING_EVENT);
-        }
+		void EnterCombat(Unit *who)
+		{
+			Talk(SAY_AGGRO);
+			
+			me->SetInCombatWithZone();
+			events.ScheduleEvent(EVENT_SPELL_HATEFUL_STRIKE, 1200);
+			events.ScheduleEvent(EVENT_SPELL_BERSERK, 360000);
+			events.ScheduleEvent(EVENT_HEALTH_CHECK, 1000);
 
-        void UpdateAI(uint32 diff) override
-        {
-            if (!UpdateVictim())
-                return;
+			if (pInstance)
+			{
+                pInstance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
+				pInstance->SetData(EVENT_PATCHWERK, IN_PROGRESS);
+			}
+		}
 
-            events.Update(diff);
+		void UpdateAI(uint32 diff)
+		{
+			if (!UpdateVictim())
+				return;
 
-            while (uint32 eventId = events.ExecuteEvent())
-            {
-                switch (eventId)
-                {
-                    case EVENT_HATEFUL:
-                    {
-                        // Hateful Strike targets the highest non-MT threat in melee range on 10man
-                        // and the higher HP target out of the two highest non-MT threats in melee range on 25man
-                        float MostThreat = 0.0f;
-                        Unit* secondThreatTarget = NULL;
-                        Unit* thirdThreatTarget = NULL;
+			events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
 
-                        std::list<HostileReference*>::const_iterator i = me->getThreatManager().getThreatList().begin();
-                        for (; i != me->getThreatManager().getThreatList().end(); ++i)
-                        { // find second highest
-                            Unit* target = (*i)->getTarget();
-                            if (target->IsAlive() && target != me->GetVictim() && (*i)->getThreat() >= MostThreat && me->IsWithinMeleeRange(target))
-                            {
-                                MostThreat = (*i)->getThreat();
-                                secondThreatTarget = target;
-                            }
-                        }
+			switch (events.GetEvent())
+			{
+				case EVENT_SPELL_HATEFUL_STRIKE:
+				{
+					//Cast Hateful strike on the player with the highest
+					//amount of HP within melee distance, and second threat amount
+					std::list<Unit*> meleeRangeTargets;
+					Unit* finalTarget = NULL;
+					uint8 counter = 0;
+					
+					ThreatContainer::StorageType::const_iterator i = me->getThreatManager().getThreatList().begin();
+					for (; i != me->getThreatManager().getThreatList().end(); ++i, ++counter)
+					{
+						// Gather all units with melee range
+						Unit *target = (*i)->getTarget();
+						if (me->IsWithinMeleeRange(target))
+							meleeRangeTargets.push_back(target);
 
-                        if (secondThreatTarget && Is25ManRaid())
-                        { // find third highest
-                            MostThreat = 0.0f;
-                            i = me->getThreatManager().getThreatList().begin();
-                            for (; i != me->getThreatManager().getThreatList().end(); ++i)
-                            {
-                                Unit* target = (*i)->getTarget();
-                                if (target->IsAlive() && target != me->GetVictim() && target != secondThreatTarget && (*i)->getThreat() >= MostThreat && me->IsWithinMeleeRange(target))
-                                {
-                                    MostThreat = (*i)->getThreat();
-                                    thirdThreatTarget = target;
-                                }
-                            }
-                        }
+						// and add threat to most hated
+						if (counter < RAID_MODE(2,3))
+							me->AddThreat(target, 500.0f);
+					}
 
-                        Unit* pHatefulTarget = NULL;
-                        if (!thirdThreatTarget)
-                            pHatefulTarget = secondThreatTarget;
-                        else if (secondThreatTarget)
-                            pHatefulTarget = (secondThreatTarget->GetHealth() < thirdThreatTarget->GetHealth()) ? thirdThreatTarget : secondThreatTarget;
+					counter = 0;
+					for (std::list<Unit*>::const_iterator i = meleeRangeTargets.begin(); i != meleeRangeTargets.end(); ++i, ++counter)
+					{
+						// if there is only one target available
+						if (meleeRangeTargets.size() == 1)
+							finalTarget = (*i);
+						else if (counter > 0) // skip first target
+						{
+							if (!finalTarget || (*i)->GetHealth() > finalTarget->GetHealth())
+								finalTarget = (*i);
 
-                        if (!pHatefulTarget)
-                            pHatefulTarget = me->GetVictim();
+							// third loop
+							if (counter >= 2)
+								break;
+						}
+					}
 
-                        DoCast(pHatefulTarget, SPELL_HATEFUL_STRIKE, true);
+					if (finalTarget)
+						me->CastSpell(finalTarget, RAID_MODE(SPELL_HATEFUL_STRIKE_10, SPELL_HATEFUL_STRIKE_25), false);
 
-                        // add threat to highest threat targets
-                        if (me->GetVictim() && me->IsWithinMeleeRange(me->GetVictim()))
-                            me->getThreatManager().addThreat(me->GetVictim(), HATEFUL_THREAT_AMT);
-                        if (secondThreatTarget)
-                            me->getThreatManager().addThreat(secondThreatTarget, HATEFUL_THREAT_AMT);
-                        if (thirdThreatTarget)
-                            me->getThreatManager().addThreat(thirdThreatTarget, HATEFUL_THREAT_AMT); // this will only ever be used in 25m
+					events.RepeatEvent(1000);
+					break;
+				}
+				case EVENT_SPELL_BERSERK:
+					Talk(EMOTE_BERSERK);
+					me->CastSpell(me, SPELL_BERSERK, true);
+					events.ScheduleEvent(EVENT_SPELL_SLIME_BOLT, 2000);
+					events.PopEvent();
+					break;
+				case EVENT_SPELL_SLIME_BOLT:
+					me->CastSpell(me, SPELL_SLIME_BOLT, false);
+					events.RepeatEvent(3000);
+					break;
+				case EVENT_HEALTH_CHECK:
+					if (me->GetHealthPct() <= 5)
+					{
+						Talk(EMOTE_ENRAGE);
+						me->CastSpell(me, SPELL_FRENZY, true);
+						events.PopEvent();
+						break;
+					}
+					events.RepeatEvent(1000);
+					break;
 
-                        events.ScheduleEvent(EVENT_HATEFUL, 1 * IN_MILLISECONDS);
-                        break;
-                    }
-                    case EVENT_BERSERK:
-                        DoCast(me, SPELL_BERSERK, true);
-                        Talk(EMOTE_BERSERK);
-                        events.ScheduleEvent(EVENT_SLIME, 2 * IN_MILLISECONDS);
-                        break;
-                    case EVENT_SLIME:
-                        DoCastVictim(SPELL_SLIME_BOLT, true);
-                        events.ScheduleEvent(EVENT_SLIME, 2 * IN_MILLISECONDS);
-                        break;
-                }
-            }
+			}
 
-            if (!Enraged && HealthBelowPct(5))
-            {
-                DoCast(me, SPELL_FRENZY, true);
-                Talk(EMOTE_FRENZY);
-                Enraged = true;
-            }
-
-            DoMeleeAttackIfReady();
-        }
-    };
-
+			DoMeleeAttackIfReady();
+		}
+	};
 };
 
 void AddSC_boss_patchwerk()

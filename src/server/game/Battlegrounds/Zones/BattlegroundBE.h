@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,7 +19,7 @@
 #ifndef __BATTLEGROUNDBE_H
 #define __BATTLEGROUNDBE_H
 
-#include "Arena.h"
+#include "Battleground.h"
 
 enum BattlegroundBEObjectTypes
 {
@@ -29,10 +29,12 @@ enum BattlegroundBEObjectTypes
     BG_BE_OBJECT_DOOR_4         = 3,
     BG_BE_OBJECT_BUFF_1         = 4,
     BG_BE_OBJECT_BUFF_2         = 5,
-    BG_BE_OBJECT_MAX            = 6
+	BG_BE_OBJECT_READY_MARKER_1 = 6,
+	BG_BE_OBJECT_READY_MARKER_2 = 7,
+    BG_BE_OBJECT_MAX            = 8
 };
 
-enum BattlegroundBEGameObjects
+enum BattlegroundBEObjects
 {
     BG_BE_OBJECT_TYPE_DOOR_1    = 183971,
     BG_BE_OBJECT_TYPE_DOOR_2    = 183973,
@@ -42,17 +44,26 @@ enum BattlegroundBEGameObjects
     BG_BE_OBJECT_TYPE_BUFF_2    = 184664
 };
 
-class BattlegroundBE : public Arena
+class BattlegroundBE : public Battleground
 {
     public:
         BattlegroundBE();
+        ~BattlegroundBE();
 
         /* inherited from BattlegroundClass */
-        void StartingEventCloseDoors() override;
-        void StartingEventOpenDoors() override;
+        void AddPlayer(Player* player);
+        void StartingEventCloseDoors();
+        void StartingEventOpenDoors();
 
-        void HandleAreaTrigger(Player* Source, uint32 Trigger) override;
-        bool SetupBattleground() override;
-        void FillInitialWorldStates(WorldPacket &d) override;
+        void RemovePlayer(Player* player);
+        void HandleAreaTrigger(Player* player, uint32 trigger);
+        bool SetupBattleground();
+        void Init();
+        void FillInitialWorldStates(WorldPacket &d);
+        void HandleKillPlayer(Player* player, Player* killer);
+        bool HandlePlayerUnderMap(Player* player);
+
+        /* Scorekeeping */
+        void UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor = true);
 };
 #endif

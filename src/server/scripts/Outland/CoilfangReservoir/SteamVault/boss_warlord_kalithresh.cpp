@@ -1,26 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss_Warlord_Kalithres
-SD%Complete: 65
-SDComment: Contains workarounds regarding warlord's rage spells not acting as expected. Both scripts here require review and fine tuning.
-SDCategory: Coilfang Resevoir, The Steamvault
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -39,61 +19,13 @@ enum NagaDistiller
     SPELL_IMPALE                = 39061,
     SPELL_WARLORDS_RAGE         = 37081,
     SPELL_WARLORDS_RAGE_NAGA    = 31543,
+    SPELL_WARLORDS_RAGE_PROC    = 36453,
 
-    SPELL_WARLORDS_RAGE_PROC    = 36453
-};
+	NPC_NAGA_DISTILLER			= 17954,
 
-class npc_naga_distiller : public CreatureScript
-{
-public:
-    npc_naga_distiller() : CreatureScript("npc_naga_distiller") { }
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return GetInstanceAI<npc_naga_distillerAI>(creature);
-    }
-
-    struct npc_naga_distillerAI : public ScriptedAI
-    {
-        npc_naga_distillerAI(Creature* creature) : ScriptedAI(creature)
-        {
-            instance = creature->GetInstanceScript();
-        }
-
-        InstanceScript* instance;
-
-        void Reset() override
-        {
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-
-            //hack, due to really weird spell behaviour :(
-            if (instance->GetData(DATA_DISTILLER) == IN_PROGRESS)
-            {
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-            }
-        }
-
-        void EnterCombat(Unit* /*who*/) override { }
-
-        void StartRageGen(Unit* /*caster*/)
-        {
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-
-            DoCast(me, SPELL_WARLORDS_RAGE_NAGA, true);
-
-            instance->SetData(DATA_DISTILLER, IN_PROGRESS);
-        }
-
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
-        {
-            if (me->GetHealth() <= damage)
-                instance->SetData(DATA_DISTILLER, DONE);
-        }
-    };
-
+	EVENT_SPELL_REFLECTION		= 1,
+	EVENT_SPELL_IMPALE			= 2,
+	EVENT_SPELL_RAGE			= 3
 };
 
 class boss_warlord_kalithresh : public CreatureScript
@@ -101,107 +33,143 @@ class boss_warlord_kalithresh : public CreatureScript
 public:
     boss_warlord_kalithresh() : CreatureScript("boss_warlord_kalithresh") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return GetInstanceAI<boss_warlord_kalithreshAI>(creature);
+        return new boss_warlord_kalithreshAI (creature);
     }
 
     struct boss_warlord_kalithreshAI : public ScriptedAI
     {
         boss_warlord_kalithreshAI(Creature* creature) : ScriptedAI(creature)
         {
-            Initialize();
             instance = creature->GetInstanceScript();
         }
 
-        void Initialize()
-        {
-            Reflection_Timer = 10000;
-            Impale_Timer = 7000 + rand32() % 7000;
-            Rage_Timer = 45000;
-            CanRage = false;
-        }
-
         InstanceScript* instance;
+		EventMap events;
 
-        uint32 Reflection_Timer;
-        uint32 Impale_Timer;
-        uint32 Rage_Timer;
-        bool CanRage;
-
-        void Reset() override
+        void Reset()
         {
-            Initialize();
-
-            instance->SetBossState(DATA_WARLORD_KALITHRESH, NOT_STARTED);
+            events.Reset();
+            if (instance)
+                instance->SetData(TYPE_WARLORD_KALITHRESH, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             Talk(SAY_AGGRO);
+			events.ScheduleEvent(EVENT_SPELL_REFLECTION, 10000);
+			events.ScheduleEvent(EVENT_SPELL_IMPALE, urand(7000, 14000));
+			events.ScheduleEvent(EVENT_SPELL_RAGE, 20000);
 
-            instance->SetBossState(DATA_WARLORD_KALITHRESH, IN_PROGRESS);
+            if (instance)
+                instance->SetData(TYPE_WARLORD_KALITHRESH, IN_PROGRESS);
         }
 
-        void KilledUnit(Unit* /*victim*/) override
+        void KilledUnit(Unit* victim)
         {
-            Talk(SAY_SLAY);
+			if (victim->GetTypeId() == TYPEID_PLAYER)
+				Talk(SAY_SLAY);
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellInfo* spell) override
-        {
-            //hack :(
-            if (spell->Id == SPELL_WARLORDS_RAGE_PROC)
-                if (instance->GetData(DATA_DISTILLER) == DONE)
-                    me->RemoveAurasDueToSpell(SPELL_WARLORDS_RAGE_PROC);
-        }
-
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             Talk(SAY_DEATH);
-
-            instance->SetBossState(DATA_WARLORD_KALITHRESH, DONE);
+            if (instance)
+                instance->SetData(TYPE_WARLORD_KALITHRESH, DONE);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
 
-            if (Rage_Timer <= diff)
-            {
-                if (Creature* distiller = me->FindNearestCreature(17954, 100.0f))
-                {
-                    Talk(SAY_REGEN);
-                    DoCast(me, SPELL_WARLORDS_RAGE);
-                    ENSURE_AI(npc_naga_distiller::npc_naga_distillerAI, distiller->AI())->StartRageGen(me);
-                }
-                Rage_Timer = 3000 + rand32() % 15000;
-            } else Rage_Timer -= diff;
-
-            //Reflection_Timer
-            if (Reflection_Timer <= diff)
-            {
-                DoCast(me, SPELL_SPELL_REFLECTION);
-                Reflection_Timer = 15000 + rand32() % 10000;
-            } else Reflection_Timer -= diff;
-
-            //Impale_Timer
-            if (Impale_Timer <= diff)
-            {
-                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                    DoCast(target, SPELL_IMPALE);
-
-                Impale_Timer = 7500 + rand32() % 5000;
-            } else Impale_Timer -= diff;
+			events.Update(diff);
+			switch (events.GetEvent())
+			{
+				case EVENT_SPELL_REFLECTION:
+					me->CastSpell(me, SPELL_SPELL_REFLECTION, false);
+					events.RepeatEvent(urand(15000, 20000));
+					break;
+				case EVENT_SPELL_IMPALE:
+					if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 10.0f, true))
+						me->CastSpell(target, SPELL_IMPALE, false);
+					events.RepeatEvent(urand(7500, 12500));
+					break;
+				case EVENT_SPELL_RAGE:
+					if (Creature* distiller = me->FindNearestCreature(NPC_NAGA_DISTILLER, 100.0f))
+					{
+						Talk(SAY_REGEN);
+						//me->CastSpell(me, SPELL_WARLORDS_RAGE, false);
+						distiller->AI()->DoAction(1);
+					}
+					events.RepeatEvent(45000);
+					break;
+			}
 
             DoMeleeAttackIfReady();
         }
     };
+
+};
+
+class npc_naga_distiller : public CreatureScript
+{
+public:
+    npc_naga_distiller() : CreatureScript("npc_naga_distiller") { }
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new npc_naga_distillerAI (creature);
+    }
+
+    struct npc_naga_distillerAI : public NullCreatureAI
+    {
+        npc_naga_distillerAI(Creature* creature) : NullCreatureAI(creature)
+        {
+            instance = creature->GetInstanceScript();
+        }
+
+        InstanceScript* instance;
+		uint32 spellTimer;
+
+        void Reset()
+        {
+			spellTimer = 0;
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+        }
+
+        void DoAction(int32 param)
+        {
+			if (param != 1)
+				return;
+
+            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+			me->CastSpell(me, SPELL_WARLORDS_RAGE_NAGA, true);
+			spellTimer = 1;
+        }
+
+        void UpdateAI(uint32 diff)
+		{
+			if (spellTimer)
+			{
+				spellTimer += diff;
+				if (spellTimer >= 12000)
+				{
+					if (Creature* kali = me->FindNearestCreature(NPC_WARLORD_KALITHRESH, 100.0f))
+						kali->CastSpell(kali, SPELL_WARLORDS_RAGE_PROC, true);
+					Unit::Kill(me, me);
+				}
+			}
+		}
+    };
+
 };
 
 void AddSC_boss_warlord_kalithresh()
 {
-    new npc_naga_distiller();
     new boss_warlord_kalithresh();
+    new npc_naga_distiller();
 }

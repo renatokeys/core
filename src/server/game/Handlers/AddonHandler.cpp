@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,10 +18,19 @@
 
 #include "zlib.h"
 #include "AddonHandler.h"
+#include "DatabaseEnv.h"
 #include "Opcodes.h"
 #include "Log.h"
 
-bool AddonHandler::BuildAddonPacket(WorldPacket* source, WorldPacket* target)
+AddonHandler::AddonHandler()
+{
+}
+
+AddonHandler::~AddonHandler()
+{
+}
+
+bool AddonHandler::BuildAddonPacket(WorldPacket* Source, WorldPacket* Target)
 {
     ByteBuffer AddOnPacked;
     uLongf AddonRealSize;
@@ -29,10 +38,10 @@ bool AddonHandler::BuildAddonPacket(WorldPacket* source, WorldPacket* target)
     uint32 TempValue;
 
     // broken addon packet, can't be received from real client
-    if (source->rpos() + 4 > source->size())
+    if (Source->rpos() + 4 > Source->size())
         return false;
 
-    *source >> TempValue;                                   // get real size of the packed structure
+    *Source >> TempValue;                                   // get real size of the packed structure
 
     // empty addon packet, nothing process, can't be received from real client
     if (!TempValue)
@@ -40,13 +49,13 @@ bool AddonHandler::BuildAddonPacket(WorldPacket* source, WorldPacket* target)
 
     AddonRealSize = TempValue;                              // temp value because ZLIB only excepts uLongf
 
-    CurrentPosition = source->rpos();                       // get the position of the pointer in the structure
+    CurrentPosition = Source->rpos();                       // get the position of the pointer in the structure
 
     AddOnPacked.resize(AddonRealSize);                      // resize target for zlib action
 
-    if (uncompress(AddOnPacked.contents(), &AddonRealSize, source->contents() + CurrentPosition, source->size() - CurrentPosition) == Z_OK)
+    if (uncompress(const_cast<uint8*>(AddOnPacked.contents()), &AddonRealSize, const_cast<uint8*>((*Source).contents() + CurrentPosition), (*Source).size() - CurrentPosition)== Z_OK)
     {
-        target->Initialize(SMSG_ADDON_INFO);
+        Target->Initialize(SMSG_ADDON_INFO);
 
         uint32 addonsCount;
         AddOnPacked >> addonsCount;                         // addons count?
@@ -69,17 +78,17 @@ bool AddonHandler::BuildAddonPacket(WorldPacket* source, WorldPacket* target)
 
             AddOnPacked >> enabled >> crc >> unk2;
 
-            TC_LOG_DEBUG("network", "ADDON: Name: %s, Enabled: 0x%x, CRC: 0x%x, Unknown2: 0x%x", addonName.c_str(), enabled, crc, unk2);
+            ;//sLog->outDebug(LOG_FILTER_NETWORKIO, "ADDON: Name: %s, Enabled: 0x%x, CRC: 0x%x, Unknown2: 0x%x", addonName.c_str(), enabled, crc, unk2);
 
             uint8 state = (enabled ? 2 : 1);
-            *target << uint8(state);
+            *Target << uint8(state);
 
             uint8 unk1 = (enabled ? 1 : 0);
-            *target << uint8(unk1);
+            *Target << uint8(unk1);
             if (unk1)
             {
                 uint8 unk = (crc != 0x4c1c776d);           // If addon is Standard addon CRC
-                *target << uint8(unk);
+                *Target << uint8(unk);
                 if (unk)
                 {
                     unsigned char tdata[256] =
@@ -101,18 +110,18 @@ bool AddonHandler::BuildAddonPacket(WorldPacket* source, WorldPacket* target)
                         0xC3, 0xFB, 0x1B, 0x8C, 0x29, 0xEF, 0x8E, 0xE5, 0x34, 0xCB, 0xD1, 0x2A, 0xCE, 0x79, 0xC3, 0x9A,
                         0x0D, 0x36, 0xEA, 0x01, 0xE0, 0xAA, 0x91, 0x20, 0x54, 0xF0, 0x72, 0xD8, 0x1E, 0xC7, 0x89, 0xD2
                     };
-                    target->append(tdata, sizeof(tdata));
+                    Target->append(tdata, sizeof(tdata));
                 }
 
-                *target << uint32(0);
+                *Target << uint32(0);
             }
 
             uint8 unk3 = (enabled ? 0 : 1);
-            *target << uint8(unk3);
+            *Target << uint8(unk3);
             if (unk3)
             {
                 // String, 256 (null terminated?)
-                *target << uint8(0);
+                *Target << uint8(0);
             }
         }
 
@@ -120,14 +129,14 @@ bool AddonHandler::BuildAddonPacket(WorldPacket* source, WorldPacket* target)
         AddOnPacked >> unk4;
 
         uint32 count = 0;
-        *target << uint32(count);
+        *Target << uint32(count);
 
-        if (AddOnPacked.rpos() != AddOnPacked.size())
-            TC_LOG_DEBUG("network", "packet under read!");
+        //if (AddOnPacked.rpos() != AddOnPacked.size())
+            ;//sLog->outDebug(LOG_FILTER_NETWORKIO, "packet under read!");
     }
     else
     {
-        TC_LOG_ERROR("network", "Addon packet uncompress error :(");
+        sLog->outError("Addon packet uncompress error :(");
         return false;
     }
     return true;

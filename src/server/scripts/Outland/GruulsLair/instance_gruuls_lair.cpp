@@ -1,19 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
@@ -21,9 +8,9 @@
 
 DoorData const doorData[] =
 {
-    { GO_MAULGAR_DOOR,  DATA_MAULGAR,   DOOR_TYPE_PASSAGE },
-    { GO_GRUUL_DOOR,    DATA_GRUUL,     DOOR_TYPE_ROOM },
-    { 0,                0,              DOOR_TYPE_ROOM } // END
+    { GO_MAULGAR_DOOR,  DATA_MAULGAR,   DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
+    { GO_GRUUL_DOOR,    DATA_GRUUL,     DOOR_TYPE_ROOM,     BOUNDARY_NONE },
+    { 0,                0,              DOOR_TYPE_ROOM,     BOUNDARY_NONE } // END
 };
 
 MinionData const minionData[] =
@@ -38,24 +25,26 @@ MinionData const minionData[] =
 class instance_gruuls_lair : public InstanceMapScript
 {
     public:
-        instance_gruuls_lair() : InstanceMapScript(GLScriptName, 565) { }
+        instance_gruuls_lair() : InstanceMapScript("instance_gruuls_lair", 565) { }
 
         struct instance_gruuls_lair_InstanceMapScript : public InstanceScript
         {
             instance_gruuls_lair_InstanceMapScript(Map* map) : InstanceScript(map)
             {
-                SetHeaders(DataHeader);
-                SetBossNumber(EncounterCount);
+                SetBossNumber(MAX_ENCOUNTER);
                 LoadDoorData(doorData);
                 LoadMinionData(minionData);
+
+                _maulgarGUID = 0;
+				_addsKilled = 0;
             }
 
-            void OnCreatureCreate(Creature* creature) override
+            void OnCreatureCreate(Creature* creature)
             {
                 switch (creature->GetEntry())
                 {
                     case NPC_MAULGAR:
-                        MaulgarGUID = creature->GetGUID();
+                        _maulgarGUID = creature->GetGUID();
                         // no break;
                     case NPC_KROSH_FIREHAND:
                     case NPC_OLM_THE_SUMMONER:
@@ -63,12 +52,10 @@ class instance_gruuls_lair : public InstanceMapScript
                     case NPC_BLINDEYE_THE_SEER:
                         AddMinion(creature, true);
                         break;
-                    default:
-                        break;
                 }
             }
 
-            void OnCreatureRemove(Creature* creature) override
+            void OnCreatureRemove(Creature* creature)
             {
                 switch (creature->GetEntry())
                 {
@@ -79,12 +66,10 @@ class instance_gruuls_lair : public InstanceMapScript
                     case NPC_BLINDEYE_THE_SEER:
                         AddMinion(creature, false);
                         break;
-                    default:
-                        break;
                 }
             }
 
-            void OnGameObjectCreate(GameObject* go) override
+            void OnGameObjectCreate(GameObject* go)
             {
                 switch (go->GetEntry())
                 {
@@ -92,12 +77,10 @@ class instance_gruuls_lair : public InstanceMapScript
                     case GO_GRUUL_DOOR:
                         AddDoor(go, true);
                         break;
-                    default:
-                        break;
                 }
             }
 
-            void OnGameObjectRemove(GameObject* go) override
+            void OnGameObjectRemove(GameObject* go)
             {
                 switch (go->GetEntry())
                 {
@@ -105,28 +88,82 @@ class instance_gruuls_lair : public InstanceMapScript
                     case GO_GRUUL_DOOR:
                         AddDoor(go, false);
                         break;
-                    default:
-                        break;
                 }
             }
 
-            ObjectGuid GetGuidData(uint32 type) const override
+			bool SetBossState(uint32 id, EncounterState state)
+			{
+				if (!InstanceScript::SetBossState(id, state))
+					return false;
+
+				if (id == DATA_MAULGAR && state == NOT_STARTED)
+					_addsKilled = 0;
+				return true;
+			}
+
+			void SetData(uint32 type, uint32 id)
+			{
+				if (type == DATA_ADDS_KILLED)
+					if (Creature* maulgar = instance->GetCreature(_maulgarGUID))
+						maulgar->AI()->DoAction(++_addsKilled);
+			}
+
+            uint32 GetData(uint32 type) const
             {
-                switch (type)
+                if (type == DATA_ADDS_KILLED)
+					return _addsKilled;
+                return 0;
+            }
+
+            std::string GetSaveData()
+            {
+                OUT_SAVE_INST_DATA;
+
+                std::ostringstream saveStream;
+                saveStream << "G L " << GetBossSaveData();
+
+                OUT_SAVE_INST_DATA_COMPLETE;
+                return saveStream.str();
+            }
+
+            void Load(char const* str)
+            {
+                if (!str)
                 {
-                    case DATA_MAULGAR:
-                        return MaulgarGUID;
-                    default:
-                        break;
+                    OUT_LOAD_INST_DATA_FAIL;
+                    return;
                 }
-                return ObjectGuid::Empty;
+
+                OUT_LOAD_INST_DATA(str);
+
+                char dataHead1, dataHead2;
+
+                std::istringstream loadStream(str);
+                loadStream >> dataHead1 >> dataHead2;
+
+                if (dataHead1 == 'G' && dataHead2 == 'L')
+                {
+                    for (uint32 i = 0; i < MAX_ENCOUNTER; ++i)
+                    {
+                        uint32 tmpState;
+                        loadStream >> tmpState;
+                        if (tmpState == IN_PROGRESS || tmpState > SPECIAL)
+                            tmpState = NOT_STARTED;
+                        SetBossState(i, EncounterState(tmpState));
+                    }
+                }
+                else
+                    OUT_LOAD_INST_DATA_FAIL;
+
+                OUT_LOAD_INST_DATA_COMPLETE;
             }
 
         protected:
-            ObjectGuid MaulgarGUID;
+			uint32 _addsKilled;
+            uint64 _maulgarGUID;
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* map) const override
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
             return new instance_gruuls_lair_InstanceMapScript(map);
         }

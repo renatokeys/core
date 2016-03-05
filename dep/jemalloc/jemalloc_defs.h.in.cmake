@@ -268,7 +268,7 @@
 #define LG_SIZEOF_INTMAX_T 3
 
 /* C99 restrict keyword supported. */
-#define JEMALLOC_HAS_RESTRICT
+/*#define JEMALLOC_HAS_RESTRICT*/
 
 /* JEMALLOC_CODE_COVERAGE enables test code coverage analysis. */
 #undef JEMALLOC_CODE_COVERAGE

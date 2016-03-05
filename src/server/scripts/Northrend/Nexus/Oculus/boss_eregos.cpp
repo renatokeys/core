@@ -1,35 +1,46 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY PUSSYWIZARD, IT OWNS NOW!
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
-#include "SpellScript.h"
-#include "SpellAuraEffects.h"
 #include "oculus.h"
 
-// Types of drake mounts: Ruby (Tank), Amber (DPS), Emerald (Healer)
-// Two Repeating phases
+enum Spells
+{
+	SPELL_ARCANE_BARRAGE_N						= 50804,
+	SPELL_ARCANE_BARRAGE_H						= 59381,
+	SPELL_ARCANE_VOLLEY_N						= 51153,
+	SPELL_ARCANE_VOLLEY_H						= 59382,
+	SPELL_ENRAGED_ASSAULT						= 51170,
+	SPELL_PLANAR_ANOMALIES						= 57959,
+	SPELL_PLANAR_SHIFT							= 51162,
+
+	SPELL_PLANAR_AURA_DAMAGE					= 59379,
+	SPELL_PLANAR_AURA_VISUAL					= 57971,
+	SPELL_PLANAR_BLAST							= 57976,
+	SPELL_SUMMON_PLANAR_ANOMALY					= 57963,
+
+	SPELL_DRAKE_STOP_TIME						= 49838,
+};
+
+#define SPELL_ARCANE_BARRAGE					DUNGEON_MODE(SPELL_ARCANE_BARRAGE_N, SPELL_ARCANE_BARRAGE_H)
+#define SPELL_ARCANE_VOLLEY						DUNGEON_MODE(SPELL_ARCANE_VOLLEY_N, SPELL_ARCANE_VOLLEY_H)
+
+enum VarosNPCs
+{
+	NPC_LEY_GUARDIAN_WHELP						= 28276,
+	NPC_PLANAR_ANOMALY							= 30879,
+};
 
 enum Events
 {
-    EVENT_ARCANE_BARRAGE = 1,
-    EVENT_ARCANE_VOLLEY,
-    EVENT_ENRAGED_ASSAULT,
-    EVENT_SUMMON_LEY_WHELP
+	EVENT_SPELL_ARCANE_BARRAGE					= 1,
+	EVENT_SPELL_ARCANE_VOLLEY					= 2,
+	EVENT_SPELL_ENRAGED_ASSAULT					= 3,
+	EVENT_SPELL_PLANAR_SHIFT					= 4,
+	EVENT_SUMMON_WHELPS							= 5,
+	EVENT_SUMMON_SINGLE_WHELP					= 6,
 };
 
 enum Says
@@ -42,269 +53,189 @@ enum Says
     SAY_SHIELD          = 5,
 };
 
-enum Spells
-{
-    SPELL_ARCANE_BARRAGE                          = 50804,
-    SPELL_ARCANE_VOLLEY                           = 51153,
-    SPELL_ENRAGED_ASSAULT                         = 51170,
-    SPELL_PLANAR_ANOMALIES                        = 57959,
-    SPELL_PLANAR_SHIFT                            = 51162,
-    SPELL_SUMMON_LEY_WHELP                        = 51175,
-    SPELL_SUMMON_PLANAR_ANOMALIES                 = 57963,
-    SPELL_PLANAR_BLAST                            = 57976
-};
-
-enum Npcs
-{
-    NPC_PLANAR_ANOMALY = 30879
-};
-
-enum Phases
-{
-    PHASE_NORMAL        = 1,
-    PHASE_FIRST_PLANAR  = 2,
-    PHASE_SECOND_PLANAR = 3
-};
-
-enum Actions
-{
-    ACTION_SET_NORMAL_EVENTS = 1
-};
-
-enum EregosData
-{
-    DATA_RUBY_VOID          = 0,      // http://www.wowhead.com/achievement=2044
-    DATA_EMERALD_VOID       = 1,      // http://www.wowhead.com/achievement=2045
-    DATA_AMBER_VOID         = 2       // http://www.wowhead.com/achievement=2046
-};
-
 class boss_eregos : public CreatureScript
 {
-    public:
-        boss_eregos() : CreatureScript("boss_eregos") { }
+public:
+    boss_eregos() : CreatureScript("boss_eregos") { }
 
-        struct boss_eregosAI : public BossAI
-        {
-            boss_eregosAI(Creature* creature) : BossAI(creature, DATA_EREGOS)
-            {
-                Initialize();
-            }
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new boss_eregosAI (pCreature);
+    }
 
-            void Initialize()
-            {
-                _phase = PHASE_NORMAL;
+	struct boss_eregosAI : public ScriptedAI
+	{
+		boss_eregosAI(Creature *c) : ScriptedAI(c)
+		{
+			pInstance = c->GetInstanceScript();
+		}
 
-                _rubyVoid = true;
-                _emeraldVoid = true;
-                _amberVoid = true;
-            }
+		InstanceScript* pInstance;
+		EventMap events;
+		uint8 shiftNumber;
 
-            void Reset() override
-            {
-                _Reset();
-                Initialize();
+		void Reset()
+		{
+			if (pInstance)
+			{
+				pInstance->SetData(DATA_EREGOS, NOT_STARTED);
+				if( pInstance->GetData(DATA_UROM) != DONE )
+					me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+				else
+					me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+			}
 
-                DoAction(ACTION_SET_NORMAL_EVENTS);
-            }
+			events.Reset();
+		}
 
-            void KilledUnit(Unit* who) override
-            {
-                if (who->GetTypeId() == TYPEID_PLAYER)
-                    Talk(SAY_KILL);
-            }
+		void EnterCombat(Unit* who)
+		{
+			Talk(SAY_AGGRO);
 
-            void EnterCombat(Unit* /*who*/) override
-            {
-                _EnterCombat();
+			if (pInstance)
+			{
+				pInstance->SetData(DATA_EREGOS, IN_PROGRESS);
 
-                Talk(SAY_AGGRO);
-                /* Checks for present drakes vehicles from each type and deactivate achievement that corresponds to each found
-                   The checks are so big in case some party try weird things like pulling boss down or hiding out of check range, the only thing player need is to get the boss kill credit after the check /even if he or his drake die/
-                   Drakes mechanic would despawn all after unmount and also drakes should be auto mounted after item use, item use after Eregos is engaged leads to his despawn - based on retail data. */
-                if (me->FindNearestCreature(NPC_RUBY_DRAKE_VEHICLE, 500.0f, true))
-                    _rubyVoid = false;
-                if (me->FindNearestCreature(NPC_EMERALD_DRAKE_VEHICLE, 500.0f, true))
-                    _emeraldVoid = false;
-                if (me->FindNearestCreature(NPC_AMBER_DRAKE_VEHICLE, 500.0f, true))
-                    _amberVoid = false;
-            }
+				if( me->FindNearestCreature(NPC_AMBER_DRAKE, 750.0f, true) )
+					pInstance->SetData(DATA_AMBER_VOID, 0);
+				else
+					pInstance->SetData(DATA_AMBER_VOID, 1);
 
-            uint32 GetData(uint32 type) const override
-            {
-               switch (type)
-               {
-                   case DATA_RUBY_VOID:
-                        return _rubyVoid;
-                   case DATA_EMERALD_VOID:
-                        return _emeraldVoid;
-                   case DATA_AMBER_VOID:
-                        return _amberVoid;
-                    default:
-                        break;
-                }
-                return 0;
-            }
+				if( me->FindNearestCreature(NPC_EMERALD_DRAKE, 750.0f, true) )
+					pInstance->SetData(DATA_EMERALD_VOID, 0);
+				else
+					pInstance->SetData(DATA_EMERALD_VOID, 1);
 
-            void DoAction(int32 action) override
-            {
-                if (action != ACTION_SET_NORMAL_EVENTS)
-                    return;
+				if( me->FindNearestCreature(NPC_RUBY_DRAKE, 750.0f, true) )
+					pInstance->SetData(DATA_RUBY_VOID, 0);
+				else
+					pInstance->SetData(DATA_RUBY_VOID, 1);
+			}
 
-                events.SetPhase(PHASE_NORMAL);
-                events.ScheduleEvent(EVENT_ARCANE_BARRAGE, urand(3, 10) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-                events.ScheduleEvent(EVENT_ARCANE_VOLLEY, urand(10, 25) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-                events.ScheduleEvent(EVENT_ENRAGED_ASSAULT, urand(35, 50) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-                events.ScheduleEvent(EVENT_SUMMON_LEY_WHELP, urand(15, 30) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-            }
+			me->SetInCombatWithZone();
 
-            void JustSummoned(Creature* summon) override
-            {
-                BossAI::JustSummoned(summon);
+			shiftNumber = 0;
 
-                if (summon->GetEntry() != NPC_PLANAR_ANOMALY)
-                    return;
+			events.RescheduleEvent(EVENT_SPELL_ARCANE_BARRAGE, 0);
+			events.RescheduleEvent(EVENT_SPELL_ARCANE_VOLLEY, 5000);
+			events.RescheduleEvent(EVENT_SPELL_ENRAGED_ASSAULT, 35000);
+			events.RescheduleEvent(EVENT_SUMMON_WHELPS, 40000);
+		}
 
-                summon->CombatStop(true);
-                summon->SetReactState(REACT_PASSIVE);
-                summon->GetMotionMaster()->MoveRandom(100.0f);
-            }
+		void JustDied(Unit* killer)
+		{
+			Talk(SAY_DEATH);
 
-            void SummonedCreatureDespawn(Creature* summon) override
-            {
-                if (summon->GetEntry() != NPC_PLANAR_ANOMALY)
-                    return;
+			if (pInstance)
+				pInstance->SetData(DATA_EREGOS, DONE);
 
-                /// @todo: See why the spell is not cast
-                summon->CastSpell(summon, SPELL_PLANAR_BLAST, true);
-            }
+			me->SummonGameObject(GO_SPOTLIGHT, 1018.06f, 1051.09f, 605.619019f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0);
+		}
 
-            void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) override
-            {
-                if (!IsHeroic())
-                    return;
+		void DamageTaken(Unit*, uint32 &damage, DamageEffectType, SpellSchoolMask)
+		{
+			if( !me->GetMap()->IsHeroic() )
+				return;
 
-                if ( (me->GetHealthPct() < 60.0f  && me->GetHealthPct() > 20.0f && _phase < PHASE_FIRST_PLANAR)
-                    || (me->GetHealthPct() < 20.0f && _phase < PHASE_SECOND_PLANAR) )
-                {
-                    events.Reset();
-                    _phase = (me->GetHealthPct() < 60.0f  && me->GetHealthPct() > 20.0f) ? PHASE_FIRST_PLANAR : PHASE_SECOND_PLANAR;
+			if( shiftNumber <= uint32(1) && uint32(me->GetHealth()*100/me->GetMaxHealth()) <= uint32(60-shiftNumber*40) )
+			{
+				++shiftNumber;
+				events.RescheduleEvent(EVENT_SPELL_PLANAR_SHIFT, 0);
+			}
+		}
 
-                    Talk(SAY_SHIELD);
-                    DoCast(SPELL_PLANAR_SHIFT);
+		void KilledUnit(Unit *victim)
+		{
+			Talk(SAY_KILL);
+		}
 
-                    // not sure about the amount, and if we should despawn previous spawns (dragon trashs)
-                    summons.DespawnAll();
-                    for (uint8 i = 0; i < 6; i++)
-                        DoCast(SPELL_PLANAR_ANOMALIES);
-                }
-            }
+		void MoveInLineOfSight(Unit* who) {}
 
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
+		void JustSummoned(Creature* pSummon)
+		{
+			if( pSummon->GetEntry() != NPC_LEY_GUARDIAN_WHELP )
+				return;
 
-                events.Update(diff);
+			DoZoneInCombat(pSummon, 300.0f);
+		}
 
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
+		void UpdateAI(uint32 diff)
+		{
+			if( !UpdateVictim() )
+				return;
 
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        case EVENT_ARCANE_BARRAGE:
-                            DoCastVictim(SPELL_ARCANE_BARRAGE);
-                            events.ScheduleEvent(EVENT_ARCANE_BARRAGE, urand(3, 10) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-                            break;
-                        case EVENT_ARCANE_VOLLEY:
-                            DoCastAOE(SPELL_ARCANE_VOLLEY);
-                            events.ScheduleEvent(EVENT_ARCANE_VOLLEY, urand(10, 25) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-                            break;
-                        case EVENT_ENRAGED_ASSAULT:
-                            Talk(SAY_ENRAGE);
-                            DoCast(SPELL_ENRAGED_ASSAULT);
-                            events.ScheduleEvent(EVENT_ENRAGED_ASSAULT, urand(35, 50) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-                            break;
-                        case EVENT_SUMMON_LEY_WHELP:
-                            for (uint8 i = 0; i < 3; i++)
-                                DoCast(SPELL_SUMMON_LEY_WHELP);
-                            events.ScheduleEvent(EVENT_SUMMON_LEY_WHELP, urand(15, 30) * IN_MILLISECONDS, 0, PHASE_NORMAL);
-                            break;
-                        default:
-                            break;
-                    }
-                }
+			if( me->HasAura(SPELL_PLANAR_SHIFT) || me->HasAura(SPELL_DRAKE_STOP_TIME) )
+				return;
 
-                DoMeleeAttackIfReady();
-            }
+			events.Update(diff);
 
-            void JustDied(Unit* /*killer*/) override
-            {
-                Talk(SAY_DEATH);
+			if( me->HasUnitState(UNIT_STATE_CASTING) )
+				return;
 
-                _JustDied();
-            }
+			DoMeleeAttackIfReady();
 
-         private:
-             uint8 _phase;
-             bool _rubyVoid;
-             bool _emeraldVoid;
-             bool _amberVoid;
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return new boss_eregosAI(creature);
-        }
+			switch( events.GetEvent() )
+			{
+				case 0:
+					break;
+				case EVENT_SPELL_ARCANE_BARRAGE:
+					if( Unit* v = me->GetVictim() )
+						me->CastSpell(v, SPELL_ARCANE_BARRAGE, false);
+					events.RepeatEvent(2500);
+					break;
+				case EVENT_SPELL_ARCANE_VOLLEY:
+					me->CastSpell(me, SPELL_ARCANE_VOLLEY, false);
+					events.RepeatEvent(8000);
+					break;
+				case EVENT_SPELL_ENRAGED_ASSAULT:
+					Talk(SAY_ENRAGE);
+					me->CastSpell(me, SPELL_ENRAGED_ASSAULT, false);
+					events.RepeatEvent(35000);
+					break;
+				case EVENT_SUMMON_WHELPS:
+					for( uint8 i=0; i<5; ++i )
+						events.ScheduleEvent(EVENT_SUMMON_SINGLE_WHELP, urand(0, 8000));
+					events.RepeatEvent(40000);
+					break;
+				case EVENT_SUMMON_SINGLE_WHELP:
+					{
+						float x = rand_norm()*50.0f-25.0f;
+						float y = rand_norm()*50.0f-25.0f;
+						float z = rand_norm()*50.0f-25.0f;
+						me->SummonCreature(NPC_LEY_GUARDIAN_WHELP, me->GetPositionX()+x, me->GetPositionY()+y, me->GetPositionZ()+z, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 5000);
+						events.PopEvent();
+					}
+					break;
+				case EVENT_SPELL_PLANAR_SHIFT:
+					//me->MonsterYell(TEXT_PLANAR_SHIFT_SAY, LANG_UNIVERSAL, 0);
+					Talk(SAY_SHIELD);
+					me->CastSpell(me, SPELL_PLANAR_SHIFT, false);
+					for( uint8 i=0; i<3; ++i )
+						if( Unit* t = SelectTarget(SELECT_TARGET_RANDOM, 0, 300.0f, false) )
+							if( Creature* pa = me->SummonCreature(NPC_PLANAR_ANOMALY, *me, TEMPSUMMON_TIMED_DESPAWN, 17000) )
+							{
+								pa->SetCanFly(true);
+								pa->SetDisableGravity(true);
+								pa->SetHover(true);
+								pa->SendMovementFlagUpdate();
+								pa->CastSpell(pa, SPELL_PLANAR_AURA_VISUAL, true);
+								pa->CastSpell(pa, SPELL_PLANAR_AURA_DAMAGE, true);
+								if (Aura* a = pa->GetAura(SPELL_PLANAR_AURA_DAMAGE))
+									a->SetDuration(15000);
+								if( pa->AI() )
+								{
+									pa->AI()->AttackStart(t);
+									pa->GetMotionMaster()->MoveChase(t, 0.01f);
+								}
+							}
+					events.PopEvent();
+					break;
+			}
+		}
+	};
 };
 
-class spell_eregos_planar_shift : public SpellScriptLoader
+void AddSC_boss_eregos()
 {
-    public:
-        spell_eregos_planar_shift() : SpellScriptLoader("spell_eregos_planar_shift") { }
-
-        class spell_eregos_planar_shift_AuraScript : public AuraScript
-        {
-            PrepareAuraScript(spell_eregos_planar_shift_AuraScript);
-
-            void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-            {
-                if (Creature* creature = GetTarget()->ToCreature())
-                    creature->AI()->DoAction(ACTION_SET_NORMAL_EVENTS);
-            }
-
-            void Register() override
-            {
-                AfterEffectRemove += AuraEffectRemoveFn(spell_eregos_planar_shift_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_SCHOOL_IMMUNITY, AURA_EFFECT_HANDLE_REAL);
-            }
-        };
-
-        AuraScript* GetAuraScript() const override
-        {
-            return new spell_eregos_planar_shift_AuraScript();
-        }
-};
-
-class achievement_gen_eregos_void : public AchievementCriteriaScript
-{
-    public:
-        achievement_gen_eregos_void(char const* name, uint32 data) : AchievementCriteriaScript(name), _data(data) { }
-
-        bool OnCheck(Player* /*player*/, Unit* target) override
-        {
-            return target && target->GetAI()->GetData(_data);
-        }
-
-    private:
-        uint32 _data;
-};
-
- void AddSC_boss_eregos()
- {
-    new boss_eregos();
-    new spell_eregos_planar_shift();
-    new achievement_gen_eregos_void("achievement_ruby_void", DATA_RUBY_VOID);
-    new achievement_gen_eregos_void("achievement_emerald_void", DATA_EMERALD_VOID);
-    new achievement_gen_eregos_void("achievement_amber_void", DATA_AMBER_VOID);
- }
+	new boss_eregos();
+}

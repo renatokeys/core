@@ -1,114 +1,77 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY PUSSYWIZARD, IT OWNS NOW!
+*/
 
-#ifndef OCULUS_H_
-#define OCULUS_H_
+#ifndef DEF_OCULUS_H
+#define DEF_OCULUS_H
 
-#define OculusScriptName "instance_oculus"
-#define DataHeader "OC"
-
-uint32 const EncounterCount = 4;
-
-enum DataTypes
+enum Data
 {
-    // Encounter States/Boss GUIDs
-    DATA_DRAKOS                 = 0,
-    DATA_VAROS                  = 1,
-    DATA_UROM                   = 2,
-    DATA_EREGOS                 = 3,
-    // GPS System
-    DATA_CONSTRUCTS             = 4
+	DATA_DRAKOS,			// Drakos the Interrogator
+	DATA_VAROS,				// Varos Cloudstrider
+	DATA_UROM,				// Mage-Lord Urom
+	DATA_EREGOS,			// Ley-Guardian Eregos
+	MAX_ENCOUNTER,
+	DATA_CC_COUNT,
+	DATA_AMBER_VOID,
+	DATA_EMERALD_VOID,
+	DATA_RUBY_VOID,
+	DATA_DCD_1				= 100,
+	DATA_DCD_2				= 101,
+	DATA_DCD_3				= 102,
 };
 
-enum CreatureIds
+enum NPCs
 {
-    NPC_DRAKOS                  = 27654,
-    NPC_VAROS                   = 27447,
-    NPC_UROM                    = 27655,
-    NPC_EREGOS                  = 27656,
+	NPC_DRAKOS				= 27654,
+	NPC_VAROS				= 27447,
+	NPC_UROM				= 27655,
+	NPC_EREGOS				= 27656,
 
-    NPC_AZURE_RING_GUARDIAN     = 28236,
-    NPC_CENTRIFUGE_CONSTRUCT    = 27641,
-    NPC_RUBY_DRAKE_VEHICLE      = 27756,
-    NPC_EMERALD_DRAKE_VEHICLE   = 27692,
-    NPC_AMBER_DRAKE_VEHICLE     = 27755,
-    NPC_VERDISA                 = 27657,
-    NPC_BELGARISTRASZ           = 27658,
-    NPC_ETERNOS                 = 27659,
-    NPC_GREATER_WHELP           = 28276
+	NPC_VERDISA				= 27657,
+	NPC_BELGARISTRASZ		= 27658,
+	NPC_ETERNOS				= 27659,
+
+	NPC_AMBER_DRAKE			= 27755,
+	NPC_EMERALD_DRAKE		= 27692,
+	NPC_RUBY_DRAKE			= 27756,
+
+	NPC_CENTRIFUGE_CONSTRUCT = 27641,
+
+	NPC_IMAGE_OF_BELGARISTRASZ = 28012,
 };
 
-enum GameObjectIds
+enum Items
 {
-    GO_DRAGON_CAGE_DOOR         = 193995,
-    GO_EREGOS_CACHE_N           = 191349,
-    GO_EREGOS_CACHE_H           = 193603
+	ITEM_EMERALD_ESSENCE	= 37815,
+	ITEM_AMBER_ESSENCE		= 37859,
+	ITEM_RUBY_ESSENCE		= 37860,
 };
 
-enum SpellEvents
+enum GOs
 {
-    EVENT_CALL_DRAGON           = 12229
+	GO_DRAGON_CAGE			= 189986,
+	GO_DRAGON_CAGE_DOOR		= 193995,
+	GO_CACHE_OF_EREGOS		= 191349,
+	GO_CACHE_OF_EREGOS_HERO	= 193603,
+	GO_SPOTLIGHT			= 191351,
 };
 
-enum CreatureActions
+enum AchievData
 {
-    ACTION_CALL_DRAGON_EVENT    = 1
+	ACHIEV_MAKE_IT_COUNT_TIMED_EVENT	= 18153,
+	CRITERIA_EXPERIENCED_AMBER			= 7177,
+	CRITERIA_EXPERIENCED_EMERALD		= 7178,
+	CRITERIA_EXPERIENCED_RUBY			= 7179,
+	CRITERIA_AMBER_VOID					= 7325,
+	CRITERIA_EMERALD_VOID				= 7324,
+	CRITERIA_RUBY_VOID					= 7323,
 };
 
 enum OculusWorldStates
 {
-    WORLD_STATE_CENTRIFUGE_CONSTRUCT_SHOW   = 3524,
-    WORLD_STATE_CENTRIFUGE_CONSTRUCT_AMOUNT = 3486
+	WORLD_STATE_CENTRIFUGE_CONSTRUCT_SHOW	= 3524,
+	WORLD_STATE_CENTRIFUGE_CONSTRUCT_AMOUNT	= 3486
 };
 
-enum OculusSpells
-{
-    SPELL_CENTRIFUGE_SHIELD     = 50053,
-    SPELL_DEATH_SPELL           = 50415
-};
-
-enum InstanceTexts
-{
-    SAY_EREGOS_INTRO_TEXT = 0,
-    SAY_VAROS_INTRO_TEXT  = 4
-};
-
-enum InstanceEvents
-{
-    EVENT_VAROS_INTRO = 1,
-    EVENT_EREGOS_INTRO
-};
-
-enum ConstructKillState
-{
-    KILL_NO_CONSTRUCT           = 0,
-    KILL_ONE_CONSTRUCT          = 1,
-    KILL_MORE_CONSTRUCT         = 2
-};
-
-enum Misc
-{
-    POINT_MOVE_OUT              = 1
-};
-
-template<class AI>
-AI* GetOculusAI(Creature* creature)
-{
-    return GetInstanceAI<AI>(creature, OculusScriptName);
-}
-
-#endif // OCULUS_H_
+#endif

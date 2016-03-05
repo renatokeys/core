@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,9 +19,12 @@
 #ifndef TRINITY_CONDITIONMGR_H
 #define TRINITY_CONDITIONMGR_H
 
-#include "Common.h"
+#include "Define.h"
+#include "Errors.h"
+#include <ace/Singleton.h>
+#include <list>
+#include <map>
 
-class Creature;
 class Player;
 class Unit;
 class WorldObject;
@@ -59,9 +62,9 @@ enum ConditionTypes
     CONDITION_PHASEMASK             = 26,                   // phasemask        0              0                  true if object is in phasemask
     CONDITION_LEVEL                 = 27,                   // level            ComparisonType 0                  true if unit's level is equal to param1 (param2 can modify the statement)
     CONDITION_QUEST_COMPLETE        = 28,                   // quest_id         0              0                  true if player has quest_id with all objectives complete, but not yet rewarded
-    CONDITION_NEAR_CREATURE         = 29,                   // creature entry   distance       dead (0/1)         true if there is a creature of entry in range
+    CONDITION_NEAR_CREATURE         = 29,                   // creature entry   distance       dead               true if there is a creature of entry in range
     CONDITION_NEAR_GAMEOBJECT       = 30,                   // gameobject entry distance       0                  true if there is a gameobject of entry in range
-    CONDITION_OBJECT_ENTRY_GUID     = 31,                   // TypeID           entry          guid               true if object is type TypeID and the entry is 0 or matches entry of the object or matches guid of the object
+    CONDITION_OBJECT_ENTRY_GUID     = 31,                   // TypeID           entry          guid/Attackable    true if object is type TypeID and the entry is 0 or matches entry of the object or matches guid of the object
     CONDITION_TYPE_MASK             = 32,                   // TypeMask         0              0                  true if object is type object's TypeMask matches provided TypeMask
     CONDITION_RELATION_TO           = 33,                   // ConditionTarget  RelationType   0                  true if object is in given relation with object specified by ConditionTarget
     CONDITION_REACTION_TO           = 34,                   // ConditionTarget  rankMask       0                  true if object's reaction matches rankMask object specified by ConditionTarget
@@ -71,14 +74,25 @@ enum ConditionTypes
     CONDITION_HP_PCT                = 38,                   // hpPct            ComparisonType 0                  true if unit's hp matches given pct
     CONDITION_REALM_ACHIEVEMENT     = 39,                   // achievement_id   0              0                  true if realm achievement is complete
     CONDITION_IN_WATER              = 40,                   // 0                0              0                  true if unit in water
-    CONDITION_MAX                   = 41                    // MAX
+	// RESERVED						= 41,
+	// RESERVED						= 42,
+	// RESERVED						= 43,
+	// RESERVED						= 44,
+	// RESERVED						= 45,
+	// RESERVED						= 46,
+	// RESERVED						= 47,
+	// RESERVED						= 48,
+	// RESERVED						= 49,
+    CONDITION_QUEST_SATISFY_EXCLUSIVE = 50,                 // quest_id         0              0                  true if satisfied exclusive group
+	CONDITION_HAS_AURA_TYPE			= 51,					// aura_type		0			   0				  true if has aura type
+    CONDITION_MAX                   = 52                    // MAX
 };
 
 /*! Documentation on implementing a new ConditionSourceType:
     Step 1: Check for the lowest free ID. Look for CONDITION_SOURCE_TYPE_UNUSED_XX in the enum.
             Then define the new source type.
 
-    Step 2: Determine and map the parameters for the new condition type.
+    Step 2: Determine and map the parameters for the new condition source type.
 
     Step 3: Add a case block to ConditionMgr::isSourceTypeValid with the new condition type
             and validate the parameters.
@@ -146,26 +160,25 @@ enum RelationType
 enum InstanceInfo
 {
     INSTANCE_INFO_DATA = 0,
-    INSTANCE_INFO_GUID_DATA,
-    INSTANCE_INFO_BOSS_STATE,
-    INSTANCE_INFO_DATA64
+    INSTANCE_INFO_DATA64,
+    INSTANCE_INFO_BOSS_STATE
 };
 
-enum MaxConditionTargets
+enum
 {
-    MAX_CONDITION_TARGETS = 3
+    MAX_CONDITION_TARGETS = 3,
 };
 
 struct ConditionSourceInfo
 {
     WorldObject* mConditionTargets[MAX_CONDITION_TARGETS]; // an array of targets available for conditions
-    Condition const* mLastFailedCondition;
-    ConditionSourceInfo(WorldObject* target0, WorldObject* target1 = nullptr, WorldObject* target2 = nullptr)
+    Condition* mLastFailedCondition;
+    ConditionSourceInfo(WorldObject* target0, WorldObject* target1 = NULL, WorldObject* target2 = NULL)
     {
         mConditionTargets[0] = target0;
         mConditionTargets[1] = target1;
         mConditionTargets[2] = target2;
-        mLastFailedCondition = nullptr;
+        mLastFailedCondition = NULL;
     }
 };
 
@@ -206,83 +219,65 @@ struct Condition
         NegativeCondition  = false;
     }
 
-    bool Meets(ConditionSourceInfo& sourceInfo) const;
-    uint32 GetSearcherTypeMaskForCondition() const;
+    bool Meets(ConditionSourceInfo& sourceInfo);
+    uint32 GetSearcherTypeMaskForCondition();
     bool isLoaded() const { return ConditionType > CONDITION_NONE || ReferenceId; }
-    uint32 GetMaxAvailableConditionTargets() const;
-
-    std::string ToString(bool ext = false) const; /// For logging purpose
+    uint32 GetMaxAvailableConditionTargets();
 };
 
-typedef std::vector<Condition*> ConditionContainer;
-typedef std::unordered_map<uint32 /*SourceEntry*/, ConditionContainer> ConditionsByEntryMap;
-typedef std::array<ConditionsByEntryMap, CONDITION_SOURCE_TYPE_MAX> ConditionEntriesByTypeArray;
-typedef std::unordered_map<uint32, ConditionsByEntryMap> ConditionEntriesByCreatureIdMap;
-typedef std::unordered_map<std::pair<int32, uint32 /*SAI source_type*/>, ConditionsByEntryMap> SmartEventConditionContainer;
-typedef std::unordered_map<uint32, ConditionContainer> ConditionReferenceContainer;//only used for references
+typedef std::list<Condition*> ConditionList;
+typedef std::map<uint32, ConditionList> ConditionTypeContainer;
+typedef std::map<ConditionSourceType, ConditionTypeContainer> ConditionContainer;
+typedef std::map<uint32, ConditionTypeContainer> CreatureSpellConditionContainer;
+typedef std::map<uint32, ConditionTypeContainer> NpcVendorConditionContainer;
+typedef std::map<std::pair<int32, uint32 /*SAI source_type*/>, ConditionTypeContainer> SmartEventConditionContainer;
+
+typedef std::map<uint32, ConditionList> ConditionReferenceContainer;//only used for references
 
 class ConditionMgr
 {
+    friend class ACE_Singleton<ConditionMgr, ACE_Null_Mutex>;
+
     private:
         ConditionMgr();
         ~ConditionMgr();
 
     public:
-        static ConditionMgr* instance()
-        {
-            static ConditionMgr instance;
-            return &instance;
-        }
-
         void LoadConditions(bool isReload = false);
-        bool isConditionTypeValid(Condition* cond) const;
+        bool isConditionTypeValid(Condition* cond);
+        ConditionList GetConditionReferences(uint32 refId);
 
-        uint32 GetSearcherTypeMaskForConditionList(ConditionContainer const& conditions) const;
-        bool IsObjectMeetToConditions(WorldObject* object, ConditionContainer const& conditions) const;
-        bool IsObjectMeetToConditions(WorldObject* object1, WorldObject* object2, ConditionContainer const& conditions) const;
-        bool IsObjectMeetToConditions(ConditionSourceInfo& sourceInfo, ConditionContainer const& conditions) const;
-        static bool CanHaveSourceGroupSet(ConditionSourceType sourceType);
-        static bool CanHaveSourceIdSet(ConditionSourceType sourceType);
-        bool IsObjectMeetingNotGroupedConditions(ConditionSourceType sourceType, uint32 entry, ConditionSourceInfo& sourceInfo) const;
-        bool IsObjectMeetingNotGroupedConditions(ConditionSourceType sourceType, uint32 entry, WorldObject* target0, WorldObject* target1 = nullptr, WorldObject* target2 = nullptr) const;
-        bool HasConditionsForNotGroupedEntry(ConditionSourceType sourceType, uint32 entry) const;
-        bool IsObjectMeetingSpellClickConditions(uint32 creatureId, uint32 spellId, WorldObject* clicker, WorldObject* target) const;
-        ConditionContainer const* GetConditionsForSpellClickEvent(uint32 creatureId, uint32 spellId) const;
-        bool IsObjectMeetingVehicleSpellConditions(uint32 creatureId, uint32 spellId, Player* player, Unit* vehicle) const;
-        bool IsObjectMeetingSmartEventConditions(int32 entryOrGuid, uint32 eventId, uint32 sourceType, Unit* unit, WorldObject* baseObject) const;
-        bool IsObjectMeetingVendorItemConditions(uint32 creatureId, uint32 itemId, Player* player, Creature* vendor) const;
-
-        struct ConditionTypeInfo
-        {
-            char const* Name;
-            bool HasConditionValue1;
-            bool HasConditionValue2;
-            bool HasConditionValue3;
-        };
-        static char const* const StaticSourceTypeData[CONDITION_SOURCE_TYPE_MAX];
-        static ConditionTypeInfo const StaticConditionTypeData[CONDITION_MAX];
+        uint32 GetSearcherTypeMaskForConditionList(ConditionList const& conditions);
+        bool IsObjectMeetToConditions(WorldObject* object, ConditionList const& conditions);
+        bool IsObjectMeetToConditions(WorldObject* object1, WorldObject* object2, ConditionList const& conditions);
+        bool IsObjectMeetToConditions(ConditionSourceInfo& sourceInfo, ConditionList const& conditions);
+        bool CanHaveSourceGroupSet(ConditionSourceType sourceType) const;
+        bool CanHaveSourceIdSet(ConditionSourceType sourceType) const;
+        ConditionList GetConditionsForNotGroupedEntry(ConditionSourceType sourceType, uint32 entry);
+        ConditionList GetConditionsForSpellClickEvent(uint32 creatureId, uint32 spellId);
+        ConditionList GetConditionsForSmartEvent(int32 entryOrGuid, uint32 eventId, uint32 sourceType);
+        ConditionList GetConditionsForVehicleSpell(uint32 creatureId, uint32 spellId);
+        ConditionList GetConditionsForNpcVendorEvent(uint32 creatureId, uint32 itemId);
 
     private:
-        bool isSourceTypeValid(Condition* cond) const;
-        bool addToLootTemplate(Condition* cond, LootTemplate* loot) const;
-        bool addToGossipMenus(Condition* cond) const;
-        bool addToGossipMenuItems(Condition* cond) const;
-        bool addToSpellImplicitTargetConditions(Condition* cond) const;
-        bool IsObjectMeetToConditionList(ConditionSourceInfo& sourceInfo, ConditionContainer const& conditions) const;
-
-        static void LogUselessConditionValue(Condition* cond, uint8 index, uint32 value);
+        bool isSourceTypeValid(Condition* cond);
+        bool addToLootTemplate(Condition* cond, LootTemplate* loot);
+        bool addToGossipMenus(Condition* cond);
+        bool addToGossipMenuItems(Condition* cond);
+        bool addToSpellImplicitTargetConditions(Condition* cond);
+        bool IsObjectMeetToConditionList(ConditionSourceInfo& sourceInfo, ConditionList const& conditions);
 
         void Clean(); // free up resources
-        std::vector<Condition*> AllocatedMemoryStore; // some garbage collection :)
+        std::list<Condition*> AllocatedMemoryStore; // some garbage collection :)
 
-        ConditionEntriesByTypeArray     ConditionStore;
-        ConditionReferenceContainer     ConditionReferenceStore;
-        ConditionEntriesByCreatureIdMap VehicleSpellConditionStore;
-        ConditionEntriesByCreatureIdMap SpellClickEventConditionStore;
-        ConditionEntriesByCreatureIdMap NpcVendorConditionContainerStore;
-        SmartEventConditionContainer    SmartEventConditionStore;
+        ConditionContainer                ConditionStore;
+        ConditionReferenceContainer       ConditionReferenceStore;
+        CreatureSpellConditionContainer   VehicleSpellConditionStore;
+        CreatureSpellConditionContainer   SpellClickEventConditionStore;
+        NpcVendorConditionContainer       NpcVendorConditionContainerStore;
+        SmartEventConditionContainer      SmartEventConditionStore;
 };
 
-#define sConditionMgr ConditionMgr::instance()
+#define sConditionMgr ACE_Singleton<ConditionMgr, ACE_Null_Mutex>::instance()
 
 #endif

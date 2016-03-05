@@ -1,296 +1,348 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss_Skarvald_Dalronn
-SD%Complete: 95
-SDComment: Needs adjustments to blizzlike timers
-SDCategory: Utgarde Keep
-EndScriptData */
+REWRITTEN FROM SCRATCH BY PUSSYWIZARD, IT OWNS NOW!
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "utgarde_keep.h"
 
-enum Texts
+enum eTexts
 {
-    // Texts are common for both bosses and their ghosts.
-    SAY_AGGRO                  = 0,
-    SAY_DEATH                  = 1, // Said once both bosses are dead.
-    SAY_DIED_FIRST             = 2, // Said by the first boss that dies.
-    SAY_KILL                   = 3,
-    SAY_DEATH_RESPONSE         = 4  // Said by the boss alive after the first one dies.
+    //signed for 24200, but used by 24200, 27390
+    YELL_SKARVALD_AGGRO                         = 0,
+    YELL_SKARVALD_DAL_DIED                      = 1,
+    YELL_SKARVALD_SKA_DIEDFIRST                 = 2,
+    YELL_SKARVALD_KILL                          = 3,
+    YELL_SKARVALD_DAL_DIEDFIRST                 = 4,
 
+    //signed for 24201, but used by 24201, 27389
+    YELL_DALRONN_AGGRO                          = 0,
+    YELL_DALRONN_SKA_DIED                       = 1,
+    YELL_DALRONN_DAL_DIEDFIRST                  = 2,
+    YELL_DALRONN_KILL                           = 3,
+    YELL_DALRONN_SKA_DIEDFIRST                  = 4,
 };
 
-enum Spells
+enum eSpells
 {
-    // Spells of Skarvald and his Ghost
+	// Skarvald:
     SPELL_CHARGE                                = 43651,
     SPELL_STONE_STRIKE                          = 48583,
-    SPELL_ENRAGE                                = 48193,
     SPELL_SUMMON_SKARVALD_GHOST                 = 48613,
 
-    // Spells of Dalronn and his Ghost
-    SPELL_SHADOW_BOLT                           = 43649,
-    SPELL_SUMMON_SKELETONS                      = 52611,
+	// Dalronn:
+    SPELL_SHADOW_BOLT_N                         = 43649,
+    SPELL_SHADOW_BOLT_H                         = 59575,
     SPELL_DEBILITATE                            = 43650,
+    SPELL_SUMMON_SKELETONS                      = 52611,
     SPELL_SUMMON_DALRONN_GHOST                  = 48612,
 };
 
-enum Events
+#define SPELL_SHADOW_BOLT				DUNGEON_MODE(SPELL_SHADOW_BOLT_N, SPELL_SHADOW_BOLT_H)
+
+enum eEvents
 {
-    // Skarvald the Constructor
-    EVENT_SKARVALD_CHARGE = 1,
-    EVENT_STONE_STRIKE,
+	EVENT_SPELL_CHARGE = 1,
+	EVENT_SPELL_STONE_STRIKE,
 
-    // Dalronn the Controller
-    EVENT_SHADOW_BOLT,
-    EVENT_DEBILITATE,
-    EVENT_SUMMON_SKELETONS,
-    EVENT_DELAYED_AGGRO_SAY, // Dalronn's SAY_AGGRO is delayed so it doesn't overlap Skarvald's one.
+	EVENT_SPELL_SHADOW_BOLT,
+	EVENT_SPELL_DEBILITATE,
+	EVENT_SPELL_SUMMON_SKELETONS,
 
-    // Common event to both bosses.
-    // Delays SAY_DEATH_RESPONSE so it doesn't overlap with the SAY_DIED_FIRST from the boss that has just died.
-    EVENT_DEATH_RESPONSE
-};
-
-enum Actions
-{
-    ACTION_OTHER_JUST_DIED = 1,
-    ACTION_DESPAWN_SUMMONS = 2 // Only needed to clear off the ghosts when the second boss dies.
-};
-
-class SkarvaldChargePredicate
-{
-    public:
-        SkarvaldChargePredicate(Unit* unit) : _me(unit) { }
-
-        bool operator() (WorldObject* target) const
-        {
-            return target->GetDistance2d(_me) >= 5.0f && target->GetDistance2d(_me) <= 30.0f;
-        }
-
-    private:
-        Unit* _me;
-};
-
-struct generic_boss_controllerAI : public BossAI
-{
-    generic_boss_controllerAI(Creature* creature) : BossAI(creature, DATA_SKARVALD_DALRONN)
-    {
-        OtherBossData = 0;
-        IsInGhostForm = me->GetEntry() == NPC_SKARVALD_GHOST || me->GetEntry() == NPC_DALRONN_GHOST;
-    }
-
-    void Reset() override
-    {
-        if (IsInGhostForm)
-        {
-            // Call this here since ghosts aren't set in combat as they spawn.
-            DoZoneInCombat(me, 50.0f);
-        }
-        else
-            _Reset();
-    }
-
-    void EnterCombat(Unit* /*who*/) override
-    {
-        if (!IsInGhostForm)
-            _EnterCombat();
-    }
-
-    void JustDied(Unit* /*killer*/) override
-    {
-        if (Creature* otherBoss = ObjectAccessor::GetCreature(*me, instance->GetGuidData(OtherBossData)))
-        {
-            if (otherBoss->IsAlive())
-            {
-                Talk(SAY_DIED_FIRST);
-                me->RemoveFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
-                otherBoss->AI()->DoAction(ACTION_OTHER_JUST_DIED);
-                DoCast(me, OtherBossData == DATA_DALRONN ? SPELL_SUMMON_SKARVALD_GHOST : SPELL_SUMMON_DALRONN_GHOST, true);
-            }
-            else
-            {
-                Talk(SAY_DEATH);
-                otherBoss->AI()->DoAction(ACTION_DESPAWN_SUMMONS);
-                _JustDied();
-            }
-        }
-    }
-
-    void DoAction(int32 actionId) override
-    {
-        switch (actionId)
-        {
-            case ACTION_OTHER_JUST_DIED:
-                events.ScheduleEvent(EVENT_DEATH_RESPONSE, 2000);
-                break;
-            case ACTION_DESPAWN_SUMMONS:
-                summons.DespawnAll();
-                break;
-            default:
-                break;
-        }
-    }
-
-    void ExecuteEvent(uint32 eventId) override
-    {
-        if (eventId == EVENT_DEATH_RESPONSE)
-            Talk(SAY_DEATH_RESPONSE);
-    }
-
-    void KilledUnit(Unit* who) override
-    {
-        if (!IsInGhostForm && who->GetTypeId() == TYPEID_PLAYER)
-            Talk(SAY_KILL);
-    }
-
-    protected:
-        uint32 OtherBossData;
-        bool IsInGhostForm;
+	EVENT_YELL_DALRONN_AGGRO,
+	EVENT_MATE_DIED,
 };
 
 class boss_skarvald_the_constructor : public CreatureScript
 {
-    public:
-        boss_skarvald_the_constructor() : CreatureScript("boss_skarvald_the_constructor") { }
+public:
+    boss_skarvald_the_constructor() : CreatureScript("boss_skarvald_the_constructor") { }
 
-        struct boss_skarvald_the_constructorAI : public generic_boss_controllerAI
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new boss_skarvald_the_constructorAI (pCreature);
+    }
+
+    struct boss_skarvald_the_constructorAI : public ScriptedAI
+    {
+        boss_skarvald_the_constructorAI(Creature *c) : ScriptedAI(c)
         {
-            boss_skarvald_the_constructorAI(Creature* creature) : generic_boss_controllerAI(creature)
-            {
-                OtherBossData = DATA_DALRONN;
-                Enraged = false;
-            }
-
-            void Reset() override
-            {
-                Enraged = false;
-                generic_boss_controllerAI::Reset();
-            }
-
-            void EnterCombat(Unit* who) override
-            {
-                generic_boss_controllerAI::EnterCombat(who);
-
-                if (!IsInGhostForm)
-                    Talk(SAY_AGGRO);
-
-                events.ScheduleEvent(EVENT_SKARVALD_CHARGE, 5000);
-                events.ScheduleEvent(EVENT_STONE_STRIKE, 10000);
-            }
-
-            void ExecuteEvent(uint32 eventId) override
-            {
-                switch (eventId)
-                {
-                    case EVENT_SKARVALD_CHARGE:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, SkarvaldChargePredicate(me)))
-                            DoCast(target, SPELL_CHARGE);
-                        events.ScheduleEvent(EVENT_CHARGE, urand(5000, 10000));
-                        break;
-                    case EVENT_STONE_STRIKE:
-                        DoCastVictim(SPELL_STONE_STRIKE);
-                        events.ScheduleEvent(EVENT_STONE_STRIKE, urand(5000, 10000));
-                        break;
-                    default:
-                        generic_boss_controllerAI::ExecuteEvent(eventId);
-                        break;
-                }
-            }
-
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
-            {
-                if (!Enraged && !IsInGhostForm && me->HealthBelowPctDamaged(15, damage))
-                {
-                    Enraged = true;
-                    DoCast(me, SPELL_ENRAGE);
-                }
-            }
-            private:
-                bool Enraged;
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetUtgardeKeepAI<boss_skarvald_the_constructorAI>(creature);
+            pInstance = c->GetInstanceScript();
         }
+
+        InstanceScript* pInstance;
+		EventMap events;
+
+        void Reset()
+        {
+			me->SetLootMode(0);
+			events.Reset();
+			if( me->GetEntry() == NPC_SKARVALD )
+			{
+				if (pInstance)
+					pInstance->SetData(DATA_DALRONN_AND_SKARVALD, NOT_STARTED);
+			}
+			else // NPC_SKARVALD_GHOST
+				if( Unit* target = me->SelectNearestTarget(50.0f) )
+				{
+					me->AddThreat(target, 0.0f);
+					AttackStart(target);
+				}
+        }
+
+		void DoAction(int32 param)
+		{
+			switch(param)
+			{
+				case 1:
+					events.RescheduleEvent(EVENT_MATE_DIED, 3500);
+					break;
+			}
+		}
+
+        void EnterCombat(Unit * who)
+        {
+            events.Reset();
+			events.RescheduleEvent(EVENT_SPELL_CHARGE, 5000);
+			events.RescheduleEvent(EVENT_SPELL_STONE_STRIKE, 10000);
+
+			if (me->GetEntry() == NPC_SKARVALD)
+				Talk(YELL_SKARVALD_AGGRO);
+
+			if (pInstance)
+			{
+				pInstance->SetData(DATA_DALRONN_AND_SKARVALD, IN_PROGRESS);
+				if( Creature* c = pInstance->instance->GetCreature(pInstance->GetData64(DATA_DALRONN)) )
+					if( !c->IsInCombat() && who )
+					{
+						c->AddThreat(who, 0.0f);
+						c->AI()->AttackStart(who);
+					}
+			}
+        }
+
+        void KilledUnit(Unit * /*victim*/)
+        {
+            if (me->GetEntry() == NPC_SKARVALD)
+                Talk(YELL_SKARVALD_KILL);
+        }
+
+        void JustDied(Unit* Killer)
+        {
+			if( me->GetEntry() != NPC_SKARVALD )
+				return;
+			if( pInstance )
+				if( Creature* dalronn = pInstance->instance->GetCreature(pInstance->GetData64(DATA_DALRONN)) )
+					if( dalronn->isDead() )
+					{
+						Talk(YELL_SKARVALD_SKA_DIEDFIRST);
+						pInstance->SetData(DATA_DALRONN_AND_SKARVALD, DONE);
+						pInstance->SetData(DATA_UNLOCK_SKARVALD_LOOT, 0);
+						return;
+					}
+					else
+					{
+						Talk(YELL_SKARVALD_DAL_DIED);
+						dalronn->AI()->DoAction(1);
+					}
+			me->CastSpell((Unit*)NULL, SPELL_SUMMON_SKARVALD_GHOST, true);
+        }
+
+        void UpdateAI(uint32 diff)
+        {
+			if (!UpdateVictim())
+				return;
+
+			events.Update(diff);
+			
+			if( me->HasUnitState(UNIT_STATE_CASTING) )
+				return;
+
+			switch( events.GetEvent() )
+			{
+				case 0:
+					break;
+				case EVENT_MATE_DIED:
+					Talk(YELL_SKARVALD_DAL_DIEDFIRST);
+					events.PopEvent();
+					break;
+				case EVENT_SPELL_CHARGE:
+					if( Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, (IsHeroic() ? 100.0f : 30.0f), true) )
+					{
+						ScriptedAI::DoResetThreat();
+						me->AddThreat(target, 10000.0f);
+						me->CastSpell(target, SPELL_CHARGE, false);
+					}
+					events.RepeatEvent(urand(5000,10000));
+					break;
+				case EVENT_SPELL_STONE_STRIKE:
+					if( me->GetVictim() && me->IsWithinMeleeRange(me->GetVictim()) )
+					{
+						me->CastSpell(me->GetVictim(), SPELL_STONE_STRIKE, false);
+						events.RepeatEvent(urand(5000,10000));
+					}
+					else
+						events.RepeatEvent(3000);
+					break;
+			}
+
+			DoMeleeAttackIfReady();
+        }
+    };
 };
 
 class boss_dalronn_the_controller : public CreatureScript
 {
-    public:
-        boss_dalronn_the_controller() : CreatureScript("boss_dalronn_the_controller") { }
+public:
+    boss_dalronn_the_controller() : CreatureScript("boss_dalronn_the_controller") { }
 
-        struct boss_dalronn_the_controllerAI : public generic_boss_controllerAI
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new boss_dalronn_the_controllerAI (pCreature);
+    }
+
+    struct boss_dalronn_the_controllerAI : public ScriptedAI
+    {
+        boss_dalronn_the_controllerAI(Creature *c) : ScriptedAI(c), summons(me)
         {
-            boss_dalronn_the_controllerAI(Creature* creature) : generic_boss_controllerAI(creature)
-            {
-                OtherBossData = DATA_SKARVALD;
-            }
-
-            void EnterCombat(Unit* who) override
-            {
-                generic_boss_controllerAI::EnterCombat(who);
-
-                events.ScheduleEvent(EVENT_SHADOW_BOLT, 1000);
-                events.ScheduleEvent(EVENT_DEBILITATE, 5000);
-
-                if (!IsInGhostForm)
-                    events.ScheduleEvent(EVENT_DELAYED_AGGRO_SAY, 5000);
-
-                if (IsHeroic())
-                    events.ScheduleEvent(EVENT_SUMMON_SKELETONS, 10000);
-            }
-
-            void ExecuteEvent(uint32 eventId) override
-            {
-                switch (eventId)
-                {
-                    case EVENT_SHADOW_BOLT:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f, true))
-                            DoCast(target, SPELL_SHADOW_BOLT);
-                        events.ScheduleEvent(EVENT_SHADOW_BOLT, 2100); //give a 100ms pause to try cast other spells
-                        break;
-                    case EVENT_DEBILITATE:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 50.0f, true))
-                            DoCast(target, SPELL_DEBILITATE);
-                        events.ScheduleEvent(EVENT_DEBILITATE, urand(5000, 10000));
-                        break;
-                    case EVENT_SUMMON_SKELETONS:
-                        DoCast(me, SPELL_SUMMON_SKELETONS);
-                        events.ScheduleEvent(EVENT_SUMMON_SKELETONS, urand(10000, 30000));
-                        break;
-                    case EVENT_DELAYED_AGGRO_SAY:
-                        Talk(SAY_AGGRO);
-                        break;
-                    default:
-                        generic_boss_controllerAI::ExecuteEvent(eventId);
-                        break;
-                }
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetUtgardeKeepAI<boss_dalronn_the_controllerAI>(creature);
+            pInstance = c->GetInstanceScript();
         }
+
+        InstanceScript* pInstance;
+		EventMap events;
+		SummonList summons;
+
+        void Reset()
+        {
+			me->SetLootMode(0);
+			events.Reset();
+			summons.DespawnAll();
+			if( me->GetEntry() == NPC_DALRONN )
+			{
+				if (pInstance)
+					pInstance->SetData(DATA_DALRONN_AND_SKARVALD, NOT_STARTED);
+			}
+			else // NPC_DALRONN_GHOST
+				if( Unit* target = me->SelectNearestTarget(50.0f) )
+				{
+					me->AddThreat(target, 0.0f);
+					AttackStart(target);
+				}
+        }
+
+		void DoAction(int32 param)
+		{
+			switch(param)
+			{
+				case -1:
+					summons.DespawnAll();
+					break;
+				case 1:
+					events.RescheduleEvent(EVENT_MATE_DIED, 3500);
+					break;
+			}
+		}
+
+        void EnterCombat(Unit * who)
+        {
+            events.Reset();
+			events.RescheduleEvent(EVENT_SPELL_SHADOW_BOLT, 1000);
+			events.RescheduleEvent(EVENT_SPELL_DEBILITATE, 5000);
+			if( IsHeroic() )
+				events.RescheduleEvent(EVENT_SPELL_SUMMON_SKELETONS, 10000);
+
+			if (me->GetEntry() == NPC_DALRONN)
+				events.RescheduleEvent(EVENT_YELL_DALRONN_AGGRO, 4999);
+
+			if (pInstance)
+			{
+				pInstance->SetData(DATA_DALRONN_AND_SKARVALD, IN_PROGRESS);
+				if( Creature* c = pInstance->instance->GetCreature(pInstance->GetData64(DATA_SKARVALD)) )
+					if( !c->IsInCombat() && who )
+					{
+						c->AddThreat(who, 0.0f);
+						c->AI()->AttackStart(who);
+					}
+			}
+        }
+
+        void KilledUnit(Unit * /*victim*/)
+        {
+            if (me->GetEntry() == NPC_DALRONN)
+                Talk(YELL_DALRONN_KILL);
+        }
+
+		void JustSummoned(Creature* s)
+		{
+			summons.Summon(s);
+		}
+
+        void JustDied(Unit* Killer)
+        {
+			if( me->GetEntry() != NPC_DALRONN )
+				return;
+			if( pInstance )
+				if( Creature* skarvald = pInstance->instance->GetCreature(pInstance->GetData64(DATA_SKARVALD)) )
+					if( skarvald->isDead() )
+					{
+						Talk(YELL_DALRONN_DAL_DIEDFIRST);
+						pInstance->SetData(DATA_DALRONN_AND_SKARVALD, DONE);
+						pInstance->SetData(DATA_UNLOCK_DALRONN_LOOT, 0);
+						return;
+					}
+					else
+					{
+						Talk(YELL_DALRONN_SKA_DIED);
+						skarvald->AI()->DoAction(1);
+					}
+			me->CastSpell((Unit*)NULL, SPELL_SUMMON_DALRONN_GHOST, true);
+        }
+
+        void UpdateAI(uint32 diff)
+        {
+			if (!UpdateVictim())
+				return;
+
+			events.Update(diff);
+			
+			if( me->HasUnitState(UNIT_STATE_CASTING) )
+				return;
+
+			switch( events.GetEvent() )
+			{
+				case 0:
+					break;
+				case EVENT_YELL_DALRONN_AGGRO:
+					Talk(YELL_DALRONN_AGGRO);
+					events.PopEvent();
+					break;
+				case EVENT_MATE_DIED:
+					Talk(YELL_DALRONN_SKA_DIEDFIRST);
+					events.PopEvent();
+					break;
+				case EVENT_SPELL_SHADOW_BOLT:
+					if( Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 42.0f, true) )
+						me->CastSpell(target, SPELL_SHADOW_BOLT, false);
+					events.RepeatEvent(2500);					
+					break;
+				case EVENT_SPELL_DEBILITATE:
+					if( Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f, true) )
+					{
+						me->CastSpell(target, SPELL_DEBILITATE, false);
+						events.RepeatEvent(urand(5000,10000));
+					}
+					else
+						events.RepeatEvent(3000);
+					break;
+				case EVENT_SPELL_SUMMON_SKELETONS:
+					me->CastSpell((Unit*)NULL, SPELL_SUMMON_SKELETONS, false);
+					events.RepeatEvent(urand(20000,30000));
+					break;
+			}
+
+			DoMeleeAttackIfReady();
+        }
+    };
 };
 
 void AddSC_boss_skarvald_dalronn()

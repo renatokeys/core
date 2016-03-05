@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -119,11 +119,9 @@ struct hyjalAI : public npc_escortAI
 {
     hyjalAI(Creature* creature);
 
-    void Initialize();
-
     void Reset();                                           // Generically used to reset our variables. Do *not* call in EnterEvadeMode as this may make problems if the raid is still in combat
 
-    void EnterEvadeMode(EvadeReason /*why*/ = EVADE_REASON_OTHER);    // Send creature back to spawn location and evade.
+    void EnterEvadeMode();                                  // Send creature back to spawn location and evade.
 
     void EnterCombat(Unit* /*who*/);                                  // Used to reset cooldowns for our spells and to inform the raid that we're under attack
 
@@ -160,9 +158,9 @@ struct hyjalAI : public npc_escortAI
     public:
         InstanceScript* instance;
 
-        ObjectGuid PlayerGUID;
-        ObjectGuid BossGUID[2];
-        ObjectGuid VeinGUID[14];
+        uint64 PlayerGUID;
+        uint64 BossGUID[2];
+        uint64 VeinGUID[14];
 
         uint32 NextWaveTimer;
         uint32 WaveCount;
@@ -193,7 +191,7 @@ struct hyjalAI : public npc_escortAI
         bool IsDummy;
         uint32 MassTeleportTimer;
         bool DoMassTeleport;
-        ObjectGuid DummyGuid;
+        uint64 DummyGuid;
 
         struct Spell
         {

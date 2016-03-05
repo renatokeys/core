@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,6 +27,8 @@
 #include <iostream>
 #include <deque>
 
+using namespace std;
+
 class MPQArchive
 {
 
@@ -37,11 +39,11 @@ public:
     ~MPQArchive() { close(); }
     void close();
 
-    void GetFileListTo(std::vector<std::string>& filelist) {
+    void GetFileListTo(vector<string>& filelist) {
         uint32_t filenum;
         if(libmpq__file_number(mpq_a, "(listfile)", &filenum)) return;
         libmpq__off_t size, transferred;
-        libmpq__file_size_unpacked(mpq_a, filenum, &size);
+        libmpq__file_unpacked_size(mpq_a, filenum, &size);
 
         char *buffer = new char[size+1];
         buffer[size] = '\0';
@@ -56,7 +58,7 @@ public:
         while ((token != NULL) && (counter < size)) {
             //cout << token << endl;
             token[strlen(token) - 1] = 0;
-            std::string s = token;
+            string s = token;
             filelist.push_back(s);
             counter += strlen(token) + 2;
             token = strtok(NULL, seps);

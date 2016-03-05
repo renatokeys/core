@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,16 +19,17 @@
 #define SC_SCRIPTLOADER_H
 
 void AddScripts();
+void CheckIfScriptsInDatabaseExist();
 void AddSpellScripts();
 void AddCommandScripts();
 void AddWorldScripts();
+void AddEventScripts();
 void AddEasternKingdomsScripts();
 void AddKalimdorScripts();
 void AddOutlandScripts();
 void AddNorthrendScripts();
-void AddEventScripts();
-void AddPetScripts();
 void AddBattlegroundScripts();
+void AddPetScripts();
 void AddOutdoorPvPScripts();
 void AddCustomScripts();
 

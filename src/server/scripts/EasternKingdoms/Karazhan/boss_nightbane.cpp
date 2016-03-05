@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -69,42 +69,17 @@ class boss_nightbane : public CreatureScript
 public:
     boss_nightbane() : CreatureScript("boss_nightbane") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return GetInstanceAI<boss_nightbaneAI>(creature);
+        return new boss_nightbaneAI (creature);
     }
 
     struct boss_nightbaneAI : public ScriptedAI
     {
         boss_nightbaneAI(Creature* creature) : ScriptedAI(creature)
         {
-            Initialize();
             instance = creature->GetInstanceScript();
             Intro = true;
-            RainBones = false;
-            Skeletons = false;
-            FlyTimer = 0;
-        }
-
-        void Initialize()
-        {
-            BellowingRoarTimer = 30000;
-            CharredEarthTimer = 15000;
-            DistractingAshTimer = 20000;
-            SmolderingBreathTimer = 10000;
-            TailSweepTimer = 12000;
-            RainofBonesTimer = 10000;
-            SmokingBlastTimer = 20000;
-            FireballBarrageTimer = 13000;
-            SearingCindersTimer = 14000;
-            WaitTimer = 1000;
-
-            Phase = 1;
-            FlyCount = 0;
-            MovePhase = 0;
-
-            Flying = false;
-            Movement = false;
         }
 
         InstanceScript* instance;
@@ -131,24 +106,41 @@ public:
         bool Flying;
         bool Movement;
 
-        uint32 WaitTimer;
         uint32 MovePhase;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            BellowingRoarTimer = 30000;
+            CharredEarthTimer = 15000;
+            DistractingAshTimer = 20000;
+            SmolderingBreathTimer = 10000;
+            TailSweepTimer = 12000;
+            RainofBonesTimer = 10000;
+            SmokingBlastTimer = 20000;
+            FireballBarrageTimer = 13000;
+            SearingCindersTimer = 14000;
+
+            Phase = 1;
+            FlyCount = 0;
+            MovePhase = 0;
 
             me->SetSpeed(MOVE_RUN, 2.0f);
-            me->SetDisableGravity(true);
+            me->SetDisableGravity(Intro);
             me->SetWalk(false);
             me->setActive(true);
 
-            if (instance->GetData(TYPE_NIGHTBANE) == DONE || instance->GetData(TYPE_NIGHTBANE) == IN_PROGRESS)
-                me->DisappearAndDie();
-            else
-                instance->SetData(TYPE_NIGHTBANE, NOT_STARTED);
+            if (instance)
+            {
+                if (instance->GetData(TYPE_NIGHTBANE) == DONE)
+                    me->DisappearAndDie();
+                else
+                    instance->SetData(TYPE_NIGHTBANE, NOT_STARTED);
+            }
 
             HandleTerraceDoors(true);
+
+            Flying = false;
+            Movement = false;
 
             if (!Intro)
             {
@@ -159,39 +151,43 @@ public:
 
         void HandleTerraceDoors(bool open)
         {
-            instance->HandleGameObject(instance->GetGuidData(DATA_MASTERS_TERRACE_DOOR_1), open);
-            instance->HandleGameObject(instance->GetGuidData(DATA_MASTERS_TERRACE_DOOR_2), open);
+            if (instance)
+            {
+                instance->HandleGameObject(instance->GetData64(DATA_MASTERS_TERRACE_DOOR_1), open);
+                instance->HandleGameObject(instance->GetData64(DATA_MASTERS_TERRACE_DOOR_2), open);
+            }
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
-            instance->SetData(TYPE_NIGHTBANE, IN_PROGRESS);
+            if (instance)
+                instance->SetData(TYPE_NIGHTBANE, IN_PROGRESS);
 
             HandleTerraceDoors(false);
            Talk(YELL_AGGRO);
         }
 
-        void AttackStart(Unit* who) override
+        void AttackStart(Unit* who)
         {
             if (!Intro && !Flying)
                 ScriptedAI::AttackStart(who);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
-            instance->SetData(TYPE_NIGHTBANE, DONE);
+            if (instance)
+                instance->SetData(TYPE_NIGHTBANE, DONE);
 
             HandleTerraceDoors(true);
         }
 
-        void MoveInLineOfSight(Unit* who) override
-
+        void MoveInLineOfSight(Unit* who)
         {
             if (!Intro && !Flying)
                 ScriptedAI::MoveInLineOfSight(who);
         }
 
-        void MovementInform(uint32 type, uint32 id) override
+        void MovementInform(uint32 type, uint32 id)
         {
             if (type != POINT_MOTION_TYPE)
                 return;
@@ -205,7 +201,8 @@ public:
                     return;
                 }
 
-                WaitTimer = 1;
+				MovePhase = id+1;
+				return;
             }
 
             if (Flying)
@@ -218,26 +215,19 @@ public:
                     return;
                 }
 
-                if (id == 3)
+                if (id < 8)
+					MovePhase = id+1;
+				else
                 {
-                    MovePhase = 4;
-                    WaitTimer = 1;
-                    return;
-                }
-
-                if (id == 8)
-                {
+					Phase = 1;
                     Flying = false;
-                    Phase = 1;
                     Movement = true;
                     return;
                 }
-
-                WaitTimer = 1;
             }
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             summoned->AI()->AttackStart(me->GetVictim());
         }
@@ -249,8 +239,8 @@ public:
             me->InterruptSpell(CURRENT_GENERIC_SPELL);
             me->HandleEmoteCommand(EMOTE_ONESHOT_LIFTOFF);
             me->SetDisableGravity(true);
-            (*me).GetMotionMaster()->Clear(false);
-            (*me).GetMotionMaster()->MovePoint(0, IntroWay[2][0], IntroWay[2][1], IntroWay[2][2]);
+            me->GetMotionMaster()->Clear(false);
+            me->GetMotionMaster()->MovePoint(0, IntroWay[2][0], IntroWay[2][1], IntroWay[2][2]);
 
             Flying = true;
 
@@ -262,43 +252,40 @@ public:
             Skeletons = false;
          }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
-            /* The timer for this was never setup apparently, not sure if the code works properly:
-            if (WaitTimer <= diff)
-            {
-                if (Intro)
-                {
-                    if (MovePhase >= 7)
-                    {
-                        me->SetLevitate(false);
-                        me->HandleEmoteCommand(EMOTE_ONESHOT_LAND);
-                        me->GetMotionMaster()->MovePoint(8, IntroWay[7][0], IntroWay[7][1], IntroWay[7][2]);
-                    }
-                    else
-                    {
-                        me->GetMotionMaster()->MovePoint(MovePhase, IntroWay[MovePhase][0], IntroWay[MovePhase][1], IntroWay[MovePhase][2]);
-                        ++MovePhase;
-                    }
-                }
-                if (Flying)
-                {
-                    if (MovePhase >= 7)
-                    {
-                        me->SetLevitate(false);
-                        me->HandleEmoteCommand(EMOTE_ONESHOT_LAND);
-                        me->GetMotionMaster()->MovePoint(8, IntroWay[7][0], IntroWay[7][1], IntroWay[7][2]);
-                    }
-                    else
-                    {
-                        me->GetMotionMaster()->MovePoint(MovePhase, IntroWay[MovePhase][0], IntroWay[MovePhase][1], IntroWay[MovePhase][2]);
-                        ++MovePhase;
-                    }
-                }
+            if (Intro)
+			{
+				if (MovePhase)
+				{
+					if (MovePhase >= 7)
+					{
+						me->SetDisableGravity(false);
+						me->HandleEmoteCommand(EMOTE_ONESHOT_LAND);
+						me->GetMotionMaster()->MovePoint(8, IntroWay[7][0], IntroWay[7][1], IntroWay[7][2]);
+					}
+					else
+					{
+						me->GetMotionMaster()->MovePoint(MovePhase, IntroWay[MovePhase][0], IntroWay[MovePhase][1], IntroWay[MovePhase][2]);
+					}
+					MovePhase = 0;
+				}
+				return;
+			}
 
-                WaitTimer = 0;
-            } else WaitTimer -= diff;
-            */
+			if (Flying && MovePhase)
+            {
+                if (MovePhase >= 7)
+                {
+                    me->SetDisableGravity(false);
+                    me->HandleEmoteCommand(EMOTE_ONESHOT_LAND);
+                    me->GetMotionMaster()->MovePoint(8, IntroWay[7][0], IntroWay[7][1], IntroWay[7][2]);
+                }
+                else
+                    me->GetMotionMaster()->MovePoint(MovePhase, IntroWay[MovePhase][0], IntroWay[MovePhase][1], IntroWay[MovePhase][2]);
+                    
+				MovePhase = 0;
+            }
 
             if (!UpdateVictim())
                 return;
@@ -337,7 +324,7 @@ public:
                 if (TailSweepTimer <= diff)
                 {
                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                        if (!me->HasInArc(float(M_PI), target))
+                        if (!me->HasInArc(M_PI, target))
                             DoCast(target, SPELL_TAIL_SWEEP);
                     TailSweepTimer = 15000;
                 } else TailSweepTimer -= diff;
@@ -420,9 +407,28 @@ public:
             }
         }
     };
+
+};
+
+class go_blackened_urn : public GameObjectScript
+{
+public:
+    go_blackened_urn() : GameObjectScript("go_blackened_urn") { }
+
+    bool OnGossipHello(Player* pPlayer, GameObject *pGo)
+    {
+		if (InstanceScript* pInstance = pGo->GetInstanceScript())
+		{
+			if (pInstance->GetData(TYPE_NIGHTBANE) != DONE && !pGo->FindNearestCreature(17225, 40.0f))
+				if (Creature *cr = ObjectAccessor::GetCreature(*pPlayer, pInstance->GetData64(DATA_NIGHTBANE)))
+					cr->GetMotionMaster()->MovePoint(0, IntroWay[0][0], IntroWay[0][1], IntroWay[0][2]);
+		}        
+		return false;
+    }
 };
 
 void AddSC_boss_nightbane()
 {
     new boss_nightbane();
+	new go_blackened_urn();
 }

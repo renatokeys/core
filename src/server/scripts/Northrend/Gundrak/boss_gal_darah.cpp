@@ -1,305 +1,283 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
-#include "SpellScript.h"
 #include "gundrak.h"
-
-/// @todo: implement stampede
 
 enum Spells
 {
-    SPELL_IMPALING_CHARGE                   = 54956,
-    SPELL_IMPALING_CHARGE_CONTROL_VEHICLE   = 54958,
-    SPELL_STOMP                             = 55292,
-    SPELL_PUNCTURE                          = 55276,
-    SPELL_STAMPEDE                          = 55218,
-    SPELL_WHIRLING_SLASH                    = 55250,
-    SPELL_ENRAGE                            = 55285,
-    SPELL_HEARTH_BEAM_VISUAL                = 54988,
-    SPELL_TRANSFORM_RHINO                   = 55297,
-    SPELL_TRANSFORM_BACK                    = 55299
+	SPELL_START_VISUAL					= 54988,
+    SPELL_ENRAGE						= 55285,
+    SPELL_IMPALING_CHARGE				= 54956,
+	SPELL_IMPALING_CHARGE_VEHICLE		= 54958,
+    SPELL_STOMP							= 55292,
+    SPELL_PUNCTURE						= 55276,
+    SPELL_STAMPEDE						= 55218,
+	SPELL_STAMPEDE_DMG					= 55220,
+    SPELL_WHIRLING_SLASH				= 55250,
+	SPELL_TRANSFORM_TO_RHINO			= 55297,
+	SPELL_TRANSFORM_TO_TROLL			= 55299
 };
 
 enum Yells
 {
-    SAY_AGGRO                               = 0,
-    SAY_SLAY                                = 1,
-    SAY_DEATH                               = 2,
-    SAY_SUMMON_RHINO                        = 3,
-    SAY_TRANSFORM_1                         = 4,
-    SAY_TRANSFORM_2                         = 5,
-    EMOTE_IMPALE                            = 6
-};
-
-enum CombatPhase
-{
-    PHASE_TROLL                             = 1,
-    PHASE_RHINO                             = 2
+    SAY_AGGRO                           = 0,
+    SAY_SLAY                            = 1,
+    SAY_DEATH                           = 2,
+    SAY_SUMMON_RHINO                    = 3,
+    SAY_TRANSFORM_1                     = 4,
+    SAY_TRANSFORM_2                     = 5
 };
 
 enum Events
 {
-    EVENT_IMPALING_CHARGE                   = 1,
-    EVENT_STOMP,
-    EVENT_PUNCTURE,
-    EVENT_STAMPEDE,
-    EVENT_WHIRLING_SLASH,
-    EVENT_ENRAGE,
-    EVENT_TRANSFORM,
-
-    EVENT_GROUP_TROLL                       = PHASE_TROLL,
-    EVENT_GROUP_RHINO                       = PHASE_RHINO
-};
-
-enum Misc
-{
-    DATA_SHARE_THE_LOVE                     = 1
+	EVENT_STAMPEDE						= 1,
+	EVENT_WHIRLING_SLASH				= 2,
+	EVENT_PUNCTURE						= 3,
+	EVENT_ENRAGE						= 4,
+	EVENT_IMPALING_CHARGE				= 5,
+	EVENT_UNSUMMON_RHINO				= 6,
+	EVENT_STOMP							= 7,
+	EVENT_KILL_TALK						= 8
 };
 
 class boss_gal_darah : public CreatureScript
 {
+	public:
+		boss_gal_darah() : CreatureScript("boss_gal_darah") { }
+
+		CreatureAI* GetAI(Creature* creature) const
+		{
+			return GetInstanceAI<boss_gal_darahAI>(creature);
+		}
+
+		struct boss_gal_darahAI : public BossAI
+		{
+			boss_gal_darahAI(Creature* creature) : BossAI(creature, DATA_GAL_DARAH)
+			{
+			}
+
+			uint8 phaseCounter;
+			std::set<uint64> impaledList;
+
+			void Reset()
+			{
+				BossAI::Reset();
+				impaledList.clear();
+				phaseCounter = 0;
+			}
+
+			void InitializeAI()
+			{
+				BossAI::InitializeAI();
+				me->CastSpell(me, SPELL_START_VISUAL, false);
+			}
+
+			void JustReachedHome()
+			{
+				BossAI::JustReachedHome();
+				me->CastSpell(me, SPELL_START_VISUAL, false);
+			}
+
+			void ScheduleEvents(bool troll)
+			{
+				events.Reset();
+				if (troll)
+				{
+					events.RescheduleEvent(EVENT_STAMPEDE, 10000);
+					events.RescheduleEvent(EVENT_WHIRLING_SLASH, 21000);
+				}
+				else
+				{
+					events.RescheduleEvent(EVENT_PUNCTURE, 10000);
+					events.RescheduleEvent(EVENT_ENRAGE, 15000);
+					events.RescheduleEvent(EVENT_IMPALING_CHARGE, 21000);
+					events.RescheduleEvent(EVENT_STOMP, 5000);
+				}
+			}
+
+			void EnterCombat(Unit* who)
+			{
+				Talk(SAY_AGGRO);
+				BossAI::EnterCombat(who);
+
+				ScheduleEvents(true);
+				me->RemoveAurasDueToSpell(SPELL_START_VISUAL);
+				me->InterruptNonMeleeSpells(true);
+			}
+
+			void JustSummoned(Creature* summon)
+			{
+				uint32 despawnTime = 0;
+				if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 60.0f, true))
+				{
+					summon->CastSpell(target, SPELL_STAMPEDE_DMG, true);
+					despawnTime = (summon->GetDistance(target)/40.0f*1000)+500;
+				}
+
+				summon->DespawnOrUnsummon(despawnTime);
+			}
+
+			uint32 GetData(uint32 type) const
+			{
+				return impaledList.size();
+			}
+
+			void JustDied(Unit* killer)
+			{
+				Talk(SAY_DEATH);
+				BossAI::JustDied(killer);
+			}
+
+			void KilledUnit(Unit*)
+			{
+				if (events.GetNextEventTime(EVENT_KILL_TALK) == 0)
+				{
+					Talk(SAY_SLAY);
+					events.ScheduleEvent(EVENT_KILL_TALK, 6000);
+				}
+			}
+
+			void UpdateAI(uint32 diff)
+			{
+				if (!UpdateVictim())
+					return;
+
+				events.Update(diff);
+				if (me->HasUnitState(UNIT_STATE_CASTING|UNIT_STATE_CHARGING))
+					return;
+
+				switch (events.ExecuteEvent())
+				{
+					case EVENT_STAMPEDE:
+						Talk(SAY_SUMMON_RHINO);
+						me->CastSpell(me->GetVictim(), SPELL_STAMPEDE, false);
+						events.ScheduleEvent(EVENT_STAMPEDE, 15000);
+						break;
+					case EVENT_WHIRLING_SLASH:
+						if (++phaseCounter >= 3)
+						{
+							ScheduleEvents(false);
+							me->CastSpell(me, SPELL_TRANSFORM_TO_RHINO, false);
+							Talk(SAY_TRANSFORM_1);
+							phaseCounter = 0;
+							return;
+						}
+						events.ScheduleEvent(EVENT_WHIRLING_SLASH, 21000);
+						me->CastSpell(me, SPELL_WHIRLING_SLASH, false);
+						break;
+					case EVENT_PUNCTURE:
+						me->CastSpell(me->GetVictim(), SPELL_PUNCTURE, false);
+						events.ScheduleEvent(EVENT_PUNCTURE, 8000);
+						break;
+					case EVENT_ENRAGE:
+						me->CastSpell(me, SPELL_ENRAGE, false);
+						events.ScheduleEvent(EVENT_ENRAGE, 20000);
+						break;
+					case EVENT_STOMP:
+						if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 30.0f, true))
+							me->CastSpell(target, SPELL_STOMP, false);
+						events.ScheduleEvent(EVENT_STOMP, 20000);
+						break;
+					case EVENT_IMPALING_CHARGE:
+						if (++phaseCounter >= 3)
+						{
+							ScheduleEvents(true);
+							me->CastSpell(me, SPELL_TRANSFORM_TO_TROLL, false);
+							Talk(SAY_TRANSFORM_2);
+							phaseCounter = 0;
+							return;
+						}
+						events.ScheduleEvent(EVENT_IMPALING_CHARGE, 21000);
+						if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1, 100.0f, true))
+						{
+							me->CastSpell(target, SPELL_IMPALING_CHARGE, false);
+							impaledList.insert(target->GetGUID());
+						}
+						break;
+				}
+
+				DoMeleeAttackIfReady();
+			}
+		};
+};
+
+class spell_galdarah_impaling_charge : public SpellScriptLoader
+{
     public:
-        boss_gal_darah() : CreatureScript("boss_gal_darah") { }
+        spell_galdarah_impaling_charge() : SpellScriptLoader("spell_galdarah_impaling_charge") { }
 
-        struct boss_gal_darahAI : public BossAI
+        class spell_galdarah_impaling_charge_SpellScript : public SpellScript
         {
-            boss_gal_darahAI(Creature* creature) : BossAI(creature, DATA_GAL_DARAH)
+            PrepareSpellScript(spell_galdarah_impaling_charge_SpellScript);
+
+            void HandleApplyAura(SpellEffIndex /*effIndex*/)
             {
-                Initialize();
+                if (Unit* target = GetHitUnit())
+					target->CastSpell(GetCaster(), SPELL_IMPALING_CHARGE_VEHICLE, true);
             }
 
-            void Initialize()
+            void Register()
             {
-                _phaseCounter = 0;
+                OnEffectHitTarget += SpellEffectFn(spell_galdarah_impaling_charge_SpellScript::HandleApplyAura, EFFECT_1, SPELL_EFFECT_APPLY_AURA);
             }
-
-            void InitializeAI() override
-            {
-                BossAI::InitializeAI();
-                DoCastAOE(SPELL_HEARTH_BEAM_VISUAL, true);
-            }
-
-            void Reset() override
-            {
-                Initialize();
-                _Reset();
-                impaledPlayers.clear();
-            }
-
-            void JustReachedHome() override
-            {
-                _JustReachedHome();
-                DoCastAOE(SPELL_HEARTH_BEAM_VISUAL, true);
-            }
-
-            void EnterCombat(Unit* /*who*/) override
-            {
-                _EnterCombat();
-                Talk(SAY_AGGRO);
-
-                SetPhase(PHASE_TROLL);
-            }
-
-            void SetPhase(CombatPhase phase)
-            {
-                events.SetPhase(phase);
-                switch (phase)
-                {
-                    case PHASE_TROLL:
-                        events.ScheduleEvent(EVENT_STAMPEDE, 10 * IN_MILLISECONDS, 0, PHASE_TROLL);
-                        events.ScheduleEvent(EVENT_WHIRLING_SLASH, 21 * IN_MILLISECONDS, 0, PHASE_TROLL);
-                        break;
-                    case PHASE_RHINO:
-                        events.ScheduleEvent(EVENT_STOMP, 25 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        events.ScheduleEvent(EVENT_IMPALING_CHARGE, 21 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        events.ScheduleEvent(EVENT_ENRAGE, 15 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        events.ScheduleEvent(EVENT_PUNCTURE, 10 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        break;
-                }
-            }
-
-            void SetGUID(ObjectGuid guid, int32 type /*= 0*/) override
-            {
-                if (type == DATA_SHARE_THE_LOVE)
-                {
-                    if (Unit* target = ObjectAccessor::GetUnit(*me, guid))
-                        Talk(EMOTE_IMPALE, target);
-                    impaledPlayers.insert(guid);
-                }
-            }
-
-            uint32 GetData(uint32 type) const override
-            {
-                if (type == DATA_SHARE_THE_LOVE)
-                    return impaledPlayers.size();
-
-                return 0;
-            }
-
-            void JustDied(Unit* /*killer*/) override
-            {
-                _JustDied();
-                Talk(SAY_DEATH);
-            }
-
-            void KilledUnit(Unit* victim) override
-            {
-                if (victim->GetTypeId() == TYPEID_PLAYER)
-                    Talk(SAY_SLAY);
-            }
-
-            void SpellHit(Unit* /*caster*/, SpellInfo const* spellInfo) override
-            {
-                if (spellInfo->Id == SPELL_TRANSFORM_BACK)
-                    me->RemoveAurasDueToSpell(SPELL_TRANSFORM_RHINO);
-            }
-
-            void ExecuteEvent(uint32 eventId) override
-            {
-                switch (eventId)
-                {
-                    case EVENT_IMPALING_CHARGE:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 60.0f, true))
-                            DoCast(target, SPELL_IMPALING_CHARGE);
-                        if (++_phaseCounter >= 2)
-                            events.ScheduleEvent(EVENT_TRANSFORM, 5 * IN_MILLISECONDS);
-                        events.ScheduleEvent(eventId, 31 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        break;
-                    case EVENT_STOMP:
-                        DoCastAOE(SPELL_STOMP);
-                        events.ScheduleEvent(eventId, 20 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        break;
-                    case EVENT_PUNCTURE:
-                        DoCastVictim(SPELL_PUNCTURE);
-                        events.ScheduleEvent(eventId, 8 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        break;
-                    case EVENT_STAMPEDE:
-                        Talk(SAY_SUMMON_RHINO);
-                        DoCast(me, SPELL_STAMPEDE);
-                        events.ScheduleEvent(eventId, 15 * IN_MILLISECONDS, 0, PHASE_TROLL);
-                        break;
-                    case EVENT_WHIRLING_SLASH:
-                        DoCastVictim(SPELL_WHIRLING_SLASH);
-                        if (++_phaseCounter >= 2)
-                            events.ScheduleEvent(EVENT_TRANSFORM, 5 * IN_MILLISECONDS);
-                        events.ScheduleEvent(eventId, 21 * IN_MILLISECONDS, 0, PHASE_TROLL);
-                        break;
-                    case EVENT_ENRAGE:
-                        DoCast(me, SPELL_ENRAGE);
-                        events.ScheduleEvent(eventId, 20 * IN_MILLISECONDS, 0, PHASE_RHINO);
-                        break;
-                    case EVENT_TRANSFORM:
-                        if (events.IsInPhase(PHASE_TROLL))
-                        {
-                            Talk(SAY_TRANSFORM_1);
-                            DoCast(me, SPELL_TRANSFORM_RHINO);
-                            SetPhase(PHASE_RHINO);
-                        }
-                        else if (events.IsInPhase(PHASE_RHINO))
-                        {
-                            Talk(SAY_TRANSFORM_2);
-                            DoCast(me, SPELL_TRANSFORM_BACK);
-                            SetPhase(PHASE_TROLL);
-                        }
-                        _phaseCounter = 0;
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-        private:
-            std::set<uint64> impaledPlayers;
-            uint8 _phaseCounter;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        SpellScript* GetSpellScript() const
         {
-            return GetGundrakAI<boss_gal_darahAI>(creature);
+            return new spell_galdarah_impaling_charge_SpellScript();
         }
 };
 
-// 54956, 59827 - Impaling Charge
-class spell_gal_darah_impaling_charge : public SpellScriptLoader
+class spell_galdarah_transform : public SpellScriptLoader
 {
     public:
-        spell_gal_darah_impaling_charge() : SpellScriptLoader("spell_gal_darah_impaling_charge") { }
+        spell_galdarah_transform() : SpellScriptLoader("spell_galdarah_transform") { }
 
-        class spell_gal_darah_impaling_charge_SpellScript : public SpellScript
+        class spell_galdarah_transform_SpellScript : public SpellScript
         {
-            PrepareSpellScript(spell_gal_darah_impaling_charge_SpellScript);
+            PrepareSpellScript(spell_galdarah_transform_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) override
-            {
-                if (!sSpellMgr->GetSpellInfo(SPELL_IMPALING_CHARGE_CONTROL_VEHICLE))
-                    return false;
-                return true;
-            }
-
-            bool Load() override
-            {
-                return GetCaster()->GetVehicleKit() && GetCaster()->GetEntry() == NPC_GAL_DARAH;
-            }
-
-            void HandleScript(SpellEffIndex /*effIndex*/)
+            void HandleScriptEffect(SpellEffIndex /*effIndex*/)
             {
                 if (Unit* target = GetHitUnit())
-                {
-                    Unit* caster = GetCaster();
-                    target->CastSpell(caster, SPELL_IMPALING_CHARGE_CONTROL_VEHICLE, true);
-                    caster->ToCreature()->AI()->SetGUID(target->GetGUID(), DATA_SHARE_THE_LOVE);
-                }
+					target->RemoveAurasDueToSpell(SPELL_TRANSFORM_TO_RHINO);
             }
 
-            void Register() override
+            void Register()
             {
-                OnEffectHitTarget += SpellEffectFn(spell_gal_darah_impaling_charge_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_CHARGE);
+                OnEffectHitTarget += SpellEffectFn(spell_galdarah_transform_SpellScript::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const override
+        SpellScript* GetSpellScript() const
         {
-            return new spell_gal_darah_impaling_charge_SpellScript();
+            return new spell_galdarah_transform_SpellScript();
         }
 };
 
 class achievement_share_the_love : public AchievementCriteriaScript
 {
     public:
-        achievement_share_the_love() : AchievementCriteriaScript("achievement_share_the_love") { }
+        achievement_share_the_love() : AchievementCriteriaScript("achievement_share_the_love")
+        {
+        }
 
-        bool OnCheck(Player* /*player*/, Unit* target) override
+        bool OnCheck(Player* /*player*/, Unit* target)
         {
             if (!target)
                 return false;
 
-            if (Creature* GalDarah = target->ToCreature())
-                if (GalDarah->AI()->GetData(DATA_SHARE_THE_LOVE) >= 5)
-                    return true;
-
-            return false;
+            return target->GetAI()->GetData(target->GetEntry()) >= 5;
         }
 };
 
 void AddSC_boss_gal_darah()
 {
     new boss_gal_darah();
-    new spell_gal_darah_impaling_charge();
+	new spell_galdarah_impaling_charge();
+	new spell_galdarah_transform();
     new achievement_share_the_love();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,9 @@ class Unit;
 
 namespace Movement
 {
+	// xinef: moved declaration here so it can be accessed out of MoveSplineInit.cpp
+	UnitMoveType SelectSpeedType(uint32 moveFlags);
+
     enum AnimType
     {
         ToGround    = 0, // 460 = ToGround, index of AnimationData.dbc
@@ -46,6 +49,21 @@ namespace Movement
         Unit* _owner;
         bool _transformForTransport;
     };
+
+	// Xinef: transforms z coordinate with hover offset
+	class HoverMovementTransform
+	{
+	public:
+		HoverMovementTransform(float z_offset) : _offset(z_offset) { }
+		Vector3 operator()(Vector3 input)
+		{
+			input.z += _offset;
+			return input;
+		}
+
+	private:
+		float _offset;
+	};
 
     /*  Initializes and launches spline movement
      */
@@ -90,8 +108,8 @@ namespace Movement
 
         /* Initializes simple A to B motion, A is current unit's position, B is destination
          */
-        void MoveTo(const Vector3& destination, bool generatePath = true, bool forceDestination = false);
-        void MoveTo(float x, float y, float z, bool generatePath = true, bool forceDestination = false);
+        void MoveTo(const Vector3& destination, bool generatePath = false, bool forceDestination = false);
+        void MoveTo(float x, float y, float z, bool generatePath = false, bool forceDestination = false);
 
         /* Sets Id of fisrt point of the path. When N-th path point will be done ILisener will notify that pointId + N done
          * Needed for waypoint movement where path splitten into parts

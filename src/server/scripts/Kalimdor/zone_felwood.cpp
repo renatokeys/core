@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -54,7 +54,7 @@ class npcs_riverbreeze_and_silversky : public CreatureScript
 public:
     npcs_riverbreeze_and_silversky() : CreatureScript("npcs_riverbreeze_and_silversky") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_INFO_DEF+1)
@@ -65,7 +65,7 @@ public:
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
@@ -78,7 +78,7 @@ public:
             {
                 player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BEACON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
                 player->SEND_GOSSIP_MENU(2848, creature->GetGUID());
-            } else if (player->GetTeam() == HORDE)
+            } else if (player->GetTeamId() == TEAM_HORDE)
             player->SEND_GOSSIP_MENU(2845, creature->GetGUID());
             else
                 player->SEND_GOSSIP_MENU(2844, creature->GetGUID());
@@ -90,7 +90,7 @@ public:
             {
                 player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BEACON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
                 player->SEND_GOSSIP_MENU(2849, creature->GetGUID());
-            } else if (player->GetTeam() == ALLIANCE)
+            } else if (player->GetTeamId() == TEAM_ALLIANCE)
             player->SEND_GOSSIP_MENU(2843, creature->GetGUID());
             else
                 player->SEND_GOSSIP_MENU(2842, creature->GetGUID());
@@ -118,7 +118,7 @@ class at_ancient_leaf : public AreaTriggerScript
     public:
         at_ancient_leaf() : AreaTriggerScript("at_ancient_leaf") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/)
         {
             if (player->IsGameMaster() || !player->IsAlive())
                 return false;

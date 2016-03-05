@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -31,15 +31,32 @@ class TotemAI : public CreatureAI
 
         explicit TotemAI(Creature* c);
 
-        void MoveInLineOfSight(Unit* who) override;
-        void AttackStart(Unit* victim) override;
-        void EnterEvadeMode(EvadeReason /*why*/) override;
+        void MoveInLineOfSight(Unit* who);
+        void AttackStart(Unit* victim);
+        void EnterEvadeMode();
+        void SpellHit(Unit* /*caster*/, const SpellInfo* /*spellInfo*/);
+        void DoAction(int32 param);
 
-        void UpdateAI(uint32 diff) override;
+        void UpdateAI(uint32 diff);
         static int Permissible(Creature const* creature);
 
     private:
-        ObjectGuid i_victimGuid;
+        uint64 i_victimGuid;
 };
+
+class KillMagnetEvent : public BasicEvent
+{
+	public:
+		KillMagnetEvent(Unit& self) : _self(self) { }
+		bool Execute(uint64 e_time, uint32 p_time)
+		{
+			_self.setDeathState(JUST_DIED);
+			return true;
+		}
+
+	protected:
+		Unit& _self;
+};
+
 #endif
 

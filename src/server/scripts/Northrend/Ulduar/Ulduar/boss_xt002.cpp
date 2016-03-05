@@ -1,635 +1,706 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/*
-    @todo
-        Fix void zone damage
-        If the boss is to close to a scrap pile -> no summon  -- Needs retail confirmation
-        make the life sparks visible...     /? Need test
-        Codestyle
+REWRITTEN FROM SCRATCH BY XINEF, IT OWNS NOW!
 */
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "SpellScript.h"
-#include "SpellAuraEffects.h"
 #include "ulduar.h"
 #include "Vehicle.h"
+#include "PassiveAI.h"
+#include "SpellAuraEffects.h"
 #include "Player.h"
-#include "WorldPacket.h"
 #include "Opcodes.h"
 
-enum Spells
+enum XT002Spells
 {
-    SPELL_TYMPANIC_TANTRUM                      = 62776,
-    SPELL_SEARING_LIGHT                         = 63018,
+	// BASIC
+	SPELL_GRAVITY_BOMB_10		= 63024,
+	SPELL_GRAVITY_BOMB_25		= 64234,
+	SPELL_SEARING_LIGHT_10		= 63018,
+	SPELL_SEARING_LIGHT_25		= 65121,
+	SPELL_TYMPANIC_TANTARUM		= 62776,
+	SPELL_XT002_ENRAGE			= 26662,
 
-    SPELL_SUMMON_LIFE_SPARK                     = 64210,
-    SPELL_SUMMON_VOID_ZONE                      = 64203,
+	// HELPERS
+    SPELL_ARCING_SMASH			= 8374,
+    SPELL_TRAMPLE				= 5568,
+    SPELL_UPPERCUT				= 10966,
+    SPELL_BOOM					= 62834,
 
-    SPELL_GRAVITY_BOMB                          = 63024,
+	// HEARTBREAK
+	SPELL_HEART_OVERLOAD		= 62789,
+	SPELL_EXPOSED_HEART			= 63849,
+	SPELL_ENERGY_ORB			= 62790,
+	SPELL_ENERGY_ORB_TRIGGER	= 62826,
+	SPELL_HEARTBREAK_10			= 65737,
+	SPELL_HEARTBREAK_25			= 64193,
 
-    SPELL_HEARTBREAK                            = 65737,
-
-    // Cast by 33337 at Heartbreak:
-    SPELL_RECHARGE_PUMMELER                     = 62831,    // Summons 33344
-    SPELL_RECHARGE_SCRAPBOT                     = 62828,    // Summons 33343
-    SPELL_RECHARGE_BOOMBOT                      = 62835,    // Summons 33346
-
-    // Cast by 33329 on 33337 (visual?)
-    SPELL_ENERGY_ORB                            = 62790,    // Triggers 62826 - needs spellscript for periodic tick to cast one of the random spells above
-
-    SPELL_HEART_HEAL_TO_FULL                    = 17683,
-    SPELL_HEART_OVERLOAD                        = 62789,
-
-    SPELL_HEART_LIGHTNING_TETHER                = 64799,    // Cast on self?
-    SPELL_HEART_RIDE_VEHICLE                    = 63313,
-    SPELL_ENRAGE                                = 26662,
-    SPELL_STAND                                 = 37752,
-    SPELL_SUBMERGE                              = 37751,
-
-    //------------------VOID ZONE--------------------
-    SPELL_VOID_ZONE                             = 64203,
-
-    // Life Spark
-    SPELL_STATIC_CHARGED                        = 64227,
-    SPELL_SHOCK                                 = 64230,
-
-    //----------------XT-002 HEART-------------------
-    SPELL_EXPOSED_HEART                         = 63849,
-    // Channeled
-
-    //---------------XM-024 PUMMELLER----------------
-    SPELL_ARCING_SMASH                          = 8374,
-    SPELL_TRAMPLE                               = 5568,
-    SPELL_UPPERCUT                              = 10966,
-
-    // Scrabot:
-    SPELL_SCRAPBOT_RIDE_VEHICLE                 = 47020,
-    SPELL_SUICIDE                               = 7,
-
-    //------------------BOOMBOT-----------------------
-    SPELL_AURA_BOOMBOT                          = 65032,
-    SPELL_BOOM                                  = 62834,
-
-    // Achievement-related spells
-    SPELL_ACHIEVEMENT_CREDIT_NERF_SCRAPBOTS     = 65037
+	// VOID ZONE
+	SPELL_VOID_ZONE_SUMMON_10	= 64203,
+	SPELL_VOID_ZONE_SUMMON_25	= 64235,
+	//SPELL_VOID_ZONE_SUMMON		= RAID_MODE(SPELL_VOID_ZONE_SUMMON_10, SPELL_VOID_ZONE_SUMMON_25, SPELL_VOID_ZONE_SUMMON_10, SPELL_VOID_ZONE_SUMMON_25),
+	SPELL_VOID_ZONE_DAMAGE		= 46262,
+	
+	// SPARK
+	SPELL_SPARK_SUMMON			= 64210,
+	SPELL_SPARK_DAMAGE_10		= 64227,
+	SPELL_SPARK_DAMAGE_25		= 64236,
+	SPELL_SPARK_MELEE			= 64230,
 };
 
-enum Events
+#define SPELL_GRAVITY_BOMB		RAID_MODE(SPELL_GRAVITY_BOMB_10, SPELL_GRAVITY_BOMB_25)
+#define SPELL_SEARING_LIGHT		RAID_MODE(SPELL_SEARING_LIGHT_10, SPELL_SEARING_LIGHT_25)
+#define SPELL_HEARTBREAK		RAID_MODE(SPELL_HEARTBREAK_10, SPELL_HEARTBREAK_25)
+#define SPELL_SPARK_DAMAGE		RAID_MODE(SPELL_SPARK_DAMAGE_10, SPELL_SPARK_DAMAGE_25)
+
+enum XT002Events
 {
-    EVENT_TYMPANIC_TANTRUM = 1,
-    EVENT_SEARING_LIGHT,
-    EVENT_GRAVITY_BOMB,
-    EVENT_HEART_PHASE,
-    EVENT_ENERGY_ORB,
-    EVENT_DISPOSE_HEART,
-    EVENT_ENRAGE,
-    EVENT_ENTER_HARD_MODE,
+	EVENT_HEALTH_CHECK			= 1,
+	EVENT_GRAVITY_BOMB			= 2,
+	EVENT_SEARING_LIGHT			= 3,
+	EVENT_ENRAGE				= 4,
+	EVENT_TYMPANIC_TANTARUM		= 5,
+	EVENT_RESTORE				= 6,
+	EVENT_START_SECOND_PHASE	= 7,
+	EVENT_REMOVE_EMOTE			= 8,
+	EVENT_CHECK_ROOM			= 9,
 };
 
-enum Timers
+enum NPCs
 {
-    TIMER_TYMPANIC_TANTRUM_MIN                  = 32000,
-    TIMER_TYMPANIC_TANTRUM_MAX                  = 36000,
-    TIMER_SEARING_LIGHT                         = 20000,
-    TIMER_GRAVITY_BOMB                          = 20000,
-    TIMER_HEART_PHASE                           = 30000,
-    TIMER_ENERGY_ORB_MIN                        = 9000,
-    TIMER_ENERGY_ORB_MAX                        = 10000,
-    TIMER_ENRAGE                                = 600000,
-
-    TIMER_VOID_ZONE                             = 3000,
-
-    // Life Spark
-    TIMER_SHOCK                                 = 12000,
-
-    // Pummeller
-    // Timers may be off
-    TIMER_ARCING_SMASH                          = 27000,
-    TIMER_TRAMPLE                               = 22000,
-    TIMER_UPPERCUT                              = 17000,
-
-    TIMER_SPAWN_ADD                             = 12000,
+	NPC_VOID_ZONE				= 34001,
+	NPC_LIFE_SPARK				= 34004,
+	NPC_XT002_HEART				= 33329,
+	NPC_XS013_SCRAPBOT			= 33343,
+	NPC_XM024_PUMMELLER			= 33344,
+	NPC_XE321_BOOMBOT			= 33346,
+	NPC_PILE_TRIGGER			= 33337,
 };
 
-enum Creatures
+enum Sounds
 {
-    NPC_VOID_ZONE                               = 34001,
-    NPC_LIFE_SPARK                              = 34004,
-    NPC_XT002_HEART                             = 33329,
-    NPC_XS013_SCRAPBOT                          = 33343,
-    NPC_XM024_PUMMELLER                         = 33344,
-    NPC_XE321_BOOMBOT                           = 33346,
+	XT_SOUND_AGGRO				= 15724,
+	XT_SOUND_HEART_OPEN			= 15725,
+	XT_SOUND_HEART_CLOSED		= 15726,
+	XT_SOUND_TANTARUM			= 15727,
+	XT_SOUND_SLAY1				= 15728,
+	XT_SOUND_SLAY2				= 15729,
+	XT_SOUND_ENRAGE				= 15730,
+	XT_SOUND_DEATH				= 15731,
+	XT_SOUND_SUMMON				= 15732,
 };
 
-enum Actions
+enum Misc
 {
-    ACTION_ENTER_HARD_MODE,
+	HEART_VEHICLE_SEAT			= 0,
+
+
+	ACTION_AWAKEN_HEART			= -5,
+	ACTION_HIDE_HEART			= -4,
+	ACTION_HEART_BROKEN			= -3,
+
+	ACHIEVEMENT_MUST_DECONSTRUCT_FASTER	= 21027,
+
+	DATA_XT002_NERF_ENGINEERING	= 50,
+	DATA_XT002_GRAVITY_ACHIEV	= 51,
 };
 
-enum XT002Data
-{
-    DATA_TRANSFERED_HEALTH,
-    DATA_HARD_MODE,
-    DATA_HEALTH_RECOVERED,
-    DATA_GRAVITY_BOMB_CASUALTY,
-};
 
-enum Yells
-{
-    SAY_AGGRO                                   = 0,
-    SAY_HEART_OPENED                            = 1,
-    SAY_HEART_CLOSED                            = 2,
-    SAY_TYMPANIC_TANTRUM                        = 3,
-    SAY_SLAY                                    = 4,
-    SAY_BERSERK                                 = 5,
-    SAY_DEATH                                   = 6,
-    SAY_SUMMON                                  = 7,
-    EMOTE_HEART_OPENED                          = 8,
-    EMOTE_HEART_CLOSED                          = 9,
-    EMOTE_TYMPANIC_TANTRUM                      = 10,
-    EMOTE_SCRAPBOT                              = 11
-};
-
-enum AchievementCredits
-{
-    ACHIEV_MUST_DECONSTRUCT_FASTER              = 21027,
-};
-
-enum VehicleSeats
-{
-    HEART_VEHICLE_SEAT_NORMAL   = 0,
-    HEART_VEHICLE_SEAT_EXPOSED  = 1,
-};
-
-/*-------------------------------------------------------
- *
- *        XT-002 DECONSTRUCTOR
- *
- *///----------------------------------------------------
 class boss_xt002 : public CreatureScript
 {
-    public:
-        boss_xt002() : CreatureScript("boss_xt002") { }
+public:
+    boss_xt002() : CreatureScript("boss_xt002") { }
 
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetUlduarAI<boss_xt002_AI>(creature);
-        }
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new boss_xt002AI (pCreature);
+    }
 
-        struct boss_xt002_AI : public BossAI
-        {
-            boss_xt002_AI(Creature* creature) : BossAI(creature, BOSS_XT002)
-            {
-                Initialize();
-                _transferHealth = 0;
-            }
+	struct boss_xt002AI : public ScriptedAI
+	{
+		boss_xt002AI(Creature *pCreature) : ScriptedAI(pCreature), summons(me)
+		{
+			m_pInstance = pCreature->GetInstanceScript();
+		}
 
-            void Initialize()
-            {
-                _healthRecovered = false;
-                _gravityBombCasualty = false;
-                _hardMode = false;
+		InstanceScript* m_pInstance;
+		uint8 _healthCheck;
+		bool _hardMode;
+		bool _nerfAchievement;
+		bool _gravityAchievement;
+		EventMap events;
+		SummonList summons;
 
-                _phase = 1;
-                _heartExposed = 0;
-            }
+		void RescheduleEvents()
+		{
+			events.RescheduleEvent(EVENT_GRAVITY_BOMB, 1000, 1);
+			events.RescheduleEvent(EVENT_TYMPANIC_TANTARUM, 60000, 1);
+			if (!_hardMode)
+				events.RescheduleEvent(EVENT_HEALTH_CHECK, 2000, 1);
+		}
 
-            void Reset() override
-            {
-                _Reset();
+		void Reset()
+		{
+			summons.DespawnAll();
+			events.Reset();
 
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                me->SetReactState(REACT_AGGRESSIVE);
-                DoCast(me, SPELL_STAND);
+			me->ResetLootMode();
+			me->RemoveAllAuras();
 
-                Initialize();
+			// first heart expose
+			_healthCheck = 75;
+			_hardMode = false;
+			_nerfAchievement = true;
+			_gravityAchievement = true;
 
-                instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_MUST_DECONSTRUCT_FASTER);
-            }
+			me->SetByteValue(UNIT_FIELD_BYTES_1, 0, UNIT_STAND_STATE_STAND); // emerge
+			me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+			me->SetControlled(false, UNIT_STATE_STUNNED);
 
-            void EnterCombat(Unit* /*who*/) override
-            {
-                Talk(SAY_AGGRO);
-                _EnterCombat();
+			if (m_pInstance)
+			{
+				m_pInstance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEVEMENT_MUST_DECONSTRUCT_FASTER);
+				m_pInstance->SetData(TYPE_XT002, NOT_STARTED);
+				if (GameObject *pGo = ObjectAccessor::GetGameObject(*me, m_pInstance->GetData64(GO_XT002_DOORS)))
+					pGo->SetGoState(GO_STATE_ACTIVE);
+			}
+		}
 
-                events.ScheduleEvent(EVENT_ENRAGE, TIMER_ENRAGE);
-                events.ScheduleEvent(EVENT_GRAVITY_BOMB, TIMER_GRAVITY_BOMB);
-                events.ScheduleEvent(EVENT_SEARING_LIGHT, TIMER_SEARING_LIGHT);
-                //Tantrum is cast a bit slower the first time.
-                events.ScheduleEvent(EVENT_TYMPANIC_TANTRUM, urand(TIMER_TYMPANIC_TANTRUM_MIN, TIMER_TYMPANIC_TANTRUM_MAX) * 2);
+		void JustSummoned(Creature* cr) { summons.Summon(cr); }
+		void SummonedCreatureDespawn(Creature* cr) { summons.Despawn(cr); }
 
-                instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_MUST_DECONSTRUCT_FASTER);
-            }
+		void AttachHeart()
+		{
+			if (Unit* heart = me->GetVehicleKit() ? me->GetVehicleKit()->GetPassenger(HEART_VEHICLE_SEAT) : NULL)
+				heart->SetHealth(heart->GetMaxHealth());
+			else if (Creature* accessory = me->SummonCreature(NPC_XT002_HEART, *me, TEMPSUMMON_MANUAL_DESPAWN))
+			{
+				accessory->AddUnitTypeMask(UNIT_MASK_ACCESSORY);
+				if (!me->HandleSpellClick(accessory, 0))
+					accessory->DespawnOrUnsummon();
+			}
+		}
 
-            void DoAction(int32 action) override
-            {
-                switch (action)
-                {
-                    case ACTION_ENTER_HARD_MODE:
-                        events.ScheduleEvent(EVENT_ENTER_HARD_MODE, 1);
-                        break;
-                }
-            }
+		void JustReachedHome() { me->setActive(false); }
 
-            void KilledUnit(Unit* who) override
-            {
-                if (who->GetTypeId() == TYPEID_PLAYER)
-                    Talk(SAY_SLAY);
-            }
+		void EnterCombat(Unit*)
+		{
+			me->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_ONESHOT_NONE);
+			events.ScheduleEvent(EVENT_ENRAGE, 600000, 0, 0);
+			events.ScheduleEvent(EVENT_CHECK_ROOM, 5000, 0, 0);
+			RescheduleEvents(); // Other events are scheduled here
 
-            void JustDied(Unit* /*killer*/) override
-            {
-                Talk(SAY_DEATH);
-                _JustDied();
-            }
+			me->setActive(true);
+			me->MonsterYell("New toys? For me? I promise I won't break them this time!", LANG_UNIVERSAL, 0);
+			me->PlayDirectSound(XT_SOUND_AGGRO);
 
-            void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) override
-            {
-                if (!_hardMode && _phase == 1 && !HealthAbovePct(100 - 25 * (_heartExposed+1)))
-                    ExposeHeart();
-            }
+			if (m_pInstance)
+			{
+				m_pInstance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEVEMENT_MUST_DECONSTRUCT_FASTER);
+				m_pInstance->SetData(TYPE_XT002, IN_PROGRESS);
+				if (GameObject *pGo = ObjectAccessor::GetGameObject(*me, m_pInstance->GetData64(GO_XT002_DOORS)))
+					pGo->SetGoState(GO_STATE_READY);
+			}
 
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
+			me->CallForHelp(175);
+			me->SetInCombatWithZone();
+			AttachHeart();
+		}
 
-                events.Update(diff);
+		void KilledUnit(Unit* victim)
+		{
+			if (victim->GetTypeId() == TYPEID_PLAYER && !urand(0,2))
+			{
+				if (urand(0,1))
+				{
+					me->MonsterYell("I... I think I broke it.", LANG_UNIVERSAL, 0);
+					me->PlayDirectSound(XT_SOUND_SLAY1);
+				}
+				else
+				{
+					me->MonsterYell("I guess it doesn't bend that way.", LANG_UNIVERSAL, 0);
+					me->PlayDirectSound(XT_SOUND_SLAY2);
+				}
+			}
+		}
 
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
+		void JustDied(Unit *victim)
+		{
+			me->MonsterYell("You are bad... Toys... Very... Baaaaad!", LANG_UNIVERSAL, 0);
+			me->PlayDirectSound(XT_SOUND_DEATH);
 
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        case EVENT_SEARING_LIGHT:
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                                DoCast(target, SPELL_SEARING_LIGHT);
+			if (m_pInstance)
+			{
+				m_pInstance->SetData(TYPE_XT002, DONE);
+				if (GameObject *pGo = ObjectAccessor::GetGameObject(*me, m_pInstance->GetData64(GO_XT002_DOORS)))
+					pGo->SetGoState(GO_STATE_ACTIVE);
+			}
 
-                            events.ScheduleEvent(EVENT_SEARING_LIGHT, TIMER_SEARING_LIGHT);
-                            break;
-                        case EVENT_GRAVITY_BOMB:
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                                DoCast(target, SPELL_GRAVITY_BOMB);
+			// Despawn summons
+			summons.DespawnAll();
+		}
 
-                            events.ScheduleEvent(EVENT_GRAVITY_BOMB, TIMER_GRAVITY_BOMB);
-                            break;
-                        case EVENT_TYMPANIC_TANTRUM:
-                            Talk(SAY_TYMPANIC_TANTRUM);
-                            Talk(EMOTE_TYMPANIC_TANTRUM);
-                            DoCast(SPELL_TYMPANIC_TANTRUM);
-                            events.ScheduleEvent(EVENT_TYMPANIC_TANTRUM, urand(TIMER_TYMPANIC_TANTRUM_MIN, TIMER_TYMPANIC_TANTRUM_MAX));
-                            break;
-                        case EVENT_DISPOSE_HEART:
-                            SetPhaseOne();
-                            break;
-                        case EVENT_ENRAGE:
-                            Talk(SAY_BERSERK);
-                            DoCast(me, SPELL_ENRAGE);
-                            break;
-                        case EVENT_ENTER_HARD_MODE:
-                            me->SetFullHealth();
-                            DoCast(me, SPELL_HEARTBREAK, true);
-                            me->AddLootMode(LOOT_MODE_HARD_MODE_1);
-                            _hardMode = true;
-                            SetPhaseOne();
-                            break;
-                    }
-                }
+		void DoAction(int32 param)
+		{
+			if (param == DATA_XT002_NERF_ENGINEERING)
+			{
+				_nerfAchievement = false;
+				return;
+			}
+			if (param == DATA_XT002_GRAVITY_ACHIEV)
+			{
+				_gravityAchievement = false;
+				return;
+			}
+			
+			if (!me->IsAlive() || _hardMode)
+				return;
 
-                if (_phase == 1)
-                    DoMeleeAttackIfReady();
-            }
+			// heart destory
+			if (param == ACTION_HEART_BROKEN)
+			{
+				_hardMode = true;
+				me->SetLootMode(3); // hard mode + normal loot
+				me->SetMaxHealth(me->GetMaxHealth());
+				me->SetHealth(me->GetMaxHealth());
+				me->SetByteValue(UNIT_FIELD_BYTES_1, 0, UNIT_STAND_STATE_STAND); // emerge
 
-            void PassengerBoarded(Unit* who, int8 /*seatId*/, bool apply) override
-            {
-                if (apply && who->GetEntry() == NPC_XS013_SCRAPBOT)
-                {
-                    // Need this so we can properly determine when to expose heart again in damagetaken hook
-                    if (me->GetHealthPct() > (25 * (4 - _heartExposed)))
-                        ++_heartExposed;
+				me->CastSpell(me, SPELL_HEARTBREAK, true);
+				
+				me->MonsterTextEmote("XT-002 Deconstructor's heart is severed from his body.", 0, true);
+				events.ScheduleEvent(EVENT_REMOVE_EMOTE, 4000);
+				return;
+			}
 
-                    Talk(EMOTE_SCRAPBOT);
-                    _healthRecovered = true;
-                }
-            }
+			// damage from heart
+			if (param > 0)
+			{
+				// avoid reducing health under 1
+				int32 _final = std::min(param, int32(me->GetHealth()-1));
 
-            uint32 GetData(uint32 type) const override
-            {
-                switch (type)
-                {
-                    case DATA_HARD_MODE:
-                        return _hardMode ? 1 : 0;
-                    case DATA_HEALTH_RECOVERED:
-                        return _healthRecovered ? 1 : 0;
-                    case DATA_GRAVITY_BOMB_CASUALTY:
-                        return _gravityBombCasualty ? 1 : 0;
-                }
+				me->ModifyHealth(-_final);
+				me->LowerPlayerDamageReq(_final);
+			}
+		}
 
-                return 0;
-            }
+		uint32 GetData(uint32 param) const
+		{
+			if (param == DATA_XT002_NERF_ENGINEERING)
+				return _nerfAchievement;
+			else if (param == DATA_XT002_GRAVITY_ACHIEV)
+				return _gravityAchievement;
 
-            void SetData(uint32 type, uint32 data) override
-            {
-                switch (type)
-                {
-                    case DATA_TRANSFERED_HEALTH:
-                        _transferHealth = data;
-                        break;
-                    case DATA_GRAVITY_BOMB_CASUALTY:
-                        _gravityBombCasualty = (data > 0) ? true : false;
-                        break;
-                }
-            }
+			return 0;
+		}
 
-            void ExposeHeart()
-            {
-                Talk(SAY_HEART_OPENED);
-                Talk(EMOTE_HEART_OPENED);
+		void UpdateAI(uint32 diff)
+		{
+			if (!UpdateVictim())
+				return;
 
-                DoCast(me, SPELL_SUBMERGE);  // WIll make creature untargetable
-                me->AttackStop();
-                me->SetReactState(REACT_PASSIVE);
+			events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
 
-                Unit* heart = me->GetVehicleKit() ? me->GetVehicleKit()->GetPassenger(HEART_VEHICLE_SEAT_NORMAL) : NULL;
-                if (heart)
-                {
-                    heart->CastSpell(heart, SPELL_HEART_OVERLOAD, false);
-                    heart->CastSpell(me, SPELL_HEART_LIGHTNING_TETHER, false);
-                    heart->CastSpell(heart, SPELL_HEART_HEAL_TO_FULL, true);
-                    heart->CastSpell(heart, SPELL_EXPOSED_HEART, false);    // Channeled
-                    heart->ChangeSeat(HEART_VEHICLE_SEAT_EXPOSED, true);
-                    heart->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                    heart->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_29);
-               }
+			switch(events.GetEvent())
+			{
+				// Control events
+				case EVENT_HEALTH_CHECK:
+					if (_hardMode)
+					{
+						events.PopEvent();
+						return;
+					}
 
-                events.CancelEvent(EVENT_SEARING_LIGHT);
-                events.CancelEvent(EVENT_GRAVITY_BOMB);
-                events.CancelEvent(EVENT_TYMPANIC_TANTRUM);
+					if (me->HealthBelowPct(_healthCheck))
+					{
+						_healthCheck -= 25;					
+						me->SetControlled(true, UNIT_STATE_STUNNED);
+						me->SetByteValue(UNIT_FIELD_BYTES_1, 0, UNIT_STAND_STATE_SUBMERGED); // submerge with animation
 
-                // Start "end of phase 2 timer"
-                events.ScheduleEvent(EVENT_DISPOSE_HEART, TIMER_HEART_PHASE);
+						me->MonsterYell("So tired. I will rest for just a moment!", LANG_UNIVERSAL, 0);
+						me->PlayDirectSound(XT_SOUND_HEART_OPEN);
 
-                // Phase 2 has officially started
-                _phase = 2;
-                _heartExposed++;
-            }
+						events.CancelEventGroup(1);
+						events.ScheduleEvent(EVENT_START_SECOND_PHASE, 5000);
+						return;
+					}
+					events.RepeatEvent(1000);
+					break;
+				case EVENT_CHECK_ROOM:
+					events.RepeatEvent(5000);
+					if (me->GetPositionX() < 722 || me->GetPositionX() > 987 || me->GetPositionY() < -139 || me->GetPositionY() > 124)
+						EnterEvadeMode();
 
-            void SetPhaseOne()
-            {
-                Talk(SAY_HEART_CLOSED);
-                Talk(EMOTE_HEART_CLOSED);
+					return;
 
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                me->SetReactState(REACT_AGGRESSIVE);
-                DoCast(me, SPELL_STAND);
+				// Abilities events
+				case EVENT_GRAVITY_BOMB:
+					me->CastCustomSpell(SPELL_GRAVITY_BOMB, SPELLVALUE_MAX_TARGETS, 1, me, true);
+					events.PopEvent();
+					events.ScheduleEvent(EVENT_SEARING_LIGHT, 10000, 1);
+					break;
+				case EVENT_SEARING_LIGHT:
+					me->CastCustomSpell(SPELL_SEARING_LIGHT, SPELLVALUE_MAX_TARGETS, 1, me, true);
+					events.PopEvent();
+					events.ScheduleEvent(EVENT_GRAVITY_BOMB, 10000, 1);
+					break;
+				case EVENT_TYMPANIC_TANTARUM:
+					me->MonsterTextEmote("XT-002 Deconstructor begins to cause the earth to quake.", 0, true);
+					me->MonsterYell("NO! NO! NO! NO! NO!", LANG_UNIVERSAL, 0);
+					me->PlayDirectSound(XT_SOUND_TANTARUM);
+					me->CastSpell(me, SPELL_TYMPANIC_TANTARUM, true);
+					events.RepeatEvent(60000);
+					return;
+				case EVENT_ENRAGE:
+					me->MonsterYell("I'm tired of these toys. I don't want to play anymore!", LANG_UNIVERSAL, 0);
+					me->PlayDirectSound(XT_SOUND_SUMMON);
+					me->CastSpell(me, SPELL_XT002_ENRAGE, true);
+					events.PopEvent();
+					break;
 
-                _phase = 1;
+				// Animation events
+				case EVENT_START_SECOND_PHASE:
+					me->MonsterTextEmote("XT-002 Deconstructor's heart is exposed and leaking energy.", 0, true);
+					me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+					if (Unit* heart = me->GetVehicleKit() ? me->GetVehicleKit()->GetPassenger(HEART_VEHICLE_SEAT) : NULL)
+						heart->GetAI()->DoAction(ACTION_AWAKEN_HEART);
+					
+					events.ScheduleEvent(EVENT_RESTORE,	30000);
+					events.PopEvent();
+					return;
+				// Restore from heartbreak
+				case EVENT_RESTORE:
+					if (_hardMode)
+					{
+						events.PopEvent();
+						return;
+					}
 
-                events.RescheduleEvent(EVENT_SEARING_LIGHT, TIMER_SEARING_LIGHT / 2);
-                events.RescheduleEvent(EVENT_GRAVITY_BOMB, TIMER_GRAVITY_BOMB);
-                events.RescheduleEvent(EVENT_TYMPANIC_TANTRUM, urand(TIMER_TYMPANIC_TANTRUM_MIN, TIMER_TYMPANIC_TANTRUM_MAX));
+					me->MonsterYell("I'm ready to play!", LANG_UNIVERSAL, 0);
+					me->PlayDirectSound(XT_SOUND_HEART_CLOSED);
+					
+					me->SetByteValue(UNIT_FIELD_BYTES_1, 0, UNIT_STAND_STATE_STAND); // emerge
+					// Hide heart
+					if (Unit* heart = me->GetVehicleKit() ? me->GetVehicleKit()->GetPassenger(HEART_VEHICLE_SEAT) : NULL)
+						heart->GetAI()->DoAction(ACTION_HIDE_HEART);
 
-                Unit* heart = me->GetVehicleKit() ? me->GetVehicleKit()->GetPassenger(HEART_VEHICLE_SEAT_EXPOSED) : NULL;
-                if (!heart)
-                    return;
+					events.ScheduleEvent(EVENT_REMOVE_EMOTE, 4000);
+					events.PopEvent();
+					return;
+				case EVENT_REMOVE_EMOTE:
+					me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+					me->SetControlled(false, UNIT_STATE_STUNNED);
 
-                heart->ChangeSeat(HEART_VEHICLE_SEAT_NORMAL, false);
-                heart->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                heart->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_29);
-                heart->RemoveAurasDueToSpell(SPELL_EXPOSED_HEART);
+					RescheduleEvents();
+					events.PopEvent();
+					return;
+			}
+			
+			// Disabled by stunned state
+			DoMeleeAttackIfReady();
+		}
 
-                if (!_hardMode)
-                {
-                    if (!_transferHealth)
-                        _transferHealth = (heart->GetMaxHealth() - heart->GetHealth());
-
-                    me->ModifyHealth(-((int32)_transferHealth));
-                }
-            }
-
-            private:
-                // Achievement related
-                bool _healthRecovered;       // Did a scrapbot recover XT-002's health during the encounter?
-                bool _hardMode;              // Are we in hard mode? Or: was the heart killed during phase 2?
-                bool _gravityBombCasualty;   // Did someone die because of Gravity Bomb damage?
-
-                uint8 _phase;
-                uint8 _heartExposed;
-                uint32 _transferHealth;
-        };
+	};
 };
-
-/*-------------------------------------------------------
- *
- *        XT-002 HEART
- *
- *///----------------------------------------------------
 
 class npc_xt002_heart : public CreatureScript
 {
-    public:
-        npc_xt002_heart() : CreatureScript("npc_xt002_heart") { }
+public:
+    npc_xt002_heart() : CreatureScript("npc_xt002_heart") { }
 
-        struct npc_xt002_heartAI : public ScriptedAI
-        {
-            npc_xt002_heartAI(Creature* creature) : ScriptedAI(creature),
-                _instance(creature->GetInstanceScript())
-            {
-                SetCombatMovement(false);
-            }
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new npc_xt002_heartAI (pCreature);
+    }
 
-            void UpdateAI(uint32 /*diff*/) override { }
+	struct npc_xt002_heartAI : public PassiveAI
+	{
+		npc_xt002_heartAI(Creature* pCreature) : PassiveAI(pCreature), summons(me)
+		{
+			me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+		}
 
-            void JustDied(Unit* /*killer*/) override
-            {
-                Creature* xt002 = _instance ? ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_XT002)) : NULL;
-                if (!xt002 || !xt002->AI())
-                    return;
+		SummonList summons;
+		uint32 _damageDone;
+		uint32 _timerSpawn;
+		
+		uint8 _spawnSelection;
+		uint8 _pummelerCount;
 
-                xt002->AI()->SetData(DATA_TRANSFERED_HEALTH, me->GetHealth());
-                xt002->AI()->DoAction(ACTION_ENTER_HARD_MODE);
-            }
+		void MoveInLineOfSight(Unit*) { }
+		void AttackStart(Unit*) { }
+		void JustSummoned(Creature* cr)
+		{
+			summons.Summon(cr);
+			if (Unit* owner = me->GetVehicleBase())
+				if (owner->GetTypeId() == TYPEID_UNIT)
+					owner->ToCreature()->AI()->JustSummoned(cr);
+		}
+		void DamageTaken(Unit*, uint32 &damage, DamageEffectType, SpellSchoolMask)
+		{
+			_damageDone += damage;
+		}
 
-        private:
-            InstanceScript* _instance;
-        };
+		void SummonPiles()
+		{
+			me->SummonCreature(NPC_PILE_TRIGGER, 893.290f, 66.820f, 409.81f, 4.2f);
+			me->SummonCreature(NPC_PILE_TRIGGER, 898.099f, -88.9115f, 409.887f, 2.23402f);
+			me->SummonCreature(NPC_PILE_TRIGGER, 793.096f, -95.158f,  409.887f, 0.855211f);
+			me->SummonCreature(NPC_PILE_TRIGGER, 794.600f, 59.660f, 409.82f, 5.34f);
+		}
 
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetInstanceAI<npc_xt002_heartAI>(creature);
-        }
+		void DoAction(int32 param)
+		{
+			if (param == ACTION_AWAKEN_HEART)
+			{
+				_pummelerCount = 0;
+				_spawnSelection = 0;
+				_damageDone = 0;
+				_timerSpawn = 0;
+				me->SetHealth(me->GetMaxHealth());
+				me->CastSpell(me, SPELL_HEART_OVERLOAD, true);
+				me->CastSpell(me, SPELL_EXPOSED_HEART, false);    // Channeled
+				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+
+				if (!summons.HasEntry(NPC_PILE_TRIGGER))
+					SummonPiles();
+			}
+			else if (param == ACTION_HIDE_HEART)
+			{
+				if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(TYPE_XT002)))
+					if (pXT002->AI())
+					{
+						pXT002->AI()->DoAction(_damageDone);
+						_damageDone = 0;
+					}
+				me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+			}
+		}
+
+		void SendEnergyToCorner()
+		{
+			Unit* pile = NULL;
+			uint8 num = urand(1,4);
+			for (SummonList::const_iterator itr = summons.begin(); itr != summons.end(); ++itr)
+				if (Creature* summon = ObjectAccessor::GetCreature(*me, *itr))
+					if (summon->GetEntry() == NPC_PILE_TRIGGER)
+					{
+						pile = summon;
+						if ((--num) == 0)
+							break;
+					}
+
+			if (pile)
+				me->CastSpell(pile, SPELL_ENERGY_ORB, true);
+		}
+
+		void SpellHitTarget(Unit *target, const SpellInfo *spellInfo)
+		{
+			// spawn not-so-random robots
+			if (spellInfo->Id == SPELL_ENERGY_ORB_TRIGGER && target->GetEntry() == NPC_PILE_TRIGGER)
+				switch (_spawnSelection)
+				{
+					case 0:
+						for (uint8 i = 0; i < 5; ++i)
+							me->SummonCreature(NPC_XS013_SCRAPBOT, target->GetPositionX()+irand(-3, 3), target->GetPositionY()+irand(-3, 3), target->GetPositionZ()+2, 0, TEMPSUMMON_CORPSE_TIMED_DESPAWN, 1000);
+						_spawnSelection++;
+						break;
+					case 1:
+						me->SummonCreature(NPC_XE321_BOOMBOT, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ()+2, 0, TEMPSUMMON_CORPSE_TIMED_DESPAWN, 5000);
+						_spawnSelection++;
+						break;
+					case 2:
+						for (uint8 i = 0; i < 5; ++i)
+							me->SummonCreature(NPC_XS013_SCRAPBOT, target->GetPositionX()+irand(-3, 3), target->GetPositionY()+irand(-3, 3), target->GetPositionZ()+2, 0, TEMPSUMMON_CORPSE_TIMED_DESPAWN, 1000);
+						_spawnSelection++;
+						break;
+					case 3:
+						if(_pummelerCount < 2)
+							me->SummonCreature(NPC_XM024_PUMMELLER, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ()+2, 0, TEMPSUMMON_CORPSE_TIMED_DESPAWN, 5000);
+						
+						_pummelerCount++;
+						_spawnSelection++;
+						break;
+					case 4:
+						for (uint8 i = 0; i < 5; ++i)
+							me->SummonCreature(NPC_XS013_SCRAPBOT, target->GetPositionX()+irand(-3, 3), target->GetPositionY()+irand(-3, 3), target->GetPositionZ()+2, 0, TEMPSUMMON_CORPSE_TIMED_DESPAWN, 1000);
+						_spawnSelection = 0;
+						break;
+				}
+		}
+
+		void JustDied(Unit *victim)
+		{
+			me->SetVisible(false);
+			if (me->GetInstanceScript())
+				if (Creature* XT002 = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(TYPE_XT002)))
+					if (XT002->AI())
+						XT002->AI()->DoAction(ACTION_HEART_BROKEN);
+		}
+
+		void UpdateAI(uint32 diff)
+		{
+			if (!me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE))
+			{
+				_timerSpawn += diff;
+				if (_timerSpawn >= 1900)
+				{
+					SendEnergyToCorner();
+					_timerSpawn -= 1900;
+				}
+			}
+		}
+	};
 };
 
-/*-------------------------------------------------------
- *
- *        XS-013 SCRAPBOT
- *
- *///----------------------------------------------------
-class npc_scrapbot : public CreatureScript
+class npc_xt002_scrapbot : public CreatureScript
 {
-    public:
-        npc_scrapbot() : CreatureScript("npc_scrapbot") { }
+public:
+    npc_xt002_scrapbot() : CreatureScript("npc_xt002_scrapbot") { }
 
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetInstanceAI<npc_scrapbotAI>(creature);
-        }
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new npc_xt002_scrapbotAI (pCreature);
+    }
 
-        struct npc_scrapbotAI : public ScriptedAI
-        {
-            npc_scrapbotAI(Creature* creature) : ScriptedAI(creature)
-            {
-                Initialize();
-                _instance = me->GetInstanceScript();
-            }
+	struct npc_xt002_scrapbotAI : public PassiveAI
+	{
+		npc_xt002_scrapbotAI(Creature* pCreature) : PassiveAI(pCreature) { }
 
-            void Initialize()
-            {
-                _rangeCheckTimer = 500;
-            }
+		bool _locked;
+		void Reset()
+		{
+			me->StopMoving();
+			_locked = true;
+			me->SetWalk(true);
 
-            void Reset() override
-            {
-                me->SetReactState(REACT_PASSIVE);
+			if (me->GetInstanceScript())
+				if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(TYPE_XT002)))
+				{
+					if (pXT002->GetPositionZ() > 411.0f) // he is on stairs... idiot cryness protection
+						me->GetMotionMaster()->MovePoint(0, 884.028931f, -14.593809f, 409.786987f);
+					else
+						_locked = false;
+				}
+		}
 
-                Initialize();
+		void JustDied(Unit* killer)
+		{
+			// Nerf Scrapbots achievement
+			if (killer->GetEntry() == NPC_XE321_BOOMBOT)
+				if (me->GetInstanceScript())
+				{
+					me->GetInstanceScript()->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_SPELL_TARGET, 65037);
+					me->GetInstanceScript()->DoUpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_BE_SPELL_TARGET, 65037);
+				}
+		}
 
-                if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_XT002)))
-                    me->GetMotionMaster()->MoveFollow(pXT002, 0.0f, 0.0f);
-            }
+		// tc idiots, they use updateAI, while we have movementinform :)
+		void MovementInform(uint32 type, uint32 param)
+		{
+			if (type == POINT_MOTION_TYPE)
+			{
+				_locked = false;
+				return;
+			}
 
-            void UpdateAI(uint32 diff) override
-            {
-                if (_rangeCheckTimer <= diff)
-                {
-                    if (Creature* xt002 = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_XT002)))
-                    {
-                        if (me->IsWithinMeleeRange(xt002))
-                        {
-                            DoCast(xt002, SPELL_SCRAPBOT_RIDE_VEHICLE);
-                            // Unapply vehicle aura again
-                            xt002->RemoveAurasDueToSpell(SPELL_SCRAPBOT_RIDE_VEHICLE);
-                            me->DespawnOrUnsummon();
-                        }
-                    }
-                }
-                else
-                    _rangeCheckTimer -= diff;
-            }
+			// we reached the target :)
+			if (type == FOLLOW_MOTION_TYPE && me->GetInstanceScript())
+				if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(TYPE_XT002)))
+				{
+					if (pXT002->IsAlive())
+					{
+						pXT002->AI()->DoAction(DATA_XT002_NERF_ENGINEERING);
+						pXT002->ModifyHealth(pXT002->GetMaxHealth() * 0.01f);
+					}
 
-            private:
-                InstanceScript* _instance;
-                uint32 _rangeCheckTimer;
-        };
+					if (!urand(0,2))
+						me->MonsterTextEmote("XT-002 Deconstructor consumes scrap bot to repair himself.", 0, true);
+					
+					me->DespawnOrUnsummon(1);
+				}
+		}
+
+		void UpdateAI(uint32 diff)
+		{
+			if (!_locked)
+			{
+				if (me->GetInstanceScript())
+					if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(TYPE_XT002)))
+					{
+						me->GetMotionMaster()->MoveFollow(pXT002, 0.0f, 0.0f);
+						_locked = true;
+					}
+			}
+		}
+	};
 };
 
-/*-------------------------------------------------------
- *
- *        XM-024 PUMMELLER
- *
- *///----------------------------------------------------
-class npc_pummeller : public CreatureScript
+class npc_xt002_pummeller : public CreatureScript
 {
-    public:
-        npc_pummeller() : CreatureScript("npc_pummeller") { }
+public:
+    npc_xt002_pummeller() : CreatureScript("npc_xt002_pummeller") { }
 
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetInstanceAI<npc_pummellerAI>(creature);
-        }
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new npc_xt002_pummellerAI (pCreature);
+    }
 
-        struct npc_pummellerAI : public ScriptedAI
-        {
-            npc_pummellerAI(Creature* creature) : ScriptedAI(creature)
-            {
-                Initialize();
-                _instance = creature->GetInstanceScript();
-            }
+	struct npc_xt002_pummellerAI : public ScriptedAI
+	{
+		npc_xt002_pummellerAI(Creature* pCreature) : ScriptedAI(pCreature) { }
 
-            void Initialize()
-            {
-                _arcingSmashTimer = TIMER_ARCING_SMASH;
-                _trampleTimer = TIMER_TRAMPLE;
-                _uppercutTimer = TIMER_UPPERCUT;
-            }
+		int32 _arcingSmashTimer;
+		int32 _trampleTimer;
+		int32 _uppercutTimer;
 
-            void Reset() override
-            {
-                Initialize();
+		void Reset()
+		{
+			_arcingSmashTimer = 0;
+			_trampleTimer = 0;
+			_uppercutTimer = 0;
 
-                if (Creature* xt002 = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_XT002)))
-                {
-                    Position pos = xt002->GetPosition();
-                    me->GetMotionMaster()->MovePoint(0, pos);
-                }
-            }
+			if (Unit *target = SelectTargetFromPlayerList(200))
+				AttackStart(target);
+			else
+				me->DespawnOrUnsummon(500);
+		}
 
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
+		void UpdateAI(uint32 diff)
+		{
+			if (!UpdateVictim())
+				return;
 
-                if (me->IsWithinMeleeRange(me->GetVictim()))
-                {
-                    if (_arcingSmashTimer <= diff)
-                    {
-                        DoCastVictim(SPELL_ARCING_SMASH);
-                        _arcingSmashTimer = TIMER_ARCING_SMASH;
-                    }
-                    else
-                        _arcingSmashTimer -= diff;
+			_arcingSmashTimer += diff;
+			_trampleTimer += diff;
+			_uppercutTimer += diff;
 
-                    if (_trampleTimer <= diff)
-                    {
-                        DoCastVictim(SPELL_TRAMPLE);
-                        _trampleTimer = TIMER_TRAMPLE;
-                    }
-                    else
-                        _trampleTimer -= diff;
+			if (_arcingSmashTimer >= 8000)
+			{
+				me->CastSpell(me->GetVictim(), SPELL_ARCING_SMASH, false);
+				_arcingSmashTimer = 0;
+				return;
+			}
+			if (_trampleTimer >= 11000)
+			{
+				me->CastSpell(me->GetVictim(), SPELL_TRAMPLE, false);
+				_trampleTimer = 0;
+				return;
+			}
+			if (_uppercutTimer >= 14000)
+			{
+				me->CastSpell(me->GetVictim(), SPELL_UPPERCUT, false);
+				_uppercutTimer = 0;
+				return;
+			}
 
-                    if (_uppercutTimer <= diff)
-                    {
-                        DoCastVictim(SPELL_UPPERCUT);
-                        _uppercutTimer = TIMER_UPPERCUT;
-                    }
-                    else
-                        _uppercutTimer -= diff;
-                }
-
-                DoMeleeAttackIfReady();
-            }
-
-            private:
-                InstanceScript* _instance;
-                uint32 _arcingSmashTimer;
-                uint32 _trampleTimer;
-                uint32 _uppercutTimer;
-        };
+			DoMeleeAttackIfReady();
+		}
+	};
 };
 
-/*-------------------------------------------------------
- *
- *        XE-321 BOOMBOT
- *
- *///----------------------------------------------------
 class BoomEvent : public BasicEvent
 {
     public:
@@ -653,325 +724,144 @@ class BoomEvent : public BasicEvent
         Creature* _me;
 };
 
-class npc_boombot : public CreatureScript
+class npc_xt002_boombot : public CreatureScript
 {
-    public:
-        npc_boombot() : CreatureScript("npc_boombot") { }
+public:
+    npc_xt002_boombot() : CreatureScript("npc_xt002_boombot") { }
 
-        CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new npc_xt002_boombotAI (pCreature);
+    }
+
+	struct npc_xt002_boombotAI : public PassiveAI
+	{
+		npc_xt002_boombotAI(Creature* pCreature) : PassiveAI(pCreature) { }
+
+		bool _locked;
+		bool _boomed;
+		void Reset()
+		{
+			me->StopMoving();
+			_locked = true;
+			_boomed = false;
+			me->SetUnitMovementFlags(MOVEMENTFLAG_WALKING);
+
+			if (me->GetInstanceScript())
+				if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(TYPE_XT002)))
+				{
+					if (pXT002->GetPositionZ() > 411.0f) // he is on stairs... idiot cryness protection
+						me->GetMotionMaster()->MovePoint(0, 884.028931f, -14.593809f, 409.786987f);
+					else
+						_locked = false;
+				}
+		}
+
+		void Explode()
+		{
+			if (_boomed)
+				return;
+
+			 _boomed = true; // Prevent recursive calls
+
+            WorldPacket data(SMSG_SPELLINSTAKILLLOG, 8+8+4);
+            data << uint64(me->GetGUID());
+            data << uint64(me->GetGUID());
+            data << uint32(SPELL_BOOM);
+            me->SendMessageToSet(&data, false);
+
+			Unit::Kill(me, me);
+
+            // Visual only seems to work if the instant kill event is delayed or the spell itself is delayed
+            // Casting done from player and caster source has the same targetinfo flags,
+            // so that can't be the issue
+            // See BoomEvent class
+            // Schedule 1s delayed
+            me->m_Events.AddEvent(new BoomEvent(me), me->m_Events.CalculateTime(1*IN_MILLISECONDS));
+		}
+
+		void JustDied(Unit*)
+		{
+			me->m_Events.AddEvent(new BoomEvent(me), me->m_Events.CalculateTime(1*IN_MILLISECONDS));
+		}
+
+		void DamageTaken(Unit*, uint32 &damage, DamageEffectType, SpellSchoolMask)
         {
-            return GetInstanceAI<npc_boombotAI>(creature);
+			if (_boomed)
+				damage = 0;
+
+			if (me->HealthBelowPctDamaged(50, damage) && !_boomed)
+			{
+				damage = 0;
+                Explode();
+			}
         }
 
-        struct npc_boombotAI : public ScriptedAI
-        {
-            npc_boombotAI(Creature* creature) : ScriptedAI(creature)
-            {
-                Initialize();
-                _instance = creature->GetInstanceScript();
-            }
+		// tc idiots, they use updateAI, while we have movementinform :)
+		void MovementInform(uint32 type, uint32 param)
+		{
+			if (type == POINT_MOTION_TYPE)
+			{
+				_locked = false;
+				return;
+			}
+			// we reached the target :)
+			//if (type == FOLLOW_MOTION_TYPE)
+			//	_kill = true;
+		}
 
-            void Initialize()
-            {
-                _boomed = false;
-            }
-
-            void Reset() override
-            {
-                Initialize();
-
-                DoCast(SPELL_AURA_BOOMBOT); // For achievement
-
-                // HACK/workaround:
-                // these values aren't confirmed - lack of data - and the values in DB are incorrect
-                // these values are needed for correct damage of Boom spell
-                me->SetFloatValue(UNIT_FIELD_MINDAMAGE, 15000.0f);
-                me->SetFloatValue(UNIT_FIELD_MAXDAMAGE, 18000.0f);
-
-                /// @todo proper waypoints?
-                if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_XT002)))
-                    me->GetMotionMaster()->MoveFollow(pXT002, 0.0f, 0.0f);
-            }
-
-            void DamageTaken(Unit* /*who*/, uint32& damage) override
-            {
-                if (damage >= (me->GetHealth() - me->GetMaxHealth() * 0.5f) && !_boomed)
-                {
-                    _boomed = true; // Prevent recursive calls
-
-                    WorldPacket data(SMSG_SPELLINSTAKILLLOG, 8+8+4);
-                    data << uint64(me->GetGUID());
-                    data << uint64(me->GetGUID());
-                    data << uint32(SPELL_BOOM);
-                    me->SendMessageToSet(&data, false);
-
-                    me->DealDamage(me, me->GetHealth(), NULL, NODAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
-
-                    damage = 0;
-
-                    // Visual only seems to work if the instant kill event is delayed or the spell itself is delayed
-                    // Casting done from player and caster source has the same targetinfo flags,
-                    // so that can't be the issue
-                    // See BoomEvent class
-                    // Schedule 1s delayed
-                    me->m_Events.AddEvent(new BoomEvent(me), me->m_Events.CalculateTime(1*IN_MILLISECONDS));
-                }
-            }
-
-            void UpdateAI(uint32 /*diff*/) override
-            {
-                if (!UpdateVictim())
-                    return;
-
-                // No melee attack
-            }
-
-           private:
-                InstanceScript* _instance;
-                bool _boomed;
-        };
+		void UpdateAI(uint32 diff)
+		{
+			if (!_locked)
+			{
+				if (me->GetInstanceScript())
+					if (Creature* pXT002 = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(TYPE_XT002)))
+					{
+						me->GetMotionMaster()->MoveFollow(pXT002, 0.0f, 0.0f);
+						_locked = true;
+					}
+			}
+		}
+	};
 };
 
-
-/*-------------------------------------------------------
- *
- *        LIFE SPARK
- *
- *///----------------------------------------------------
-class npc_life_spark : public CreatureScript
+class npc_xt002_life_spark : public CreatureScript
 {
-    public:
-        npc_life_spark() : CreatureScript("npc_life_spark") { }
+public:
+    npc_xt002_life_spark() : CreatureScript("npc_xt002_life_spark") { }
 
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return new npc_life_sparkAI(creature);
-        }
+    CreatureAI* GetAI(Creature* pCreature) const
+    {
+        return new npc_xt002_life_sparkAI (pCreature);
+    }
 
-        struct npc_life_sparkAI : public ScriptedAI
-        {
-            npc_life_sparkAI(Creature* creature) : ScriptedAI(creature)
-            {
-                Initialize();
-            }
+	struct npc_xt002_life_sparkAI : public ScriptedAI
+	{
+		npc_xt002_life_sparkAI(Creature* pCreature) : ScriptedAI(pCreature)
+		{
+			me->SetMaxHealth(RAID_MODE(54000, 172000));
+			me->SetHealth(me->GetMaxHealth());
+			me->CastSpell(me, SPELL_SPARK_DAMAGE, true);
+		}
 
-            void Initialize()
-            {
-                _shockTimer = 0; // first one is immediate.
-            }
+		uint32 _attackTimer;
+		void Reset()
+		{
+			if (Unit *target = SelectTargetFromPlayerList(200))
+				AttackStart(target);
+			else
+				me->DespawnOrUnsummon();
+		}
 
-            void Reset() override
-            {
-                DoCast(me, SPELL_STATIC_CHARGED);
-                Initialize();
-            }
+		void UpdateAI(uint32 diff)
+		{
+			if (!UpdateVictim())
+				return;
 
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
-
-                if (_shockTimer <= diff)
-                {
-                    if (me->IsWithinMeleeRange(me->GetVictim()))
-                    {
-                        DoCastVictim(SPELL_SHOCK);
-                        _shockTimer = TIMER_SHOCK;
-                    }
-                }
-                else _shockTimer -= diff;
-            }
-
-            private:
-                uint32 _shockTimer;
-        };
-};
-
-class spell_xt002_searing_light_spawn_life_spark : public SpellScriptLoader
-{
-    public:
-        spell_xt002_searing_light_spawn_life_spark() : SpellScriptLoader("spell_xt002_searing_light_spawn_life_spark") { }
-
-        class spell_xt002_searing_light_spawn_life_spark_AuraScript : public AuraScript
-        {
-            PrepareAuraScript(spell_xt002_searing_light_spawn_life_spark_AuraScript);
-
-            bool Validate(SpellInfo const* /*spell*/) override
-            {
-                if (!sSpellMgr->GetSpellInfo(SPELL_SUMMON_LIFE_SPARK))
-                    return false;
-                return true;
-            }
-
-            void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
-            {
-                if (Player* player = GetOwner()->ToPlayer())
-                    if (Unit* xt002 = GetCaster())
-                        if (xt002->HasAura(aurEff->GetAmount()))   // Heartbreak aura indicating hard mode
-                            player->CastSpell(player, SPELL_SUMMON_LIFE_SPARK, true);
-            }
-
-            void Register() override
-            {
-                AfterEffectRemove += AuraEffectRemoveFn(spell_xt002_searing_light_spawn_life_spark_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
-            }
-        };
-
-        AuraScript* GetAuraScript() const override
-        {
-            return new spell_xt002_searing_light_spawn_life_spark_AuraScript();
-        }
-};
-
-class spell_xt002_gravity_bomb_aura : public SpellScriptLoader
-{
-    public:
-        spell_xt002_gravity_bomb_aura() : SpellScriptLoader("spell_xt002_gravity_bomb_aura") { }
-
-        class spell_xt002_gravity_bomb_aura_AuraScript : public AuraScript
-        {
-            PrepareAuraScript(spell_xt002_gravity_bomb_aura_AuraScript);
-
-            bool Validate(SpellInfo const* /*spell*/) override
-            {
-                if (!sSpellMgr->GetSpellInfo(SPELL_SUMMON_VOID_ZONE))
-                    return false;
-                return true;
-            }
-
-            void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
-            {
-                if (Player* player = GetOwner()->ToPlayer())
-                    if (Unit* xt002 = GetCaster())
-                        if (xt002->HasAura(aurEff->GetAmount()))   // Heartbreak aura indicating hard mode
-                            player->CastSpell(player, SPELL_SUMMON_VOID_ZONE, true);
-            }
-
-            void OnPeriodic(AuraEffect const* aurEff)
-            {
-                Unit* xt002 = GetCaster();
-                if (!xt002)
-                    return;
-
-                Unit* owner = GetOwner()->ToUnit();
-                if (!owner)
-                    return;
-
-                if (aurEff->GetAmount() >= int32(owner->GetHealth()))
-                    if (xt002->GetAI())
-                        xt002->GetAI()->SetData(DATA_GRAVITY_BOMB_CASUALTY, 1);
-            }
-
-            void Register() override
-            {
-                OnEffectPeriodic += AuraEffectPeriodicFn(spell_xt002_gravity_bomb_aura_AuraScript::OnPeriodic, EFFECT_2, SPELL_AURA_PERIODIC_DAMAGE);
-                AfterEffectRemove += AuraEffectRemoveFn(spell_xt002_gravity_bomb_aura_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
-            }
-        };
-
-        AuraScript* GetAuraScript() const override
-        {
-            return new spell_xt002_gravity_bomb_aura_AuraScript();
-        }
-};
-
-class spell_xt002_gravity_bomb_damage : public SpellScriptLoader
-{
-    public:
-        spell_xt002_gravity_bomb_damage() : SpellScriptLoader("spell_xt002_gravity_bomb_damage") { }
-
-        class spell_xt002_gravity_bomb_damage_SpellScript : public SpellScript
-        {
-            PrepareSpellScript(spell_xt002_gravity_bomb_damage_SpellScript);
-
-            void HandleScript(SpellEffIndex /*eff*/)
-            {
-                Unit* caster = GetCaster();
-                if (!caster)
-                    return;
-
-                if (GetHitDamage() >= int32(GetHitUnit()->GetHealth()))
-                    if (caster->GetAI())
-                        caster->GetAI()->SetData(DATA_GRAVITY_BOMB_CASUALTY, 1);
-            }
-
-            void Register() override
-            {
-                OnEffectHitTarget += SpellEffectFn(spell_xt002_gravity_bomb_damage_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
-            }
-        };
-
-        SpellScript* GetSpellScript() const override
-        {
-            return new spell_xt002_gravity_bomb_damage_SpellScript();
-        }
-};
-
-class spell_xt002_heart_overload_periodic : public SpellScriptLoader
-{
-    public:
-        spell_xt002_heart_overload_periodic() : SpellScriptLoader("spell_xt002_heart_overload_periodic") { }
-
-        class spell_xt002_heart_overload_periodic_SpellScript : public SpellScript
-        {
-            PrepareSpellScript(spell_xt002_heart_overload_periodic_SpellScript);
-
-            bool Validate(SpellInfo const* /*spell*/) override
-            {
-                if (!sSpellMgr->GetSpellInfo(SPELL_ENERGY_ORB))
-                    return false;
-
-                if (!sSpellMgr->GetSpellInfo(SPELL_RECHARGE_BOOMBOT))
-                    return false;
-
-                if (!sSpellMgr->GetSpellInfo(SPELL_RECHARGE_PUMMELER))
-                    return false;
-
-                if (!sSpellMgr->GetSpellInfo(SPELL_RECHARGE_SCRAPBOT))
-                    return false;
-
-                return true;
-            }
-
-            void HandleScript(SpellEffIndex /*effIndex*/)
-            {
-                if (Unit* caster = GetCaster())
-                {
-                    if (InstanceScript* instance = caster->GetInstanceScript())
-                    {
-                        if (Unit* toyPile = ObjectAccessor::GetUnit(*caster, instance->GetGuidData(DATA_TOY_PILE_0 + urand(0, 3))))
-                        {
-                            caster->CastSpell(toyPile, SPELL_ENERGY_ORB, true);
-
-                            // This should probably be incorporated in a dummy effect handler, but I've had trouble getting the correct target
-                            // Weighed randomization (approximation)
-                            uint32 const spells[] = { SPELL_RECHARGE_SCRAPBOT, SPELL_RECHARGE_SCRAPBOT, SPELL_RECHARGE_SCRAPBOT,
-                                SPELL_RECHARGE_PUMMELER, SPELL_RECHARGE_BOOMBOT };
-
-                            for (uint8 i = 0; i < 5; ++i)
-                            {
-                                uint8 a = urand(0, 4);
-                                uint32 spellId = spells[a];
-                                toyPile->CastSpell(toyPile, spellId, true, NULL, NULL, instance->GetGuidData(BOSS_XT002));
-                            }
-                        }
-                    }
-
-                    if (Creature* base = caster->GetVehicleCreatureBase())
-                        base->AI()->Talk(SAY_SUMMON);
-                }
-            }
-
-            void Register() override
-            {
-                OnEffectHit += SpellEffectFn(spell_xt002_heart_overload_periodic_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_DUMMY);
-            }
-        };
-
-        SpellScript* GetSpellScript() const override
-        {
-            return new spell_xt002_heart_overload_periodic_SpellScript();
-        }
+			me->CastSpell(me->GetVictim(), SPELL_SPARK_MELEE, false);
+			DoMeleeAttackIfReady();
+		}
+	};
 };
 
 class spell_xt002_tympanic_tantrum : public SpellScriptLoader
@@ -990,114 +880,224 @@ class spell_xt002_tympanic_tantrum : public SpellScriptLoader
 
             void RecalculateDamage()
             {
-                SetHitDamage(GetHitUnit()->CountPctFromMaxHealth(GetHitDamage()));
+				if (GetHitUnit())
+					SetHitDamage(GetHitUnit()->CountPctFromMaxHealth(GetHitDamage()));
             }
 
-            void Register() override
+            void Register()
             {
-                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_xt002_tympanic_tantrum_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
-                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_xt002_tympanic_tantrum_SpellScript::FilterTargets, EFFECT_1, TARGET_UNIT_SRC_AREA_ENEMY);
+                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_xt002_tympanic_tantrum_SpellScript::FilterTargets, EFFECT_ALL, TARGET_UNIT_SRC_AREA_ENEMY);
                 OnHit += SpellHitFn(spell_xt002_tympanic_tantrum_SpellScript::RecalculateDamage);
             }
         };
 
-        SpellScript* GetSpellScript() const override
+        SpellScript* GetSpellScript() const
         {
             return new spell_xt002_tympanic_tantrum_SpellScript();
         }
 };
 
-class spell_xt002_submerged : public SpellScriptLoader
+class spell_xt002_gravity_bomb_aura : public SpellScriptLoader
 {
     public:
-        spell_xt002_submerged() : SpellScriptLoader("spell_xt002_submerged") { }
+        spell_xt002_gravity_bomb_aura() : SpellScriptLoader("spell_xt002_gravity_bomb_aura") { }
 
-        class spell_xt002_submerged_SpellScript : public SpellScript
+        class spell_xt002_gravity_bomb_aura_AuraScript : public AuraScript
         {
-            PrepareSpellScript(spell_xt002_submerged_SpellScript);
+            PrepareAuraScript(spell_xt002_gravity_bomb_aura_AuraScript);
 
-            void HandleScript(SpellEffIndex /*eff*/)
+            void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
             {
-                Creature* target = GetHitCreature();
-                if (!target)
-                    return;
-
-                target->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                target->SetByteValue(UNIT_FIELD_BYTES_1, 0, UNIT_STAND_STATE_SUBMERGED);
+                if (Player* player = GetOwner()->ToPlayer())
+                    if (Unit* xt002 = GetCaster())
+                        if (xt002->HasAura(aurEff->GetAmount()))   // Heartbreak aura indicating hard mode
+                            if (Creature* cr = xt002->SummonCreature(NPC_VOID_ZONE, player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN, 180000))
+							{
+								int32 damage = GetSpellInfo()->Id == 63025 ? 5000 : 7500;
+								cr->CastCustomSpell(cr, SPELL_VOID_ZONE_DAMAGE, &damage, 0, 0, true);
+							}
             }
 
-            void Register() override
+            void OnPeriodic(AuraEffect const* aurEff)
             {
-                OnEffectHitTarget += SpellEffectFn(spell_xt002_submerged_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+                Unit* xt002 = GetCaster();
+                if (!xt002)
+                    return;
+
+                Unit* owner = GetOwner()->ToUnit();
+                if (!owner)
+                    return;
+
+               if (aurEff->GetAmount() >= int32(owner->GetHealth()))
+                    if (xt002->GetAI())
+                        xt002->GetAI()->DoAction(DATA_XT002_GRAVITY_ACHIEV);
+            }
+
+            void Register()
+            {
+                OnEffectPeriodic += AuraEffectPeriodicFn(spell_xt002_gravity_bomb_aura_AuraScript::OnPeriodic, EFFECT_2, SPELL_AURA_PERIODIC_DAMAGE);
+                AfterEffectRemove += AuraEffectRemoveFn(spell_xt002_gravity_bomb_aura_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        SpellScript* GetSpellScript() const override
+        AuraScript* GetAuraScript() const
         {
-            return new spell_xt002_submerged_SpellScript();
+            return new spell_xt002_gravity_bomb_aura_AuraScript();
+        }
+
+		class spell_xt002_gravity_bomb_aura_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_xt002_gravity_bomb_aura_SpellScript);
+
+            void SelectTarget(std::list<WorldObject*>& targets)
+            {
+				if (Unit* victim = GetCaster()->GetVictim())
+					targets.remove_if(Trinity::ObjectGUIDCheck(victim->GetGUID(), true)); 
+            }
+
+            void Register()
+            {
+                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_xt002_gravity_bomb_aura_SpellScript::SelectTarget, EFFECT_ALL, TARGET_UNIT_DEST_AREA_ENEMY);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_xt002_gravity_bomb_aura_SpellScript();
         }
 };
 
-class achievement_nerf_engineering : public AchievementCriteriaScript
+class spell_xt002_gravity_bomb_damage : public SpellScriptLoader
 {
     public:
-        achievement_nerf_engineering() : AchievementCriteriaScript("achievement_nerf_engineering") { }
+        spell_xt002_gravity_bomb_damage() : SpellScriptLoader("spell_xt002_gravity_bomb_damage") { }
 
-        bool OnCheck(Player* /*source*/, Unit* target) override
+        class spell_xt002_gravity_bomb_damage_SpellScript : public SpellScript
         {
-            if (!target || !target->GetAI())
-                return false;
+            PrepareSpellScript(spell_xt002_gravity_bomb_damage_SpellScript);
 
-            return !(target->GetAI()->GetData(DATA_HEALTH_RECOVERED));
+            void HandleScript(SpellEffIndex /*eff*/)
+            {
+                Unit* caster = GetCaster();
+                if (!caster)
+                    return;
+
+				if (GetHitDamage() >= int32(GetHitUnit()->GetHealth()))
+                    if (caster->GetAI())
+						caster->GetAI()->DoAction(DATA_XT002_GRAVITY_ACHIEV);
+            }
+
+            void Register()
+            {
+                OnEffectHitTarget += SpellEffectFn(spell_xt002_gravity_bomb_damage_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_xt002_gravity_bomb_damage_SpellScript();
         }
 };
 
-class achievement_heartbreaker : public AchievementCriteriaScript
+class spell_xt002_searing_light_spawn_life_spark : public SpellScriptLoader
 {
     public:
-        achievement_heartbreaker() : AchievementCriteriaScript("achievement_heartbreaker") { }
+        spell_xt002_searing_light_spawn_life_spark() : SpellScriptLoader("spell_xt002_searing_light_spawn_life_spark") { }
 
-        bool OnCheck(Player* /*source*/, Unit* target) override
+        class spell_xt002_searing_light_spawn_life_spark_AuraScript : public AuraScript
         {
-            if (!target || !target->GetAI())
-                return false;
+            PrepareAuraScript(spell_xt002_searing_light_spawn_life_spark_AuraScript);
 
-            return target->GetAI()->GetData(DATA_HARD_MODE) != 0;
+            void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+            {
+                if (Player* player = GetOwner()->ToPlayer())
+                    if (Unit* xt002 = GetCaster())
+                        if (xt002->HasAura(aurEff->GetAmount()))   // Heartbreak aura indicating hard mode
+							xt002->SummonCreature(NPC_LIFE_SPARK, player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN, 180000);
+            }
+
+            void Register()
+            {
+                OnEffectRemove += AuraEffectRemoveFn(spell_xt002_searing_light_spawn_life_spark_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_xt002_searing_light_spawn_life_spark_AuraScript();
+        }
+
+		class spell_xt002_searing_light_spawn_life_spark_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_xt002_searing_light_spawn_life_spark_SpellScript);
+
+            void SelectTarget(std::list<WorldObject*>& targets)
+            {
+				if (Unit* victim = GetCaster()->GetVictim())
+					targets.remove_if(Trinity::ObjectGUIDCheck(victim->GetGUID(), true)); 
+            }
+
+            void Register()
+            {
+                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_xt002_searing_light_spawn_life_spark_SpellScript::SelectTarget, EFFECT_ALL, TARGET_UNIT_DEST_AREA_ENEMY);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_xt002_searing_light_spawn_life_spark_SpellScript();
         }
 };
 
-class achievement_nerf_gravity_bombs : public AchievementCriteriaScript
+class achievement_xt002_nerf_engineering : public AchievementCriteriaScript
 {
     public:
-        achievement_nerf_gravity_bombs() : AchievementCriteriaScript("achievement_nerf_gravity_bombs") { }
+        achievement_xt002_nerf_engineering() : AchievementCriteriaScript("achievement_xt002_nerf_engineering") {}
 
-        bool OnCheck(Player* /*source*/, Unit* target) override
+        bool OnCheck(Player* player, Unit* target)
         {
-            if (!target || !target->GetAI())
-                return false;
+			if (target)
+				if (InstanceScript* instance = target->GetInstanceScript())
+					if (Creature* cr = ObjectAccessor::GetCreature(*target, instance->GetData64(TYPE_XT002)))
+						return cr->AI()->GetData(DATA_XT002_NERF_ENGINEERING);
+						
+			return false;
+        }
+};
 
-            return !(target->GetAI()->GetData(DATA_GRAVITY_BOMB_CASUALTY));
+class achievement_xt002_nerf_gravity_bombs : public AchievementCriteriaScript
+{
+    public:
+        achievement_xt002_nerf_gravity_bombs() : AchievementCriteriaScript("achievement_xt002_nerf_gravity_bombs") {}
+
+        bool OnCheck(Player* player, Unit* target)
+        {
+			if (target)
+				if (InstanceScript* instance = target->GetInstanceScript())
+					if (Creature* cr = ObjectAccessor::GetCreature(*target, instance->GetData64(TYPE_XT002)))
+						return cr->AI()->GetData(DATA_XT002_GRAVITY_ACHIEV);
+						
+			return false;
         }
 };
 
 void AddSC_boss_xt002()
 {
-    new npc_xt002_heart();
-    new npc_scrapbot();
-    new npc_pummeller();
-    new npc_boombot();
-
-    new npc_life_spark();
+	// Npcs
     new boss_xt002();
+	new npc_xt002_heart();
+	new npc_xt002_scrapbot();
+	new npc_xt002_pummeller();
+	new npc_xt002_boombot();
+	new npc_xt002_life_spark();
 
-    new spell_xt002_searing_light_spawn_life_spark();
-    new spell_xt002_gravity_bomb_aura();
-    new spell_xt002_gravity_bomb_damage();
-    new spell_xt002_heart_overload_periodic();
-    new spell_xt002_tympanic_tantrum();
-    new spell_xt002_submerged();
+	// Spells
+	new spell_xt002_tympanic_tantrum();
+	new spell_xt002_gravity_bomb_aura();
+	new spell_xt002_gravity_bomb_damage();
+	new spell_xt002_searing_light_spawn_life_spark();
 
-    new achievement_nerf_engineering();
-    new achievement_heartbreaker();
-    new achievement_nerf_gravity_bombs();
+	// Achievements
+	new achievement_xt002_nerf_engineering();
+	new achievement_xt002_nerf_gravity_bombs();
 }

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,11 +20,10 @@
 #define __BATTLEGROUNDIC_H
 
 #include "Battleground.h"
-#include "BattlegroundScore.h"
 #include "Language.h"
 #include "Object.h"
 
-const uint32 BG_IC_Factions[2] =
+const uint32 BG_IC_Factions[BG_TEAMS_COUNT] =
 {
     1732, // Alliance
     1735  // Horde
@@ -37,6 +36,7 @@ enum creaturesIC
     NPC_KOR_KRON_GUARD                      = 34918, // horde guard
     NPC_SEVEN_TH_LEGION_INFANTRY            = 34919, // alliance guard
     NPC_KEEP_CANNON                         = 34944,
+	NPC_BROKEN_KEEP_CANNON                  = 35819,
     NPC_DEMOLISHER                          = 34775,
     NPC_SIEGE_ENGINE_H                      = 35069,
     NPC_SIEGE_ENGINE_A                      = 34776,
@@ -192,8 +192,9 @@ enum gameobjectsIC
 
 enum Times
 {
-    WORKSHOP_UPDATE_TIME     = 180000, // 3 minutes
-    DOCKS_UPDATE_TIME        = 180000, // not sure if it is 3 minutes
+    WORKSHOP_UPDATE_TIME     = 10000, // 10 seconds
+    DOCKS_UPDATE_TIME        = 10000, // 10 seconds
+	VEHICLE_RESPAWN_TIME     = 180,   // 3 minutes, not sure
     IC_RESOURCE_TIME         = 45000, // not sure, need more research
     CLOSE_DOORS_TIME         = 20000,
     BANNER_STATE_CHANGE_TIME = 60000,
@@ -202,14 +203,17 @@ enum Times
 
 enum Actions
 {
-    ACTION_GUNSHIP_READY = 1
+    ACTION_GUNSHIP_READY				= 1,
+	ACTION_TELEPORT_PLAYER_TO_TRANSPORT = 2,
+
+	AREA_TRIGGER_HORDE_KEEP				= 5535,
+	AREA_TRIGGER_ALLIANCE_KEEP			= 5536
 };
 
 struct ICNpc
 {
     uint32 type;
     uint32 entry;
-    TeamId team;
     float x;
     float y;
     float z;
@@ -278,7 +282,6 @@ enum BG_IC_GOs
     BG_IC_GO_FLAGPOLE_1_3,
     BG_IC_GO_FLAGPOLE_1_4,
     BG_IC_GO_FLAGPOLE_1_5,
-    BG_IC_GO_FLAGPOLE_1_6,
 
     BG_IC_GO_HANGAR_BANNER,
 
@@ -351,7 +354,7 @@ enum BG_IC_GOs
     BG_IC_GO_TELEPORTER_EFFECTS_H_3,
     BG_IC_GO_TELEPORTER_EFFECTS_H_4,
     BG_IC_GO_TELEPORTER_EFFECTS_H_5,
-    BG_IC_GO_TELEPORTER_EFFECTS_H_6
+    BG_IC_GO_TELEPORTER_EFFECTS_H_6,
 };
 
 enum BG_IC_NPCs
@@ -390,6 +393,7 @@ enum BG_IC_NPCs
     BG_IC_NPC_KEEP_CANNON_22,
     BG_IC_NPC_KEEP_CANNON_23,
     BG_IC_NPC_KEEP_CANNON_24,
+    BG_IC_NPC_KEEP_CANNON_25,
 
     BG_IC_NPC_SIEGE_ENGINE_A,
     BG_IC_NPC_SIEGE_ENGINE_H,
@@ -443,7 +447,7 @@ enum BannersTypes
 enum BG_IC_MaxSpawns
 {
     MAX_NORMAL_GAMEOBJECTS_SPAWNS                       = BG_IC_GO_DOODAD_ND_WINTERORC_WALL_GATEFX_DOOR03+1,
-    MAX_NORMAL_NPCS_SPAWNS                              = BG_IC_NPC_KEEP_CANNON_24+1,
+    MAX_NORMAL_NPCS_SPAWNS                              = BG_IC_NPC_KEEP_CANNON_25+1,
     MAX_WORKSHOP_SPAWNS                                 = 10,
     MAX_DOCKS_SPAWNS                                    = 12,
     MAX_SPIRIT_GUIDES_SPAWNS                            = 7,
@@ -470,43 +474,44 @@ enum BG_IC_MaxSpawns
 
 const ICNpc BG_IC_NpcSpawnlocs[MAX_NORMAL_NPCS_SPAWNS] =
 {
-    {BG_IC_NPC_OVERLORD_AGMAR, NPC_OVERLORD_AGMAR, TEAM_HORDE, 1295.44f, -765.733f, 70.0541f, 0.0f}, //Overlord Agmar 1
-    {BG_IC_NPC_HIGH_COMMANDER_HALFORD_WYRMBANE, NPC_HIGH_COMMANDER_HALFORD_WYRMBANE, TEAM_ALLIANCE, 224.983f, -831.573f, 60.9034f, 0.0f}, //High Commander Halford Wyrmbane 2
-    {BG_IC_NPC_KOR_KRON_GUARD_1, NPC_KOR_KRON_GUARD, TEAM_HORDE, 1296.01f, -773.256f, 69.958f, 0.292168f}, // 3
-    {BG_IC_NPC_KOR_KRON_GUARD_2, NPC_KOR_KRON_GUARD, TEAM_HORDE, 1295.94f, -757.756f, 69.9587f, 6.02165f}, // 4
-    {BG_IC_NPC_KOR_KRON_GUARD_3, NPC_KOR_KRON_GUARD, TEAM_HORDE, 1295.09f, -760.927f, 69.9587f, 5.94311f}, // 5
-    {BG_IC_NPC_KOR_KRON_GUARD_4, NPC_KOR_KRON_GUARD, TEAM_HORDE, 1295.13f, -769.7f, 69.95f, 0.34f}, // 6
+    {BG_IC_NPC_OVERLORD_AGMAR, NPC_OVERLORD_AGMAR, 1295.44f, -765.733f, 70.0541f, 0.0f}, //Overlord Agmar 1
+    {BG_IC_NPC_HIGH_COMMANDER_HALFORD_WYRMBANE, NPC_HIGH_COMMANDER_HALFORD_WYRMBANE, 224.983f, -831.573f, 60.9034f, 0.0f}, //High Commander Halford Wyrmbane 2
+    {BG_IC_NPC_KOR_KRON_GUARD_1, NPC_KOR_KRON_GUARD, 1296.01f, -773.256f, 69.958f, 0.292168f}, // 3
+    {BG_IC_NPC_KOR_KRON_GUARD_2, NPC_KOR_KRON_GUARD, 1295.94f, -757.756f, 69.9587f, 6.02165f}, // 4
+    {BG_IC_NPC_KOR_KRON_GUARD_3, NPC_KOR_KRON_GUARD, 1295.09f, -760.927f, 69.9587f, 5.94311f}, // 5
+    {BG_IC_NPC_KOR_KRON_GUARD_4, NPC_KOR_KRON_GUARD, 1295.13f, -769.7f, 69.95f, 0.34f}, // 6
 
-    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_1, NPC_SEVEN_TH_LEGION_INFANTRY, TEAM_ALLIANCE, 223.969f, -822.958f, 60.8151f, 0.46337f}, // 7
-    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_2, NPC_SEVEN_TH_LEGION_INFANTRY, TEAM_ALLIANCE, 224.211f, -826.952f, 60.8188f, 6.25961f}, // 8
-    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_3, NPC_SEVEN_TH_LEGION_INFANTRY, TEAM_ALLIANCE, 223.119f, -838.386f, 60.8145f, 5.64857f}, // 9
-    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_4, NPC_SEVEN_TH_LEGION_INFANTRY, TEAM_ALLIANCE, 223.889f, -835.102f, 60.8201f, 6.21642f}, // 10
+    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_1, NPC_SEVEN_TH_LEGION_INFANTRY, 223.969f, -822.958f, 60.8151f, 0.46337f}, // 7
+    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_2, NPC_SEVEN_TH_LEGION_INFANTRY, 224.211f, -826.952f, 60.8188f, 6.25961f}, // 8
+    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_3, NPC_SEVEN_TH_LEGION_INFANTRY, 223.119f, -838.386f, 60.8145f, 5.64857f}, // 9
+    {BG_IC_NPC_SEVEN_TH_LEGION_INFANTRY_4, NPC_SEVEN_TH_LEGION_INFANTRY, 223.889f, -835.102f, 60.8201f, 6.21642f}, // 10
 
-    {BG_IC_NPC_KEEP_CANNON_1, NPC_KEEP_CANNON, TEAM_ALLIANCE, 415.825f, -754.634f, 87.799f, 1.78024f}, // 11
-    {BG_IC_NPC_KEEP_CANNON_2, NPC_KEEP_CANNON, TEAM_ALLIANCE, 410.142f, -755.332f, 87.7991f, 1.78024f}, // 12
-    {BG_IC_NPC_KEEP_CANNON_3, NPC_KEEP_CANNON, TEAM_ALLIANCE, 424.33f, -879.352f, 88.0446f, 0.436332f}, // 13
-    {BG_IC_NPC_KEEP_CANNON_4, NPC_KEEP_CANNON, TEAM_ALLIANCE, 425.602f, -786.646f, 87.7991f, 5.74213f}, // 14
-    {BG_IC_NPC_KEEP_CANNON_5, NPC_KEEP_CANNON, TEAM_ALLIANCE, 426.743f, -884.939f, 87.9613f, 0.436332f}, // 15
-    {BG_IC_NPC_KEEP_CANNON_6, NPC_KEEP_CANNON, TEAM_ALLIANCE, 404.736f, -755.495f, 87.7989f, 1.78024f}, // 16
-    {BG_IC_NPC_KEEP_CANNON_7, NPC_KEEP_CANNON, TEAM_ALLIANCE, 428.375f, -780.797f, 87.7991f, 5.79449f}, // 17
-    {BG_IC_NPC_KEEP_CANNON_8, NPC_KEEP_CANNON, TEAM_ALLIANCE, 429.175f, -890.436f, 88.0446f, 0.436332f}, // 18
-    {BG_IC_NPC_KEEP_CANNON_9, NPC_KEEP_CANNON, TEAM_ALLIANCE, 430.872f, -775.278f, 87.7991f, 5.88176f}, // 19
-    {BG_IC_NPC_KEEP_CANNON_10, NPC_KEEP_CANNON, TEAM_ALLIANCE, 408.056f, -911.283f, 88.0445f, 4.64258f}, // 20
-    {BG_IC_NPC_KEEP_CANNON_11, NPC_KEEP_CANNON, TEAM_ALLIANCE, 413.609f, -911.566f, 88.0447f, 4.66003f}, // 21
-    {BG_IC_NPC_KEEP_CANNON_12, NPC_KEEP_CANNON, TEAM_ALLIANCE, 402.554f, -910.557f, 88.0446f, 4.57276f}, // 22
+    {BG_IC_NPC_KEEP_CANNON_1, NPC_KEEP_CANNON, 415.825f, -754.634f, 87.799f, 1.78024f}, // 11
+    {BG_IC_NPC_KEEP_CANNON_2, NPC_KEEP_CANNON, 410.142f, -755.332f, 87.7991f, 1.78024f}, // 12
+    {BG_IC_NPC_KEEP_CANNON_3, NPC_KEEP_CANNON, 424.33f, -879.352f, 88.0446f, 0.436332f}, // 13
+    {BG_IC_NPC_KEEP_CANNON_4, NPC_KEEP_CANNON, 425.602f, -786.646f, 87.7991f, 5.74213f}, // 14
+    {BG_IC_NPC_KEEP_CANNON_5, NPC_KEEP_CANNON, 426.743f, -884.939f, 87.9613f, 0.436332f}, // 15
+    {BG_IC_NPC_KEEP_CANNON_6, NPC_KEEP_CANNON, 404.736f, -755.495f, 87.7989f, 1.78024f}, // 16
+    {BG_IC_NPC_KEEP_CANNON_7, NPC_KEEP_CANNON, 428.375f, -780.797f, 87.7991f, 5.79449f}, // 17
+    {BG_IC_NPC_KEEP_CANNON_8, NPC_KEEP_CANNON, 429.175f, -890.436f, 88.0446f, 0.436332f}, // 18
+    {BG_IC_NPC_KEEP_CANNON_9, NPC_KEEP_CANNON, 430.872f, -775.278f, 87.7991f, 5.88176f}, // 19
+    {BG_IC_NPC_KEEP_CANNON_10, NPC_KEEP_CANNON, 408.056f, -911.283f, 88.0445f, 4.64258f}, // 20
+    {BG_IC_NPC_KEEP_CANNON_11, NPC_KEEP_CANNON, 413.609f, -911.566f, 88.0447f, 4.66003f}, // 21
+    {BG_IC_NPC_KEEP_CANNON_12, NPC_KEEP_CANNON, 402.554f, -910.557f, 88.0446f, 4.57276f}, // 22
 
-    {BG_IC_NPC_KEEP_CANNON_13, NPC_KEEP_CANNON, TEAM_HORDE, 1158.91f, -660.144f, 87.9332f, 0.750492f}, // 23
-    {BG_IC_NPC_KEEP_CANNON_14, NPC_KEEP_CANNON, TEAM_HORDE, 1156.22f, -866.809f, 87.8754f, 5.27089f}, // 24
-    {BG_IC_NPC_KEEP_CANNON_15, NPC_KEEP_CANNON, TEAM_HORDE, 1163.74f, -663.67f, 88.3571f, 0.558505f}, // 25
-    {BG_IC_NPC_KEEP_CANNON_16, NPC_KEEP_CANNON, TEAM_HORDE, 1135.18f, -683.896f, 88.0409f, 3.9619f}, // 26
-    {BG_IC_NPC_KEEP_CANNON_17, NPC_KEEP_CANNON, TEAM_HORDE, 1138.91f, -836.359f, 88.3728f, 2.18166f}, // 27
-    {BG_IC_NPC_KEEP_CANNON_18, NPC_KEEP_CANNON, TEAM_HORDE, 1162.08f, -863.717f, 88.358f, 5.48033f}, // 28
-    {BG_IC_NPC_KEEP_CANNON_19, NPC_KEEP_CANNON, TEAM_HORDE, 1167.13f, -669.212f, 87.9682f, 0.383972f}, // 29
-    {BG_IC_NPC_KEEP_CANNON_20, NPC_KEEP_CANNON, TEAM_HORDE, 1137.72f, -688.517f, 88.4023f, 3.9619f}, // 30
-    {BG_IC_NPC_KEEP_CANNON_21, NPC_KEEP_CANNON, TEAM_HORDE, 1135.29f, -840.878f, 88.0252f, 2.30383f}, // 31
-    {BG_IC_NPC_KEEP_CANNON_22, NPC_KEEP_CANNON, TEAM_HORDE, 1144.33f, -833.309f, 87.9268f, 2.14675f}, // 32
-    {BG_IC_NPC_KEEP_CANNON_23, NPC_KEEP_CANNON, TEAM_HORDE, 1142.59f, -691.946f, 87.9756f, 3.9619f}, // 33
-    {BG_IC_NPC_KEEP_CANNON_24, NPC_KEEP_CANNON, TEAM_HORDE, 1166.13f, -858.391f, 87.9653f, 5.63741f} // 34
+    {BG_IC_NPC_KEEP_CANNON_13, NPC_KEEP_CANNON, 1158.91f, -660.144f, 87.9332f, 0.750492f}, // 23
+    {BG_IC_NPC_KEEP_CANNON_14, NPC_KEEP_CANNON, 1156.22f, -866.809f, 87.8754f, 5.27089f}, // 24
+    {BG_IC_NPC_KEEP_CANNON_15, NPC_KEEP_CANNON, 1163.74f, -663.67f, 88.3571f, 0.558505f}, // 25
+    {BG_IC_NPC_KEEP_CANNON_16, NPC_KEEP_CANNON, 1135.18f, -683.896f, 88.0409f, 3.9619f}, // 26
+    {BG_IC_NPC_KEEP_CANNON_17, NPC_KEEP_CANNON, 1138.91f, -836.359f, 88.3728f, 2.18166f}, // 27
+    {BG_IC_NPC_KEEP_CANNON_18, NPC_KEEP_CANNON, 1162.08f, -863.717f, 88.358f, 5.48033f}, // 28
+    {BG_IC_NPC_KEEP_CANNON_19, NPC_KEEP_CANNON, 1167.13f, -669.212f, 87.9682f, 0.383972f}, // 29
+    {BG_IC_NPC_KEEP_CANNON_20, NPC_KEEP_CANNON, 1137.72f, -688.517f, 88.4023f, 3.9619f}, // 30
+    {BG_IC_NPC_KEEP_CANNON_21, NPC_KEEP_CANNON, 1135.29f, -840.878f, 88.0252f, 2.30383f}, // 31
+    {BG_IC_NPC_KEEP_CANNON_22, NPC_KEEP_CANNON, 1144.33f, -833.309f, 87.9268f, 2.14675f}, // 32
+    {BG_IC_NPC_KEEP_CANNON_23, NPC_KEEP_CANNON, 1135.29f, -840.878f, 88.0252f, 2.30383f}, // 33
+    {BG_IC_NPC_KEEP_CANNON_24, NPC_KEEP_CANNON, 1142.59f, -691.946f, 87.9756f, 3.9619f}, // 34
+    {BG_IC_NPC_KEEP_CANNON_25, NPC_KEEP_CANNON, 1166.13f, -858.391f, 87.9653f, 5.63741f} // 35
 };
 
 const Position BG_IC_WorkshopVehicles[5] =
@@ -521,7 +526,7 @@ const Position BG_IC_WorkshopVehicles[5] =
 const Position BG_IC_DocksVehiclesGlaives[2] =
 {
     {779.3125f, -342.972229f, 12.2104874f, 4.712389f}, // Glaive Throwers
-    {790.029541f, -342.899323f, 12.2128582f, 4.71238f} // Glaive Throwers
+    {790.029541f, -342.899323f, 12.2128582f, 4.71238f}, // Glaive Throwers
 };
 
 const Position BG_IC_DocksVehiclesCatapults[4] =
@@ -529,7 +534,7 @@ const Position BG_IC_DocksVehiclesCatapults[4] =
     {757.283f, -341.7795f, 12.2113762f, 4.729842f}, // Catapults
     {766.947937f, -342.053833f, 12.2009945f, 4.694f}, // Catapults
     {800.3785f, -342.607635f, 12.1669979f, 4.6774f}, // Catapults
-    {810.7257f, -342.083344f, 12.1675768f, 4.6600f} // Catapults
+    {810.7257f, -342.083344f, 12.1675768f, 4.6600f}, // Catapults
 };
 
 const Position BG_IC_HangarTeleporters[3] =
@@ -548,8 +553,8 @@ const Position BG_IC_HangarTeleporterEffects[3] =
 
 const Position BG_IC_HangarTrigger[2] =
 {
-    {11.69965f, 0.034146f, 20.62076f, 3.211406f},
-    {7.305609f, -0.095246f, 34.51022f, 3.159046f}
+    {-25.73f, -0.09f, 26.1f, 3.211406f},
+    {7.305609f, -0.095246f, 40.51022f, 3.159046f}
 };
 
 const Position BG_IC_HangarCaptains[4] =
@@ -667,14 +672,13 @@ const ICGo BG_IC_ObjSpawnlocs[MAX_NORMAL_GAMEOBJECTS_SPAWNS] =
     {BG_IC_GO_DOODAD_VR_PORTCULLIS01_1, GO_DOODAD_VR_PORTCULLIS01, 1156.89f, -843.998f, 48.6322f, 0.732934f}, // Doodad_VR_Portcullis01
     {BG_IC_GO_DOODAD_VR_PORTCULLIS01_2, GO_DOODAD_VR_PORTCULLIS01, 1157.05f, -682.36f, 48.6322f, -0.829132f}, // Doodad_VR_Portcullis01
 
-    {BG_IC_GO_FLAGPOLE_1_1, GO_FLAGPOLE_1, -400.809f, 37.6253f, -1.76278f, 0.0f}, // Flagpole
+    {BG_IC_GO_FLAGPOLE_1_1, GO_FLAGPOLE_1, 1269.5f, -400.809f, 37.6253f, -1.76278f}, // Flagpole
     {BG_IC_GO_FLAGPOLE_2_1, GO_FLAGPOLE_2, 1284.76f, -705.668f, 48.9163f, -3.08918f}, // Flagpole
     {BG_IC_GO_FLAGPOLE_2_2, GO_FLAGPOLE_2, 299.153f, -784.589f, 48.9162f, -0.157079f}, // Flagpole
     {BG_IC_GO_FLAGPOLE_1_2, GO_FLAGPOLE_1, 726.385f, -360.205f, 17.8153f, -1.6057f}, // Flagpole
     {BG_IC_GO_FLAGPOLE_1_3, GO_FLAGPOLE_1, 807.78f, -1000.07f, 132.381f, -1.91986f}, // Flagpole
     {BG_IC_GO_FLAGPOLE_1_4, GO_FLAGPOLE_1, 776.229f, -804.283f, 6.45052f, 1.6057f}, // Flagpole
     {BG_IC_GO_FLAGPOLE_1_5, GO_FLAGPOLE_1, 251.016f, -1159.32f, 17.2376f, -2.25147f}, // Flagpole
-    {BG_IC_GO_FLAGPOLE_1_6, GO_FLAGPOLE_1, 1269.502f, -400.809f, 37.62525f, -1.762782f}, // Flagpole
 
     {BG_IC_GO_HORDE_KEEP_PORTCULLIS, GO_HORDE_KEEP_PORTCULLIS, 1283.05f, -765.878f, 50.8297f, -3.13286f}, // Horde Keep Portcullis
 
@@ -706,20 +710,24 @@ const Position workshopBombs[2] =
 
 enum Spells
 {
-    SPELL_OIL_REFINERY                      = 68719,
-    SPELL_QUARRY                            = 68720,
-    SPELL_PARACHUTE                         = 66656,
-    SPELL_SLOW_FALL                         = 12438,
-    SPELL_DESTROYED_VEHICLE_ACHIEVEMENT     = 68357,
-    SPELL_BACK_DOOR_JOB_ACHIEVEMENT         = 68502,
-    SPELL_DRIVING_CREDIT_DEMOLISHER         = 68365,
-    SPELL_DRIVING_CREDIT_GLAIVE             = 68363,
-    SPELL_DRIVING_CREDIT_SIEGE              = 68364,
-    SPELL_DRIVING_CREDIT_CATAPULT           = 68362,
-    SPELL_SIMPLE_TELEPORT                   = 12980,
-    SPELL_TELEPORT_VISUAL_ONLY              = 51347,
-    SPELL_PARACHUTE_IC                      = 66657,
-    SPELL_LAUNCH_NO_FALLING_DAMAGE          = 66251
+    SPELL_OIL_REFINERY					= 68719,
+    SPELL_QUARRY						= 68720,
+
+    SPELL_DESTROYED_VEHICLE_ACHIEVEMENT	= 68357,
+	SPELL_BACK_DOOR_JOB					= 68502,
+
+    SPELL_DRIVING_CREDIT_DEMOLISHER		= 68365,
+    SPELL_DRIVING_CREDIT_GLAIVE			= 68363,
+    SPELL_DRIVING_CREDIT_SIEGE			= 68364,
+    SPELL_DRIVING_CREDIT_CATAPULT		= 68362,
+
+	SPELL_REPAIR_TURRET_CHANNEL			= 68077,
+	SPELL_REPAIR_TURRET_DUMMY			= 68078,
+
+    SPELL_SIMPLE_TELEPORT               = 12980,
+    SPELL_TELEPORT_VISUAL_ONLY          = 51347,
+    SPELL_PARACHUTE_IC                  = 66657,
+    SPELL_LAUNCH_NO_FALLING_DAMAGE      = 66251
 };
 
 enum BG_IC_Objectives
@@ -730,71 +738,71 @@ enum BG_IC_Objectives
 
 enum ICWorldStates
 {
-    BG_IC_ALLIANCE_RENFORT_SET          = 4221,
-    BG_IC_HORDE_RENFORT_SET             = 4222,
-    BG_IC_ALLIANCE_RENFORT              = 4226,
-    BG_IC_HORDE_RENFORT                 = 4227,
-    BG_IC_GATE_FRONT_H_WS_CLOSED        = 4317,
-    BG_IC_GATE_WEST_H_WS_CLOSED         = 4318,
-    BG_IC_GATE_EAST_H_WS_CLOSED         = 4319,
-    BG_IC_GATE_FRONT_A_WS_CLOSED        = 4328,
-    BG_IC_GATE_WEST_A_WS_CLOSED         = 4327,
-    BG_IC_GATE_EAST_A_WS_CLOSED         = 4326,
-    BG_IC_GATE_FRONT_H_WS_OPEN          = 4322,
-    BG_IC_GATE_WEST_H_WS_OPEN           = 4321,
-    BG_IC_GATE_EAST_H_WS_OPEN           = 4320,
-    BG_IC_GATE_FRONT_A_WS_OPEN          = 4323,
-    BG_IC_GATE_WEST_A_WS_OPEN           = 4324,
-    BG_IC_GATE_EAST_A_WS_OPEN           = 4325,
+    BG_IC_ALLIANCE_RENFORT_SET      = 4221,
+    BG_IC_HORDE_RENFORT_SET         = 4222,
+    BG_IC_ALLIANCE_RENFORT          = 4226,
+    BG_IC_HORDE_RENFORT             = 4227,
+    BG_IC_GATE_FRONT_H_WS_CLOSED    = 4317,
+    BG_IC_GATE_WEST_H_WS_CLOSED     = 4318,
+    BG_IC_GATE_EAST_H_WS_CLOSED     = 4319,
+    BG_IC_GATE_FRONT_A_WS_CLOSED    = 4328,
+    BG_IC_GATE_WEST_A_WS_CLOSED     = 4327,
+    BG_IC_GATE_EAST_A_WS_CLOSED     = 4326,
+    BG_IC_GATE_FRONT_H_WS_OPEN      = 4322,
+    BG_IC_GATE_WEST_H_WS_OPEN       = 4321,
+    BG_IC_GATE_EAST_H_WS_OPEN       = 4320,
+    BG_IC_GATE_FRONT_A_WS_OPEN      = 4323,
+    BG_IC_GATE_WEST_A_WS_OPEN       = 4324,
+    BG_IC_GATE_EAST_A_WS_OPEN       = 4325,
 
-    BG_IC_DOCKS_UNCONTROLLED            = 4301,
-    BG_IC_DOCKS_CONFLICT_A              = 4305,
-    BG_IC_DOCKS_CONFLICT_H              = 4302,
-    BG_IC_DOCKS_CONTROLLED_A            = 4304,
-    BG_IC_DOCKS_CONTROLLED_H            = 4303,
+    BG_IC_DOCKS_UNCONTROLLED = 4301,
+    BG_IC_DOCKS_CONFLICT_A = 4305,
+    BG_IC_DOCKS_CONFLICT_H = 4302,
+    BG_IC_DOCKS_CONTROLLED_A = 4304,
+    BG_IC_DOCKS_CONTROLLED_H = 4303,
 
-    BG_IC_HANGAR_UNCONTROLLED           = 4296,
-    BG_IC_HANGAR_CONFLICT_A             = 4300,
-    BG_IC_HANGAR_CONFLICT_H             = 4297,
-    BG_IC_HANGAR_CONTROLLED_A           = 4299,
-    BG_IC_HANGAR_CONTROLLED_H           = 4298,
+    BG_IC_HANGAR_UNCONTROLLED = 4296,
+    BG_IC_HANGAR_CONFLICT_A = 4300,
+    BG_IC_HANGAR_CONFLICT_H = 4297,
+    BG_IC_HANGAR_CONTROLLED_A = 4299,
+    BG_IC_HANGAR_CONTROLLED_H = 4298,
 
-    BG_IC_QUARRY_UNCONTROLLED           = 4306,
-    BG_IC_QUARRY_CONFLICT_A             = 4310,
-    BG_IC_QUARRY_CONFLICT_H             = 4307,
-    BG_IC_QUARRY_CONTROLLED_A           = 4309,
-    BG_IC_QUARRY_CONTROLLED_H           = 4308,
+    BG_IC_QUARRY_UNCONTROLLED = 4306,
+    BG_IC_QUARRY_CONFLICT_A = 4310,
+    BG_IC_QUARRY_CONFLICT_H = 4307,
+    BG_IC_QUARRY_CONTROLLED_A = 4309,
+    BG_IC_QUARRY_CONTROLLED_H = 4308,
 
-    BG_IC_REFINERY_UNCONTROLLED         = 4311,
-    BG_IC_REFINERY_CONFLICT_A           = 4315,
-    BG_IC_REFINERY_CONFLICT_H           = 4312,
-    BG_IC_REFINERY_CONTROLLED_A         = 4314,
-    BG_IC_REFINERY_CONTROLLED_H         = 4313,
+    BG_IC_REFINERY_UNCONTROLLED = 4311,
+    BG_IC_REFINERY_CONFLICT_A = 4315,
+    BG_IC_REFINERY_CONFLICT_H = 4312,
+    BG_IC_REFINERY_CONTROLLED_A = 4314,
+    BG_IC_REFINERY_CONTROLLED_H = 4313,
 
-    BG_IC_WORKSHOP_UNCONTROLLED         = 4294,
-    BG_IC_WORKSHOP_CONFLICT_A           = 4228,
-    BG_IC_WORKSHOP_CONFLICT_H           = 4293,
-    BG_IC_WORKSHOP_CONTROLLED_A         = 4229,
-    BG_IC_WORKSHOP_CONTROLLED_H         = 4230,
+    BG_IC_WORKSHOP_UNCONTROLLED = 4294,
+    BG_IC_WORKSHOP_CONFLICT_A = 4228,
+    BG_IC_WORKSHOP_CONFLICT_H = 4293,
+    BG_IC_WORKSHOP_CONTROLLED_A = 4229,
+    BG_IC_WORKSHOP_CONTROLLED_H = 4230,
 
-    BG_IC_ALLIANCE_KEEP_UNCONTROLLED    = 4341,
-    BG_IC_ALLIANCE_KEEP_CONFLICT_A      = 4342,
-    BG_IC_ALLIANCE_KEEP_CONFLICT_H      = 4343,
-    BG_IC_ALLIANCE_KEEP_CONTROLLED_A    = 4339,
-    BG_IC_ALLIANCE_KEEP_CONTROLLED_H    = 4340,
+    BG_IC_ALLIANCE_KEEP_UNCONTROLLED = 4341,
+    BG_IC_ALLIANCE_KEEP_CONFLICT_A = 4342,
+    BG_IC_ALLIANCE_KEEP_CONFLICT_H = 4343,
+    BG_IC_ALLIANCE_KEEP_CONTROLLED_A = 4339,
+    BG_IC_ALLIANCE_KEEP_CONTROLLED_H = 4340,
 
-    BG_IC_HORDE_KEEP_UNCONTROLLED       = 4346,
-    BG_IC_HORDE_KEEP_CONFLICT_A         = 4347,
-    BG_IC_HORDE_KEEP_CONFLICT_H         = 4348,
-    BG_IC_HORDE_KEEP_CONTROLLED_A       = 4344,
-    BG_IC_HORDE_KEEP_CONTROLLED_H       = 4345
+    BG_IC_HORDE_KEEP_UNCONTROLLED = 4346,
+    BG_IC_HORDE_KEEP_CONFLICT_A = 4347,
+    BG_IC_HORDE_KEEP_CONFLICT_H = 4348,
+    BG_IC_HORDE_KEEP_CONTROLLED_A = 4344,
+    BG_IC_HORDE_KEEP_CONTROLLED_H = 4345
 };
 
 enum BG_IC_GateState
 {
-    BG_IC_GATE_OK           = 1,
-    BG_IC_GATE_DAMAGED      = 2,
-    BG_IC_GATE_DESTROYED    = 3
+    BG_IC_GATE_OK = 1,
+    BG_IC_GATE_DAMAGED = 2,
+    BG_IC_GATE_DESTROYED = 3
 };
 
 enum ICDoorList
@@ -805,7 +813,7 @@ enum ICDoorList
     BG_IC_A_FRONT,
     BG_IC_A_WEST,
     BG_IC_A_EAST,
-    BG_IC_MAXDOOR
+    BG_IC_MAXDOOR,
 };
 
 enum ICNodePointType
@@ -834,7 +842,7 @@ enum ICNodeState
 
 const uint32 BG_IC_GraveyardIds[MAX_NODE_TYPES+2] = {0, 0, 1480, 1481, 1482, 1485, 1486, 1483, 1484};
 
-Position const BG_IC_SpiritGuidePos[MAX_NODE_TYPES+2] =
+const float BG_IC_SpiritGuidePos[MAX_NODE_TYPES+2][4] =
 {
     {0.0f, 0.0f, 0.0f, 0.0f},                     // no grave
     {0.0f, 0.0f, 0.0f, 0.0f},                     // no grave
@@ -851,7 +859,7 @@ Position const BG_IC_SpiritGuidePos[MAX_NODE_TYPES+2] =
 struct ICNodePoint
 {
     uint32 gameobject_type; // with this we will get the GameObject of that point
-    uint32 gameobject_entry; // what gameobject entry is active here.
+    uint32 gameobject_entry; // what gamoebject entry is active here.
     TeamId faction; // who has this node
     ICNodePointType nodeType; // here we can specify if it is graveyards, hangar etc...
     uint32 banners[4]; // the banners that have this point
@@ -876,45 +884,16 @@ const ICNodePoint nodePointInitial[7] =
 
 enum HonorRewards
 {
-    RESOURCE_HONOR_AMOUNT   = 12,
-    WINNER_HONOR_AMOUNT     = 500
+    RESOURCE_HONOR_AMOUNT = 12,
+    WINNER_HONOR_AMOUNT = 500
 };
 
-struct BattlegroundICScore final : public BattlegroundScore
+struct BattlegroundICScore : public BattlegroundScore
 {
-    friend class BattlegroundIC;
-
-    protected:
-        BattlegroundICScore(ObjectGuid playerGuid) : BattlegroundScore(playerGuid), BasesAssaulted(0), BasesDefended(0) { }
-
-        void UpdateScore(uint32 type, uint32 value) override
-        {
-            switch (type)
-            {
-                case SCORE_BASES_ASSAULTED:
-                    BasesAssaulted += value;
-                    break;
-                case SCORE_BASES_DEFENDED:
-                    BasesDefended += value;
-                    break;
-                default:
-                    BattlegroundScore::UpdateScore(type, value);
-                    break;
-            }
-        }
-
-        void BuildObjectivesBlock(WorldPacket& data) final override
-        {
-            data << uint32(2); // Objectives Count
-            data << uint32(BasesAssaulted);
-            data << uint32(BasesDefended);
-        }
-
-        uint32 GetAttr1() const final override { return BasesAssaulted; }
-        uint32 GetAttr2() const final override { return BasesDefended; }
-
-        uint32 BasesAssaulted;
-        uint32 BasesDefended;
+    BattlegroundICScore(Player* player) : BattlegroundScore(player), BasesAssaulted(0), BasesDefended(0) { }
+    ~BattlegroundICScore() { }
+    uint32 BasesAssaulted;
+    uint32 BasesDefended;
 };
 
 class BattlegroundIC : public Battleground
@@ -924,35 +903,37 @@ class BattlegroundIC : public Battleground
         ~BattlegroundIC();
 
         /* inherited from BattlegroundClass */
-        void AddPlayer(Player* player) override;
-        void StartingEventCloseDoors() override;
-        void StartingEventOpenDoors() override;
-        void PostUpdateImpl(uint32 diff) override;
+        void AddPlayer(Player* player);
+        void StartingEventCloseDoors();
+        void StartingEventOpenDoors();
+        void PostUpdateImpl(uint32 diff);
 
-        void RemovePlayer(Player* player, ObjectGuid guid, uint32 team) override;
-        void HandleAreaTrigger(Player* player, uint32 trigger) override;
-        bool SetupBattleground() override;
+        void RemovePlayer(Player* player);
+        void HandleAreaTrigger(Player* player, uint32 trigger);
+        bool SetupBattleground();
         void SpawnLeader(uint32 teamid);
-        void HandleKillUnit(Creature* unit, Player* killer) override;
-        void HandleKillPlayer(Player* player, Player* killer) override;
-        void EndBattleground(uint32 winner) override;
-        void EventPlayerClickedOnFlag(Player* source, GameObject* /*target_obj*/) override;
+        void HandleKillUnit(Creature* unit, Player* killer);
+        void HandleKillPlayer(Player* player, Player* killer);
+        void EndBattleground(TeamId winnerTeamId);
+        void EventPlayerClickedOnFlag(Player* source, GameObject* /*gameObject*/);
 
-        void DestroyGate(Player* player, GameObject* go) override;
+        void EventPlayerDamagedGO(Player* /*player*/, GameObject* go, uint32 eventType);
+        void DestroyGate(Player* player, GameObject* go);
 
-        WorldSafeLocsEntry const* GetClosestGraveYard(Player* player) override;
+        WorldSafeLocsEntry const* GetClosestGraveyard(Player* player);
 
         /* Scorekeeping */
-        void FillInitialWorldStates(WorldPacket& data) override;
+        void UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor = true);
 
-        void HandlePlayerResurrect(Player* player) override;
+        void FillInitialWorldStates(WorldPacket& data);
+
+        void HandlePlayerResurrect(Player* player);
 
         uint32 GetNodeState(uint8 nodeType) const { return (uint8)nodePoint[nodeType].nodeState; }
 
-        bool IsAllNodesControlledByTeam(uint32 team) const override;
-
-        bool IsSpellAllowed(uint32 spellId, Player const* player) const override;
-
+        bool AllNodesConrolledByTeam(TeamId teamId) const;  // overwrited
+		bool IsResourceGlutAllowed(TeamId teamId) const;
+		void DoAction(uint32 action, uint64 guid);
     private:
         uint32 closeFortressDoorsTimer;
         bool doorsClosed;
@@ -963,22 +944,25 @@ class BattlegroundIC : public Battleground
         BG_IC_GateState GateStatus[6];
         ICNodePoint nodePoint[7];
 
-        Transport* gunshipAlliance;
-        Transport* gunshipHorde;
+		typedef std::map<uint32, uint32> RespawnMap;
+		RespawnMap respawnMap;
 
-        uint32 GetNextBanner(ICNodePoint* node, uint32 team, bool returnDefinitve);
+        MotionTransport* gunshipAlliance;
+        MotionTransport* gunshipHorde;
+
+        uint32 GetNextBanner(ICNodePoint* nodePoint, uint32 team, bool returnDefinitve);
 
         uint32 GetGateIDFromEntry(uint32 id)
         {
             uint32 i = 0;
             switch (id)
             {
-                case GO_HORDE_GATE_1: i = BG_IC_H_FRONT ;break;
-                case GO_HORDE_GATE_2: i = BG_IC_H_WEST ;break;
-                case GO_HORDE_GATE_3: i = BG_IC_H_EAST ;break;
-                case GO_ALLIANCE_GATE_3: i = BG_IC_A_FRONT ;break;
-                case GO_ALLIANCE_GATE_1: i = BG_IC_A_WEST ;break;
-                case GO_ALLIANCE_GATE_2: i = BG_IC_A_EAST ;break;
+                case GO_HORDE_GATE_1: i = BG_IC_H_FRONT; break;
+                case GO_HORDE_GATE_2: i = BG_IC_H_EAST; break;
+                case GO_HORDE_GATE_3: i = BG_IC_H_WEST; break;
+                case GO_ALLIANCE_GATE_3: i = BG_IC_A_FRONT; break;
+                case GO_ALLIANCE_GATE_1: i = BG_IC_A_WEST; break;
+                case GO_ALLIANCE_GATE_2: i = BG_IC_A_EAST; break;
             }
             return i;
         }
@@ -993,10 +977,10 @@ class BattlegroundIC : public Battleground
                     uws = (open ? BG_IC_GATE_FRONT_H_WS_OPEN : BG_IC_GATE_FRONT_H_WS_CLOSED);
                     break;
                 case GO_HORDE_GATE_2:
-                    uws = (open ? BG_IC_GATE_WEST_H_WS_OPEN : BG_IC_GATE_WEST_H_WS_CLOSED);
+                    uws = (open ? BG_IC_GATE_EAST_H_WS_OPEN : BG_IC_GATE_EAST_H_WS_CLOSED);
                     break;
                 case GO_HORDE_GATE_3:
-                    uws = (open ? BG_IC_GATE_EAST_H_WS_OPEN : BG_IC_GATE_EAST_H_WS_CLOSED);
+                    uws = (open ? BG_IC_GATE_WEST_H_WS_OPEN : BG_IC_GATE_WEST_H_WS_CLOSED);
                     break;
                 case GO_ALLIANCE_GATE_3:
                     uws = (open ? BG_IC_GATE_FRONT_A_WS_OPEN : BG_IC_GATE_FRONT_A_WS_CLOSED);
@@ -1011,9 +995,10 @@ class BattlegroundIC : public Battleground
             return uws;
         }
 
-        void UpdateNodeWorldState(ICNodePoint* node);
-        void HandleCapturedNodes(ICNodePoint* node, bool recapture);
-        void HandleContestedNodes(ICNodePoint* node);
+        void UpdateNodeWorldState(ICNodePoint* nodePoint);
+        void HandleCapturedNodes(ICNodePoint* nodePoint, bool recapture);
+        void HandleContestedNodes(ICNodePoint* nodePoint);
+		void TurnBosses(bool on);
 };
 
 #endif

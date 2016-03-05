@@ -1,19 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY XINEF, IT OWNS NOW!
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -21,139 +8,158 @@
 
 enum Spells
 {
-    SPELL_BASH                                    = 57094, // Victim
-    SPELL_ENTANGLING_ROOTS                        = 57095, // Random Victim 100Y
-    SPELL_MINI                                    = 57055, // Self
-    SPELL_VENOM_BOLT_VOLLEY                       = 57088, // Random Victim 100Y
-    SPELL_HEALTHY_MUSHROOM_POTENT_FUNGUS          = 56648, // Killer 3Y
-    SPELL_POISONOUS_MUSHROOM_POISON_CLOUD         = 57061, // Self - Duration 8 Sec
-    SPELL_POISONOUS_MUSHROOM_VISUAL_AREA          = 61566, // Self
-    SPELL_POISONOUS_MUSHROOM_VISUAL_AURA          = 56741, // Self
-    SPELL_PUTRID_MUSHROOM                         = 31690, // To make the mushrooms visible
-    SPELL_POWER_MUSHROOM_VISUAL_AURA              = 56740,
+    SPELL_BASH								= 57094,
+    SPELL_ENTANGLING_ROOTS					= 57095,
+    SPELL_MINI								= 57055,
+    SPELL_VENOM_BOLT_VOLLEY					= 57088,
+    SPELL_HEALTHY_MUSHROOM_POTENT_FUNGUS	= 56648,
+    SPELL_POISONOUS_MUSHROOM_POISON_CLOUD	= 57061,
+    SPELL_POISONOUS_MUSHROOM_VISUAL_AURA	= 56741,
+	SPELL_HEALTHY_MUSHROOM_VISUAL_AURA		= 56740,
 };
 
 enum Creatures
 {
-    NPC_TRIGGER                                     = 19656
+    NPC_HEALTHY_MUSHROOM					= 30391,
+    NPC_POISONOUS_MUSHROOM					= 30435
 };
 
 enum Events
 {
-    EVENT_SPAWN = 1,
-    EVENT_MINI,
-    EVENT_ROOT,
-    EVENT_BASH,
-    EVENT_BOLT,
-    EVENT_AURA
+	EVENT_AMANITAR_SPAWN					= 1,
+	EVENT_AMANITAR_ROOTS					= 2,
+	EVENT_AMANITAR_BASH						= 3,
+	EVENT_AMANITAR_BOLT						= 4,
 };
 
 class boss_amanitar : public CreatureScript
 {
-    public:
-        boss_amanitar() : CreatureScript("boss_amanitar") { }
+public:
+    boss_amanitar() : CreatureScript("boss_amanitar") { }
 
-        struct boss_amanitarAI : public BossAI
+    struct boss_amanitarAI : public ScriptedAI
+    {
+        boss_amanitarAI(Creature *c) : ScriptedAI(c), summons(me)
         {
-            boss_amanitarAI(Creature* creature) : BossAI(creature, DATA_AMANITAR) { }
-
-            void Reset() override
-            {
-                _Reset();
-                me->SetMeleeDamageSchool(SPELL_SCHOOL_NATURE);
-                me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_NATURE, true);
-            }
-
-            void EnterCombat(Unit* /*who*/) override
-            {
-                _EnterCombat();
-
-                events.ScheduleEvent(EVENT_ROOT, urand(5, 9) * IN_MILLISECONDS);
-                events.ScheduleEvent(EVENT_BASH, urand(10, 14) * IN_MILLISECONDS);
-                events.ScheduleEvent(EVENT_BOLT, urand(15, 20) * IN_MILLISECONDS);
-                events.ScheduleEvent(EVENT_MINI, urand(12, 18) * IN_MILLISECONDS);
-                events.ScheduleEvent(EVENT_SPAWN, 5  * IN_MILLISECONDS);
-            }
-
-            void JustDied(Unit* /*killer*/) override
-            {
-                _JustDied();
-                instance->DoRemoveAurasDueToSpellOnPlayers(SPELL_MINI);
-            }
-
-            void SpawnAdds()
-            {
-                uint8 u = 0;
-
-                for (uint8 i = 0; i < 30; ++i)
-                {
-                    Position pos = me->GetRandomNearPosition(30.0f);
-                    pos.m_positionZ = me->GetMap()->GetHeight(pos.GetPositionX(), pos.GetPositionY(), MAX_HEIGHT) + 2.0f;
-
-                    if (Creature* trigger = me->SummonCreature(NPC_TRIGGER, pos))
-                    {
-                        Creature* temp1 = trigger->FindNearestCreature(NPC_HEALTHY_MUSHROOM, 4.0f, true);
-                        Creature* temp2 = trigger->FindNearestCreature(NPC_POISONOUS_MUSHROOM, 4.0f, true);
-                        if (temp1 || temp2)
-                        {
-                            trigger->DisappearAndDie();
-                        }
-                        else
-                        {
-                            u = 1 - u;
-                            trigger->DisappearAndDie();
-                            me->SummonCreature(u > 0 ? NPC_POISONOUS_MUSHROOM : NPC_HEALTHY_MUSHROOM, pos, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 60 * IN_MILLISECONDS);
-                        }
-                    }
-                }
-            }
-
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
-
-                events.Update(diff);
-
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
-
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        case EVENT_SPAWN:
-                            SpawnAdds();
-                            events.ScheduleEvent(EVENT_SPAWN, 20 * IN_MILLISECONDS);
-                            break;
-                        case EVENT_MINI:
-                            DoCast(SPELL_MINI);
-                            events.ScheduleEvent(EVENT_MINI, urand(25, 30) * IN_MILLISECONDS);
-                            break;
-                        case EVENT_ROOT:
-                            DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true), SPELL_ENTANGLING_ROOTS, true);
-                            events.ScheduleEvent(EVENT_ROOT, urand(10, 15) * IN_MILLISECONDS);
-                            break;
-                        case EVENT_BASH:
-                            DoCastVictim(SPELL_BASH);
-                            events.ScheduleEvent(EVENT_BASH, urand(7, 12) * IN_MILLISECONDS);
-                            break;
-                        case EVENT_BOLT:
-                            DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true), SPELL_VENOM_BOLT_VOLLEY, true);
-                            events.ScheduleEvent(EVENT_BOLT, urand(18, 22) * IN_MILLISECONDS);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                DoMeleeAttackIfReady();
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetAhnKahetAI<boss_amanitarAI>(creature);
+            pInstance = c->GetInstanceScript();
+            me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_NATURE, true);
         }
+
+        InstanceScript* pInstance;
+		EventMap events;
+		SummonList summons;
+
+        void Reset()
+        {
+			events.Reset();
+			summons.DespawnAll();
+            me->SetMeleeDamageSchool(SPELL_SCHOOL_NATURE);
+
+            if (pInstance)
+			{
+                pInstance->SetData(DATA_AMANITAR_EVENT, NOT_STARTED);
+				pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_MINI);
+			}
+        }
+
+        void JustDied(Unit* /*Killer*/)
+        {
+			summons.DespawnAll();
+            if (pInstance)
+            {
+                pInstance->SetData(DATA_AMANITAR_EVENT, DONE);
+                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_MINI);
+            }
+        }
+
+        void EnterCombat(Unit* /*who*/)
+        {
+            if (pInstance)
+                pInstance->SetData(DATA_AMANITAR_EVENT, IN_PROGRESS);
+
+            me->CastSpell(me, SPELL_MINI, false);
+
+			events.ScheduleEvent(EVENT_AMANITAR_ROOTS, urand(5000, 9000));
+            events.ScheduleEvent(EVENT_AMANITAR_BASH, urand(10000, 14000));
+            events.ScheduleEvent(EVENT_AMANITAR_BOLT, urand(15000, 20000));
+            events.ScheduleEvent(EVENT_AMANITAR_SPAWN, 0);
+        }
+
+		void JustSummoned(Creature *cr) { summons.Summon(cr); }
+
+        void SpawnAdds()
+        {
+			summons.DespawnAll();
+			Position center;
+			center.Relocate(362.6f, -870, -75);
+
+            for (uint8 i = 0; i < 25; ++i)
+            {
+				float orientation = 2*rand_norm()*M_PI;
+				float x = center.GetPositionX() + i*2*cos(orientation);
+				float y = center.GetPositionY() + i*2*sin(orientation);
+                me->SummonCreature(NPC_POISONOUS_MUSHROOM, x, y, me->GetMap()->GetHeight(x, y, MAX_HEIGHT));
+            }
+
+			for (uint8 i = 0; i < 25; ++i)
+            {
+				float orientation = 2*rand_norm()*M_PI;
+				float x = center.GetPositionX() + i*2*cos(orientation);
+				float y = center.GetPositionY() + i*2*sin(orientation);
+                me->SummonCreature(NPC_HEALTHY_MUSHROOM, x, y, me->GetMap()->GetHeight(x, y, MAX_HEIGHT));
+            }
+        }
+
+        void UpdateAI(uint32 diff)
+        {
+            //Return since we have no target
+            if (!UpdateVictim())
+                return;
+
+			events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
+
+			switch (events.GetEvent())
+			{
+				case EVENT_AMANITAR_SPAWN:
+				{
+					SpawnAdds();
+					events.RepeatEvent(urand(35000, 40000));
+					break;
+				}
+				case EVENT_AMANITAR_ROOTS:
+				{
+					if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+						me->CastSpell(pTarget, SPELL_ENTANGLING_ROOTS, false);
+
+					events.RepeatEvent(urand(15000, 20000));
+					break;
+				}
+				case EVENT_AMANITAR_BASH:
+				{
+					me->CastSpell(me->GetVictim(), SPELL_BASH, false);
+					events.RepeatEvent(urand(15000, 20000));
+					break;
+				}
+				case EVENT_AMANITAR_BOLT:
+				{
+					if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+						me->CastSpell(pTarget, SPELL_VENOM_BOLT_VOLLEY, false);
+					
+					events.RepeatEvent(urand(15000, 20000));
+					break;
+				}
+			}
+
+            DoMeleeAttackIfReady();
+        }
+    };
+
+    CreatureAI *GetAI(Creature *creature) const
+    {
+        return new boss_amanitarAI(creature);
+    }
 };
 
 class npc_amanitar_mushrooms : public CreatureScript
@@ -163,63 +169,53 @@ public:
 
     struct npc_amanitar_mushroomsAI : public ScriptedAI
     {
-        npc_amanitar_mushroomsAI(Creature* creature) : ScriptedAI(creature) { }
+        npc_amanitar_mushroomsAI(Creature* c) : ScriptedAI(c)
+	    {
+            SetCombatMovement(false);
+        }
 
-        EventMap events;
-
-        void Reset() override
+		uint32 Timer;
+        void Reset()
         {
-            events.Reset();
-            events.ScheduleEvent(EVENT_AURA, 1 * IN_MILLISECONDS);
+			me->CastSpell(me, 31690, true);
 
-            me->SetDisplayId(me->GetCreatureTemplate()->Modelid2);
-            DoCast(SPELL_PUTRID_MUSHROOM);
-
+			Timer = 0;
             if (me->GetEntry() == NPC_POISONOUS_MUSHROOM)
-                DoCast(SPELL_POISONOUS_MUSHROOM_VISUAL_AURA);
-            else
-                DoCast(SPELL_POWER_MUSHROOM_VISUAL_AURA);
+			{
+                me->CastSpell(me, SPELL_POISONOUS_MUSHROOM_VISUAL_AURA, true);
+				me->CastSpell(me, SPELL_POISONOUS_MUSHROOM_POISON_CLOUD, false);
+			}
+			else
+				me->CastSpell(me, SPELL_HEALTHY_MUSHROOM_VISUAL_AURA, true);
         }
 
-        void DamageTaken(Unit* /*attacker*/, uint32 &damage) override
+        void JustDied(Unit* killer)
         {
-            if (damage >= me->GetHealth() && me->GetEntry() == NPC_HEALTHY_MUSHROOM)
-                DoCast(me, SPELL_HEALTHY_MUSHROOM_POTENT_FUNGUS, true);
+            if (!killer)
+                return;
+
+            if (me->GetEntry() == NPC_HEALTHY_MUSHROOM)
+                me->CastSpell(me, SPELL_HEALTHY_MUSHROOM_POTENT_FUNGUS, true);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
-        void AttackStart(Unit* /*victim*/) override { }
+        void EnterCombat(Unit* /*who*/) {}
+        void AttackStart(Unit* /*victim*/) {}
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
-            if (!UpdateVictim())
-                return;
-
-            events.Update(diff);
-
-            if (me->HasUnitState(UNIT_STATE_CASTING))
-                return;
-
-            while (uint32 eventId = events.ExecuteEvent())
+            if (me->GetEntry() == NPC_POISONOUS_MUSHROOM)
             {
-                switch (eventId)
+				Timer += diff;
+                if (Timer >= 7000)
                 {
-                    case EVENT_AURA:
-                        if (me->GetEntry() == NPC_POISONOUS_MUSHROOM)
-                        {
-                            DoCast(me, SPELL_POISONOUS_MUSHROOM_VISUAL_AREA, true);
-                            DoCast(me, SPELL_POISONOUS_MUSHROOM_POISON_CLOUD);
-                        }
-                        events.ScheduleEvent(EVENT_AURA, 7 * IN_MILLISECONDS);
-                        break;
-                    default:
-                        break;
+                    me->CastSpell(me, SPELL_POISONOUS_MUSHROOM_POISON_CLOUD, false);
+                    Timer = 0;
                 }
             }
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI *GetAI(Creature *creature) const
     {
         return new npc_amanitar_mushroomsAI(creature);
     }
@@ -227,6 +223,6 @@ public:
 
 void AddSC_boss_amanitar()
 {
-    new boss_amanitar();
-    new npc_amanitar_mushrooms();
+    new boss_amanitar;
+    new npc_amanitar_mushrooms;
 }

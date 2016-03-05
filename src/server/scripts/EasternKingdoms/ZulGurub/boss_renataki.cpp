@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -40,27 +40,11 @@ enum Misc
 
 class boss_renataki : public CreatureScript
 {
-    public:
-        boss_renataki() : CreatureScript("boss_renataki") { }
+    public: boss_renataki() : CreatureScript("boss_renataki") { }
 
         struct boss_renatakiAI : public BossAI
         {
-            boss_renatakiAI(Creature* creature) : BossAI(creature, DATA_EDGE_OF_MADNESS)
-            {
-                Initialize();
-            }
-
-            void Initialize()
-            {
-                Invisible_Timer = urand(8000, 18000);
-                Ambush_Timer = 3000;
-                Visible_Timer = 4000;
-                Aggro_Timer = urand(15000, 25000);
-                ThousandBlades_Timer = urand(4000, 8000);
-
-                Invisible = false;
-                Ambushed = false;
-            }
+            boss_renatakiAI(Creature* creature) : BossAI(creature, DATA_EDGE_OF_MADNESS) { }
 
             uint32 Invisible_Timer;
             uint32 Ambush_Timer;
@@ -71,23 +55,30 @@ class boss_renataki : public CreatureScript
             bool Invisible;
             bool Ambushed;
 
-            void Reset() override
+            void Reset()
             {
                 _Reset();
-                Initialize();
+                Invisible_Timer = urand(8000, 18000);
+                Ambush_Timer = 3000;
+                Visible_Timer = 4000;
+                Aggro_Timer = urand(15000, 25000);
+                ThousandBlades_Timer = urand(4000, 8000);
+
+                Invisible = false;
+                Ambushed = false;
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 _JustDied();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -110,9 +101,11 @@ class boss_renataki : public CreatureScript
                 {
                     if (Ambush_Timer <= diff)
                     {
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true))
+                        Unit* target = NULL;
+                        target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                        if (target)
                         {
-                            DoTeleportTo(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ());
+                            me->NearTeleportTo(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), me->GetOrientation());
                             DoCast(target, SPELL_AMBUSH);
                         }
 
@@ -142,12 +135,14 @@ class boss_renataki : public CreatureScript
                 {
                     if (Aggro_Timer <= diff)
                     {
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true))
-                        {
-                            if (DoGetThreat(me->GetVictim()))
-                                DoModifyThreatPercent(me->GetVictim(), -50);
+                        Unit* target = NULL;
+                        target = SelectTarget(SELECT_TARGET_RANDOM, 1);
+
+                        if (DoGetThreat(me->GetVictim()))
+                            DoModifyThreatPercent(me->GetVictim(), -50);
+
+                        if (target)
                             AttackStart(target);
-                        }
 
                         Aggro_Timer = urand(7000, 20000);
                     } else Aggro_Timer -= diff;
@@ -163,7 +158,7 @@ class boss_renataki : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new boss_renatakiAI(creature);
         }

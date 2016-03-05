@@ -1,22 +1,19 @@
-# Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
-# modifications, as long as this notice is preserved.
+# modifications, as long as this notice is preserved. 
 #
 # This program is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 # Set projectname (must be done AFTER setting configurationtypes)
-project(TrinityCore)
+project(SunwellCore)
 
 # CMake policies (can not be handled elsewhere)
-cmake_minimum_required(VERSION 2.8.9)
+cmake_minimum_required(VERSION 2.8)
 cmake_policy(SET CMP0005 OLD)
-if(POLICY CMP0043)
-  cmake_policy(SET CMP0043 OLD) # Disable 'Ignore COMPILE_DEFINITIONS_<Config> properties'
-endif(POLICY CMP0043)
 
 # add this options before PROJECT keyword
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
@@ -50,17 +47,18 @@ endif()
 
 include(CheckPlatform)
 
-include(GroupSources)
-
 # basic packagesearching and setup (further support will be needed, this is a preliminary release!)
 set(OPENSSL_EXPECTED_VERSION 1.0.0)
+set(ACE_EXPECTED_VERSION 5.8.3)
 
 find_package(PCHSupport)
+find_package(ACE REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
-find_package(MySQL)
 
-include(ConfigureBoost)
+if( NOT USE_MYSQL_SOURCES )
+  find_package(MySQL REQUIRED)
+endif()
 
 if( UNIX )
   find_package(Readline)
@@ -68,9 +66,9 @@ if( UNIX )
   find_package(BZip2)
 endif()
 
-if(NOT WITHOUT_GIT)
-  find_package(Git)
-endif()
+#if(NOT WITHOUT_GIT)
+#  find_package(Git)
+#endif()
 
 # Find revision ID and hash of the sourcetree
 include(cmake/genrev.cmake)

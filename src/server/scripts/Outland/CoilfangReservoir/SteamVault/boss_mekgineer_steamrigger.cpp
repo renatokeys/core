@@ -1,53 +1,33 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss_Mekgineer_Steamrigger
-SD%Complete: 60
-SDComment: Mechanics' interrrupt heal doesn't work very well, also a proper movement needs to be implemented -> summon further away and move towards target to repair.
-SDCategory: Coilfang Resevoir, The Steamvault
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "steam_vault.h"
 
-enum Yells
+enum MekgineerSteamrigger
 {
-    SAY_MECHANICS               = 0,
-    SAY_AGGRO                   = 1,
-    SAY_SLAY                    = 2,
-    SAY_DEATH                   = 3
-};
+    SAY_MECHANICS				= 0,
+    SAY_AGGRO					= 1,
+    SAY_SLAY					= 2,
+    SAY_DEATH					= 3,
 
-enum Spells
-{
-    SPELL_SUPER_SHRINK_RAY      = 31485,
-    SPELL_SAW_BLADE             = 31486,
-    SPELL_ELECTRIFIED_NET       = 35107,
+    SPELL_SUPER_SHRINK_RAY		= 31485,
+    SPELL_SAW_BLADE				= 31486,
+    SPELL_ELECTRIFIED_NET		= 35107,
+	SPELL_REPAIR_N				= 31532,
+	SPELL_REPAIR_H				= 37936,
 
-    SPELL_DISPEL_MAGIC          = 17201,
-    SPELL_REPAIR                = 31532,
-    H_SPELL_REPAIR              = 37936
-};
+    NPC_STREAMRIGGER_MECHANIC	= 17951,
 
-enum Creatures
-{
-    NPC_STREAMRIGGER_MECHANIC   = 17951
+	EVENT_CHECK_HP25			= 1,
+	EVENT_CHECK_HP50			= 2,
+	EVENT_CHECK_HP75			= 3,
+	EVENT_SPELL_SHRINK			= 4,
+	EVENT_SPELL_SAW				= 5,
+	EVENT_SPELL_NET				= 6
+	
 };
 
 class boss_mekgineer_steamrigger : public CreatureScript
@@ -55,211 +35,156 @@ class boss_mekgineer_steamrigger : public CreatureScript
 public:
     boss_mekgineer_steamrigger() : CreatureScript("boss_mekgineer_steamrigger") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return GetInstanceAI<boss_mekgineer_steamriggerAI>(creature);
+        return new boss_mekgineer_steamriggerAI (creature);
     }
 
     struct boss_mekgineer_steamriggerAI : public ScriptedAI
     {
         boss_mekgineer_steamriggerAI(Creature* creature) : ScriptedAI(creature)
         {
-            Initialize();
             instance = creature->GetInstanceScript();
         }
 
-        void Initialize()
-        {
-            Shrink_Timer = 20000;
-            Saw_Blade_Timer = 15000;
-            Electrified_Net_Timer = 10000;
-
-            Summon75 = false;
-            Summon50 = false;
-            Summon25 = false;
-        }
-
         InstanceScript* instance;
+		EventMap events;
 
-        uint32 Shrink_Timer;
-        uint32 Saw_Blade_Timer;
-        uint32 Electrified_Net_Timer;
-        bool Summon75;
-        bool Summon50;
-        bool Summon25;
-
-        void Reset() override
+        void Reset()
         {
-            Initialize();
-
-            instance->SetBossState(DATA_MEKGINEER_STEAMRIGGER, NOT_STARTED);
+            events.Reset();
+            if (instance)
+                instance->SetData(TYPE_MEKGINEER_STEAMRIGGER, NOT_STARTED);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             Talk(SAY_DEATH);
-
-            instance->SetBossState(DATA_MEKGINEER_STEAMRIGGER, DONE);
+            if (instance)
+                instance->SetData(TYPE_MEKGINEER_STEAMRIGGER, DONE);
         }
 
-        void KilledUnit(Unit* /*victim*/) override
+        void KilledUnit(Unit* victim)
         {
-            Talk(SAY_SLAY);
+			if (victim->GetTypeId() == TYPEID_PLAYER)
+				Talk(SAY_SLAY);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             Talk(SAY_AGGRO);
+			events.ScheduleEvent(EVENT_SPELL_SHRINK, 20000);
+			events.ScheduleEvent(EVENT_SPELL_SAW, 15000);
+			events.ScheduleEvent(EVENT_SPELL_NET, 10000);
+			events.ScheduleEvent(EVENT_CHECK_HP75, 5000);
+			events.ScheduleEvent(EVENT_CHECK_HP50, 5000);
+			events.ScheduleEvent(EVENT_CHECK_HP25, 5000);
 
-            instance->SetBossState(DATA_MEKGINEER_STEAMRIGGER, IN_PROGRESS);
+            if (instance)
+                instance->SetData(TYPE_MEKGINEER_STEAMRIGGER, IN_PROGRESS);
         }
 
-        //no known summon spells exist
-        void SummonMechanichs()
+        void SummonMechanics()
         {
             Talk(SAY_MECHANICS);
 
-            DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, 5, 5, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
-            DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, -5, 5, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
-            DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, -5, -5, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
-
-            if (rand32() % 2)
-                DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, 5, -7, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
-            if (rand32() % 2)
-                DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, 7, -5, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
+			me->SummonCreature(NPC_STREAMRIGGER_MECHANIC, me->GetPositionX()+15.0f, me->GetPositionY()+15.0f, me->GetPositionZ(), 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
+			me->SummonCreature(NPC_STREAMRIGGER_MECHANIC, me->GetPositionX()-15.0f, me->GetPositionY()+15.0f, me->GetPositionZ(), 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
+			me->SummonCreature(NPC_STREAMRIGGER_MECHANIC, me->GetPositionX()-15.0f, me->GetPositionY()-15.0f, me->GetPositionZ(), 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
+			if (urand(0,1))
+				me->SummonCreature(NPC_STREAMRIGGER_MECHANIC, me->GetPositionX()+15.0f, me->GetPositionY()-15.0f, me->GetPositionZ(), 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
         }
 
-        void UpdateAI(uint32 diff) override
+		void JustSummoned(Creature* cr)
+		{
+			cr->GetMotionMaster()->MoveFollow(me, 0.0f, 0.0f);
+		}
+
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
 
-            if (Shrink_Timer <= diff)
-            {
-                DoCastVictim(SPELL_SUPER_SHRINK_RAY);
-                Shrink_Timer = 20000;
-            } else Shrink_Timer -= diff;
-
-            if (Saw_Blade_Timer <= diff)
-            {
-                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1))
-                    DoCast(target, SPELL_SAW_BLADE);
-                else
-                    DoCastVictim(SPELL_SAW_BLADE);
-
-                Saw_Blade_Timer = 15000;
-            } else Saw_Blade_Timer -= diff;
-
-            if (Electrified_Net_Timer <= diff)
-            {
-                DoCastVictim(SPELL_ELECTRIFIED_NET);
-                Electrified_Net_Timer = 10000;
-            }
-            else Electrified_Net_Timer -= diff;
-
-            if (!Summon75)
-            {
-                if (HealthBelowPct(75))
-                {
-                    SummonMechanichs();
-                    Summon75 = true;
-                }
-            }
-
-            if (!Summon50)
-            {
-                if (HealthBelowPct(50))
-                {
-                    SummonMechanichs();
-                    Summon50 = true;
-                }
-            }
-
-            if (!Summon25)
-            {
-                if (HealthBelowPct(25))
-                {
-                    SummonMechanichs();
-                    Summon25 = true;
-                }
-            }
+			events.Update(diff);
+			switch (uint32 eventId = events.GetEvent())
+			{
+				case EVENT_SPELL_SHRINK:
+					me->CastSpell(me->GetVictim(), SPELL_SUPER_SHRINK_RAY, false);
+					events.RepeatEvent(20000);
+					break;
+				case EVENT_SPELL_SAW:
+					if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1))
+						me->CastSpell(target, SPELL_SAW_BLADE, false);
+					else
+						me->CastSpell(me->GetVictim(), SPELL_SAW_BLADE, false);
+					events.RepeatEvent(15000);
+					break;
+				case EVENT_SPELL_NET:
+					if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+						me->CastSpell(target, SPELL_ELECTRIFIED_NET, false);
+					events.RepeatEvent(10000);
+					break;
+				case EVENT_CHECK_HP25:
+				case EVENT_CHECK_HP50:
+				case EVENT_CHECK_HP75:
+					if (me->HealthBelowPct(eventId*25))
+					{
+						SummonMechanics();
+						events.PopEvent();
+						return;
+					}
+					events.RepeatEvent(2000);
+					break;
+			}
 
             DoMeleeAttackIfReady();
         }
     };
-
 };
-
-#define MAX_REPAIR_RANGE            (13.0f)                 //we should be at least at this range for repair
-#define MIN_REPAIR_RANGE            (7.0f)                  //we can stop movement at this range to repair but not required
 
 class npc_steamrigger_mechanic : public CreatureScript
 {
 public:
     npc_steamrigger_mechanic() : CreatureScript("npc_steamrigger_mechanic") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return GetInstanceAI<npc_steamrigger_mechanicAI>(creature);
+        return new npc_steamrigger_mechanicAI (creature);
     }
 
     struct npc_steamrigger_mechanicAI : public ScriptedAI
     {
         npc_steamrigger_mechanicAI(Creature* creature) : ScriptedAI(creature)
         {
-            Initialize();
-            instance = creature->GetInstanceScript();
         }
 
-        void Initialize()
+        uint32 repairTimer;
+		uint64 bossGUID;
+
+        void Reset()
         {
-            Repair_Timer = 2000;
+            repairTimer = 0;
+			bossGUID = 0;
+			if (InstanceScript* instance = me->GetInstanceScript())
+				bossGUID = instance->GetData64(TYPE_MEKGINEER_STEAMRIGGER);
         }
 
-        InstanceScript* instance;
+        void MoveInLineOfSight(Unit* /*who*/) {}
 
-        uint32 Repair_Timer;
-
-        void Reset() override
+        void UpdateAI(uint32 diff)
         {
-            Initialize();
-        }
-
-        void MoveInLineOfSight(Unit* /*who*/) override
-        {
-            //react only if attacked
-        }
-
-        void EnterCombat(Unit* /*who*/) override { }
-
-        void UpdateAI(uint32 diff) override
-        {
-            if (Repair_Timer <= diff)
+			repairTimer += diff;
+            if (repairTimer >= 2000)
             {
-                if (instance->GetBossState(DATA_MEKGINEER_STEAMRIGGER) == IN_PROGRESS)
+				repairTimer = 0;
+                if (Unit* boss = ObjectAccessor::GetUnit(*me, bossGUID))
                 {
-                    if (Creature* mekgineer = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_MEKGINEER_STEAMRIGGER)))
-                    {
-                        if (me->IsWithinDistInMap(mekgineer, MAX_REPAIR_RANGE))
-                        {
-                            //are we already channeling? Doesn't work very well, find better check?
-                            if (!me->GetUInt32Value(UNIT_CHANNEL_SPELL))
-                            {
-                                //me->GetMotionMaster()->MovementExpired();
-                                //me->GetMotionMaster()->MoveIdle();
-
-                                DoCast(me, SPELL_REPAIR, true);
-                            }
-                            Repair_Timer = 5000;
-                        }
-                        else
-                        {
-                            //me->GetMotionMaster()->MovementExpired();
-                            //me->GetMotionMaster()->MoveFollow(pMekgineer, 0, 0);
-                        }
-                    }
-                } else Repair_Timer = 5000;
-            } else Repair_Timer -= diff;
+                    if (me->IsWithinDistInMap(boss, 13.0f))
+						if (!me->HasUnitState(UNIT_STATE_CASTING))
+                            me->CastSpell(me, DUNGEON_MODE(SPELL_REPAIR_N, SPELL_REPAIR_H), false);
+                }
+				return;
+            }
 
             if (!UpdateVictim())
                 return;
@@ -267,7 +192,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 void AddSC_boss_mekgineer_steamrigger()

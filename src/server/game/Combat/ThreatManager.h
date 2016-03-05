@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,7 +23,6 @@
 #include "SharedDefines.h"
 #include "LinkedReference/Reference.h"
 #include "UnitEvents.h"
-#include "ObjectGuid.h"
 
 #include <list>
 
@@ -34,7 +33,7 @@ class Creature;
 class ThreatManager;
 class SpellInfo;
 
-#define THREAT_UPDATE_INTERVAL 1 * IN_MILLISECONDS    // Server should send threat update to client periodically each second
+#define THREAT_UPDATE_INTERVAL 2 * IN_MILLISECONDS    // Server should send threat update to client periodically each second
 
 //==============================================================
 // Class to calculate the real threat based
@@ -61,10 +60,6 @@ class HostileReference : public Reference<Unit, ThreatManager>
         float getThreat() const { return iThreat; }
 
         bool isOnline() const { return iOnline; }
-
-        // The Unit might be in water and the creature can not enter the water, but has range attack
-        // in this case online = true, but accessible = false
-        bool isAccessible() const { return iAccessible; }
 
         // used for temporary setting a threat and reducting it later again.
         // the threat modification is stored
@@ -96,15 +91,13 @@ class HostileReference : public Reference<Unit, ThreatManager>
         void updateOnlineStatus();
 
         void setOnlineOfflineState(bool isOnline);
-
-        void setAccessibleState(bool isAccessible);
         //=================================================
 
         bool operator == (const HostileReference& hostileRef) const { return hostileRef.getUnitGuid() == getUnitGuid(); }
 
         //=================================================
 
-        ObjectGuid getUnitGuid() const { return iUnitGuid; }
+        uint64 getUnitGuid() const { return iUnitGuid; }
 
         //=================================================
         // reference is not needed anymore. realy delete it !
@@ -118,13 +111,13 @@ class HostileReference : public Reference<Unit, ThreatManager>
         //=================================================
 
         // Tell our refTo (target) object that we have a link
-        void targetObjectBuildLink() override;
+        void targetObjectBuildLink();
 
         // Tell our refTo (taget) object, that the link is cut
-        void targetObjectDestroyLink() override;
+        void targetObjectDestroyLink();
 
         // Tell our refFrom (source) object, that the link is cut (Target destroyed)
-        void sourceObjectDestroyLink() override;
+        void sourceObjectDestroyLink();
     private:
         // Inform the source, that the status of that reference was changed
         void fireStatusChanged(ThreatRefStatusChangeEvent& threatRefStatusChangeEvent);
@@ -133,9 +126,8 @@ class HostileReference : public Reference<Unit, ThreatManager>
     private:
         float iThreat;
         float iTempThreatModifier;                          // used for taunt
-        ObjectGuid iUnitGuid;
+        uint64 iUnitGuid;
         bool iOnline;
-        bool iAccessible;
 };
 
 //==============================================================
@@ -217,7 +209,10 @@ class ThreatManager
 
         float getThreat(Unit* victim, bool alsoSearchOfflineList = false);
 
+        float getThreatWithoutTemp(Unit* victim, bool alsoSearchOfflineList = false);
+
         bool isThreatListEmpty() const { return iThreatContainer.empty(); }
+        bool areThreatListsEmpty() const { return iThreatContainer.empty() && iThreatOfflineContainer.empty(); }
 
         void processThreatEvent(ThreatRefStatusChangeEvent* threatRefStatusChangeEvent);
 
@@ -282,7 +277,7 @@ namespace Trinity
     class ThreatOrderPred
     {
         public:
-            ThreatOrderPred(bool ascending = false) : m_ascending(ascending) { }
+            ThreatOrderPred(bool ascending = false) : m_ascending(ascending) {}
             bool operator() (HostileReference const* a, HostileReference const* b) const
             {
                 return m_ascending ? a->getThreat() < b->getThreat() : a->getThreat() > b->getThreat();

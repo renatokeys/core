@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,23 +18,25 @@
 #ifndef TRANSPORTMGR_H
 #define TRANSPORTMGR_H
 
+#include <ace/Singleton.h>
 #include <G3D/Quat.h>
 #include "Spline.h"
 #include "DBCStores.h"
-#include "ObjectGuid.h"
 
 struct KeyFrame;
 struct GameObjectTemplate;
 struct TransportTemplate;
 class Transport;
+class StaticTransport;
+class MotionTransport;
 class Map;
 
 typedef Movement::Spline<double>                 TransportSpline;
 typedef std::vector<KeyFrame>                    KeyFrameVec;
-typedef std::unordered_map<uint32, TransportTemplate> TransportTemplates;
-typedef std::set<Transport*>                     TransportSet;
-typedef std::unordered_map<uint32, TransportSet>      TransportMap;
-typedef std::unordered_map<uint32, std::set<uint32> > TransportInstanceMap;
+typedef UNORDERED_MAP<uint32, TransportTemplate> TransportTemplates;
+typedef std::set<MotionTransport*>               TransportSet;
+typedef UNORDERED_MAP<uint32, TransportSet>      TransportMap;
+typedef UNORDERED_MAP<uint32, std::set<uint32> > TransportInstanceMap;
 
 struct KeyFrame
 {
@@ -62,7 +64,7 @@ struct KeyFrame
     uint32 NextArriveTime;
 
     bool IsTeleportFrame() const { return Teleport; }
-    bool IsStopFrame() const { return Node->Flags == 2; }
+    bool IsStopFrame() const { return Node->actionFlag == 2; }
 };
 
 struct TransportTemplate
@@ -90,29 +92,24 @@ struct TransportAnimation
     TransportPathRotationContainer Rotations;
     uint32 TotalTime;
 
-    TransportAnimationEntry const* GetAnimNode(uint32 time) const;
-    G3D::Quat GetAnimRotation(uint32 time) const;
+    bool GetAnimNode(uint32 time, TransportAnimationEntry const* &curr, TransportAnimationEntry const* &next, float &percPos) const;
+    void GetAnimRotation(uint32 time, G3D::Quat &curr, G3D::Quat &next, float &percRot) const;
 };
 
 typedef std::map<uint32, TransportAnimation> TransportAnimationContainer;
 
 class TransportMgr
 {
+        friend class ACE_Singleton<TransportMgr, ACE_Thread_Mutex>;
         friend void LoadDBCStores(std::string const&);
 
     public:
-        static TransportMgr* instance()
-        {
-            static TransportMgr instance;
-            return &instance;
-        }
-
         void Unload();
 
         void LoadTransportTemplates();
 
         // Creates a transport using given GameObject template entry
-        Transport* CreateTransport(uint32 entry, ObjectGuid::LowType guid = 0, Map* map = NULL);
+        MotionTransport* CreateTransport(uint32 entry, uint32 guid = 0, Map* map = NULL);
 
         // Spawns all continent transports, used at core startup
         void SpawnContinentTransports();
@@ -162,6 +159,6 @@ class TransportMgr
         TransportAnimationContainer _transportAnimations;
 };
 
-#define sTransportMgr TransportMgr::instance()
+#define sTransportMgr ACE_Singleton<TransportMgr, ACE_Thread_Mutex>::instance()
 
 #endif // TRANSPORTMGR_H

@@ -1,430 +1,197 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: boss_the_lurker_below
-SD%Complete: 80
-SDComment: Coilfang Frenzy, find out how could we fishing in the strangepool
-SDCategory: The Lurker Below
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "serpent_shrine.h"
-#include "Spell.h"
-#include "Player.h"
 
 enum Spells
 {
-    SPELL_SPOUT             = 37433,
-    SPELL_SPOUT_ANIM        = 42835,
-    SPELL_SPOUT_BREATH      = 37431,
-    SPELL_KNOCKBACK         = 19813,
-    SPELL_GEYSER            = 37478,
-    SPELL_WHIRL             = 37660,
-    SPELL_WATERBOLT         = 37138,
-    SPELL_SUBMERGE          = 37550,
-    SPELL_EMERGE            = 20568,
-
-
-    // Ambusher spells
-    SPELL_SPREAD_SHOT       = 37790,
-    SPELL_SHOOT             = 37770,
-    // Guardian spells
-    SPELL_ARCINGSMASH       = 38761, // Wrong SpellId. Can't find the right one.
-    SPELL_HAMSTRING         = 26211
+	SPELL_WATER_BOLT		= 37138,
+	SPELL_WHIRL				= 37660,
+	SPELL_GEYSER			= 37478,
+	SPELL_SPOUT_VISUAL		= 37431,
+	SPELL_SPOUT_PERIODIC	= 37430,
+	SPELL_LURKER_SPAWN_TRIGGER = 54587 // Needed for achievement
 };
 
-enum Creatures
+enum Misc
 {
-    NPC_COILFANG_GUARDIAN   = 21873,
-    NPC_COILFANG_AMBUSHER   = 21865
+	EMOTE_TAKE_BREATH			= 0,
+	ACTION_START_EVENT			= 1,
+	MAX_SUMMONS					= 9,
+
+	NPC_COILFANG_GUARDIAN		= 21873,
+	NPC_COILFANG_AMBUSHER		= 21865,
+
+	EVENT_PHASE_1				= 1,
+	EVENT_PHASE_2				= 2,
+	EVENT_SPELL_WHIRL			= 3,
+	EVENT_SPELL_SPOUT			= 4,
+	EVENT_SPELL_GEYSER			= 5,
+	EVENT_SPELL_SPOUT_PERIODIC	= 6
 };
 
-#define EMOTE_SPOUT "The Lurker Below takes a deep breath."
-
-#define SPOUT_DIST  100
-
-float AddPos[9][3] =
+const Position positions[MAX_SUMMONS] =
 {
-    // MOVE_AMBUSHER_1 X, Y, Z
-    {2.8553810f, -459.823914f, -19.182686f},
-    {12.400000f, -466.042267f, -19.182686f},
-    {51.366653f, -460.836060f, -19.182686f},
-    {62.597980f, -457.433044f, -19.182686f},
-    {77.607452f, -384.302765f, -19.182686f},
-    {63.897900f, -378.984924f, -19.182686f},
-    {34.447250f, -387.333618f, -19.182686f},
-    {14.388216f, -423.468018f, -19.625271f},
-    {42.471519f, -445.115295f, -19.769423f}
+    {2.8553810f, -459.823914f, -19.182686f, 0.0f},
+    {12.400000f, -466.042267f, -19.182686f, 0.0f},
+    {51.366653f, -460.836060f, -19.182686f, 0.0f},
+    {62.597980f, -457.433044f, -19.182686f, 0.0f},
+    {77.607452f, -384.302765f, -19.182686f, 0.0f},
+    {63.897900f, -378.984924f, -19.182686f, 0.0f},
+    {34.447250f, -387.333618f, -19.182686f, 0.0f},
+    {14.388216f, -423.468018f, -19.625271f, 0.0f},
+    {42.471519f, -445.115295f, -19.769423f, 0.0f}
 };
 
 class boss_the_lurker_below : public CreatureScript
 {
-public:
-    boss_the_lurker_below() : CreatureScript("boss_the_lurker_below") { }
+	public:
+		boss_the_lurker_below() : CreatureScript("boss_the_lurker_below") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return GetInstanceAI<boss_the_lurker_belowAI>(creature);
-    }
+		CreatureAI* GetAI(Creature* creature) const
+		{
+			return GetInstanceAI<boss_the_lurker_belowAI>(creature);
+		}
 
-    struct boss_the_lurker_belowAI : public ScriptedAI
-    {
-        boss_the_lurker_belowAI(Creature* creature) : ScriptedAI(creature), Summons(me)
-        {
-            Initialize();
-            SetCombatMovement(false);
-            instance = creature->GetInstanceScript();
-        }
+		struct boss_the_lurker_belowAI : public BossAI
+		{
+			boss_the_lurker_belowAI(Creature* creature) : BossAI(creature, DATA_THE_LURKER_BELOW)
+			{
+			}
 
-        void Initialize()
-        {
-            SpoutAnimTimer = 1000;
-            RotTimer = 0;
-            WaterboltTimer = 15000; // give time to get in range when fight starts
-            SpoutTimer = 45000;
-            WhirlTimer = 18000; // after avery spout
-            PhaseTimer = 120000;
-            GeyserTimer = rand32() % 5000 + 15000;
-            CheckTimer = 15000; // give time to get in range when fight starts
-            WaitTimer = 60000; // never reached
-            WaitTimer2 = 60000; // never reached
+			void Reset()
+			{
+				BossAI::Reset();
+				me->SetStandState(UNIT_STAND_STATE_SUBMERGED);
+				me->SetVisible(false);
+				me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+			}
 
-            Submerged = true; // will be false at combat start
-            Spawned = false;
-            InRange = false;
-            CanStartEvent = false;
-        }
+			void JustSummoned(Creature* summon)
+			{
+				summon->SetInCombatWithZone();
+				summons.Summon(summon);
+			}
 
-        InstanceScript* instance;
-        SummonList Summons;
+			void DoAction(int32 param)
+			{
+				if (param == ACTION_START_EVENT)
+					me->SetInCombatWithZone();
+			}
 
-        bool Spawned;
-        bool Submerged;
-        bool InRange;
-        bool CanStartEvent;
-        uint32 RotTimer;
-        uint32 SpoutAnimTimer;
-        uint32 WaterboltTimer;
-        uint32 SpoutTimer;
-        uint32 WhirlTimer;
-        uint32 PhaseTimer;
-        uint32 GeyserTimer;
-        uint32 CheckTimer;
-        uint32 WaitTimer;
-        uint32 WaitTimer2;
+			void JustDied(Unit* killer)
+			{
+				BossAI::JustDied(killer);
+			}
 
-        bool CheckCanStart()//check if players fished
-        {
-            if (instance->GetData(DATA_STRANGE_POOL) == NOT_STARTED)
-                return false;
-            return true;
-        }
+			void AttackStart(Unit* who)
+			{
+				if (who && me->GetReactState() == REACT_AGGRESSIVE)
+					me->Attack(who, true);
+			}
 
-        void Reset() override
-        {
-            me->SetSwim(true);
-            me->SetDisableGravity(true);
-            Initialize();
+			void EnterCombat(Unit* who)
+			{
+				BossAI::EnterCombat(who);
+				me->setAttackTimer(BASE_ATTACK, 6000);
+				me->SetVisible(true);
+				me->UpdateObjectVisibility(true);
+				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+				me->SetStandState(UNIT_STAND_STATE_STAND);
 
-            Summons.DespawnAll();
+				events.ScheduleEvent(EVENT_SPELL_WHIRL, 18000);
+				events.ScheduleEvent(EVENT_SPELL_SPOUT, 45000);
+				events.ScheduleEvent(EVENT_SPELL_GEYSER, 10000);
+				events.ScheduleEvent(EVENT_PHASE_2, 125000);
+			}
 
-            instance->SetData(DATA_THELURKERBELOWEVENT, NOT_STARTED);
-            instance->SetData(DATA_STRANGE_POOL, NOT_STARTED);
-            DoCast(me, SPELL_SUBMERGE); // submerge anim
-            me->SetVisible(false); // we start invis under water, submerged
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
-        }
+			void MoveInLineOfSight(Unit* who)
+			{
+			}
 
-        void JustDied(Unit* /*killer*/) override
-        {
-            instance->SetData(DATA_THELURKERBELOWEVENT, DONE);
-            instance->SetData(DATA_STRANGE_POOL, IN_PROGRESS);
+			void UpdateAI(uint32 diff)
+			{
+				if (!UpdateVictim())
+					return;
 
-            Summons.DespawnAll();
-        }
+				events.Update(diff);
+				if (me->HasUnitState(UNIT_STATE_CASTING))
+					return;
 
-        void EnterCombat(Unit* /*who*/) override
-        {
-            instance->SetData(DATA_THELURKERBELOWEVENT, IN_PROGRESS);
-        }
+				switch (events.ExecuteEvent())
+				{
+					case EVENT_SPELL_WHIRL:
+						me->CastSpell(me, SPELL_WHIRL, false);
+						events.ScheduleEvent(EVENT_SPELL_WHIRL, 18000);
+						break;
+					case EVENT_SPELL_GEYSER:
+						if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+							me->CastSpell(target, SPELL_GEYSER, false);
+						events.ScheduleEvent(EVENT_SPELL_GEYSER, 10000);
+						break;
+					case EVENT_SPELL_SPOUT:
+						Talk(EMOTE_TAKE_BREATH);
+						me->CastSpell(me, SPELL_SPOUT_VISUAL, TRIGGERED_IGNORE_SET_FACING);
+						me->SetReactState(REACT_PASSIVE);
+						me->SetFacingToObject(me->GetVictim());
+						me->SetTarget(0);
+						events.ScheduleEvent(EVENT_SPELL_SPOUT, 60000);
+						events.RescheduleEvent(EVENT_SPELL_WHIRL, 18000);
+						events.RescheduleEvent(EVENT_SPELL_GEYSER, 25000);
+						events.ScheduleEvent(EVENT_SPELL_SPOUT_PERIODIC, 3000);
+						break;
+					case EVENT_SPELL_SPOUT_PERIODIC:
+						me->InterruptNonMeleeSpells(false);
+						me->CastSpell(me, SPELL_SPOUT_PERIODIC, true);
+						break;
+					case EVENT_PHASE_2:
+						events.Reset();
+						events.ScheduleEvent(EVENT_PHASE_1, 60000);
+						me->SetStandState(UNIT_STAND_STATE_SUBMERGED);
+						me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+						for (uint8 i = 0; i < MAX_SUMMONS; ++i)
+							me->SummonCreature(i < 6 ? NPC_COILFANG_AMBUSHER : NPC_COILFANG_GUARDIAN, positions[i].GetPositionX(), positions[i].GetPositionY(), positions[i].GetPositionZ(), positions[i].GetAngle(me), TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
+						break;
+					case EVENT_PHASE_1:
+						me->setAttackTimer(BASE_ATTACK, 6000);
+						me->SetStandState(UNIT_STAND_STATE_STAND);
+						me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
 
-        void MoveInLineOfSight(Unit* who) override
+						events.Reset();
+						events.ScheduleEvent(EVENT_SPELL_SPOUT, 10000);
+						events.ScheduleEvent(EVENT_PHASE_2, 120000);
+						break;
+				}
 
-        {
-            if (!CanStartEvent) // boss is invisible, don't attack
-                return;
-            if (!me->GetVictim() && who->IsValidAttackTarget(me))
-            {
-                float attackRadius = me->GetAttackDistance(who);
-                if (me->IsWithinDistInMap(who, attackRadius))
-                    AttackStart(who);
-            }
-        }
+				if (me->getStandState() != UNIT_STAND_STATE_STAND || !me->isAttackReady() || me->GetReactState() != REACT_AGGRESSIVE)
+					return;
 
-        void MovementInform(uint32 type, uint32 /*id*/) override
-        {
-            if (type == ROTATE_MOTION_TYPE)
-                me->SetReactState(REACT_AGGRESSIVE);
-        }
+				Unit* target = NULL;
+				if (me->IsWithinMeleeRange(me->GetVictim()))
+					target = me->GetVictim();
+				else
+				{
+					ThreatContainer::StorageType const &t_list = me->getThreatManager().getThreatList();
+					for (ThreatContainer::StorageType::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
+						if (Unit* threatTarget = ObjectAccessor::GetUnit(*me, (*itr)->getUnitGuid()))
+							if (me->IsWithinMeleeRange(threatTarget))
+							{
+								target = threatTarget;
+								break;
+							}
+				}
 
-        void UpdateAI(uint32 diff) override
-        {
-            if (!CanStartEvent) // boss is invisible, don't attack
-            {
-                if (CheckCanStart())
-                {
-                    if (Submerged)
-                    {
-                        me->SetVisible(true);
-                        Submerged = false;
-                        WaitTimer2 = 500;
-                    }
+				if (target)			
+					me->AttackerStateUpdate(target);
+				else if (target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+					me->CastSpell(target, SPELL_WATER_BOLT, false);
 
-                    if (!Submerged && WaitTimer2 <= diff) // wait 500ms before emerge anim
-                    {
-                        me->RemoveAllAuras();
-                        me->SetUInt32Value(UNIT_NPC_EMOTESTATE, 0);
-                        DoCast(me, SPELL_EMERGE, false);
-                        WaitTimer2 = 60000; // never reached
-                        WaitTimer = 3000;
-                    }
-                    else
-                        WaitTimer2 -= diff;
-
-                    if (WaitTimer <= diff) // wait 3secs for emerge anim, then attack
-                    {
-                        WaitTimer = 3000;
-                        CanStartEvent = true; // fresh fished from pool
-                        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
-                        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                    }
-                    else
-                        WaitTimer -= diff;
-                }
-                return;
-            }
-
-            if (me->getThreatManager().getThreatList().empty()) // check if should evade
-            {
-                if (me->IsInCombat())
-                    EnterEvadeMode();
-                return;
-            }
-            if (!Submerged)
-            {
-                if (PhaseTimer <= diff)
-                {
-                    me->InterruptNonMeleeSpells(false);
-                    DoCast(me, SPELL_SUBMERGE);
-                    PhaseTimer = 60000; // 60secs submerged
-                    Submerged = true;
-                } else PhaseTimer-=diff;
-
-                if (SpoutTimer <= diff)
-                {
-                    me->TextEmote(EMOTE_SPOUT, nullptr, true);
-                    me->SetReactState(REACT_PASSIVE);
-                    me->GetMotionMaster()->MoveRotate(20000, urand(0, 1) ? ROTATE_DIRECTION_LEFT : ROTATE_DIRECTION_RIGHT);
-                    SpoutTimer = 45000;
-                    WhirlTimer = 20000; // whirl directly after spout
-                    RotTimer = 20000;
-                    return;
-                } else SpoutTimer -= diff;
-
-                // Whirl directly after a Spout and at random times
-                if (WhirlTimer <= diff)
-                {
-                    WhirlTimer = 18000;
-                    DoCast(me, SPELL_WHIRL);
-                } else WhirlTimer -= diff;
-
-                if (CheckTimer <= diff)//check if there are players in melee range
-                {
-                    InRange = false;
-                    Map::PlayerList const &PlayerList = me->GetMap()->GetPlayers();
-                    if (!PlayerList.isEmpty())
-                    {
-                        for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
-                        {
-                            if (me->IsWithinMeleeRange(i->GetSource()))
-                                InRange = true;
-                        }
-                    }
-                    CheckTimer = 2000;
-                } else CheckTimer -= diff;
-
-                if (RotTimer)
-                {
-                    Map::PlayerList const &PlayerList = me->GetMap()->GetPlayers();
-                    for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
-                    {
-                        if (i->GetSource() && i->GetSource()->IsAlive() && me->HasInArc(diff/20000.f*float(M_PI)*2.f, i->GetSource()) && me->IsWithinDist(i->GetSource(), SPOUT_DIST) && !i->GetSource()->IsInWater())
-                            DoCast(i->GetSource(), SPELL_SPOUT, true); // only knock back players in arc, in 100yards, not in water
-                    }
-
-                    if (SpoutAnimTimer <= diff)
-                    {
-                        DoCast(me, SPELL_SPOUT_ANIM, true);
-                        SpoutAnimTimer = 1000;
-                    } else SpoutAnimTimer -= diff;
-
-                    if (RotTimer <= diff)
-                    {
-                        RotTimer = 0;
-                    } else RotTimer -= diff;
-                    return;
-                }
-
-                if (GeyserTimer <= diff)
-                {
-                    Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1);
-                    if (!target && me->GetVictim())
-                        target = me->GetVictim();
-                    if (target)
-                        DoCast(target, SPELL_GEYSER, true);
-                    GeyserTimer = rand32() % 5000 + 15000;
-                } else GeyserTimer -= diff;
-
-                if (!InRange) // if on players in melee range cast Waterbolt
-                {
-                    if (WaterboltTimer <= diff)
-                    {
-                        Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
-                        if (!target && me->GetVictim())
-                            target = me->GetVictim();
-                        if (target)
-                            DoCast(target, SPELL_WATERBOLT, true);
-                        WaterboltTimer = 3000;
-                    } else WaterboltTimer -= diff;
-                }
-
-                if (!UpdateVictim())
-                    return;
-
-                DoMeleeAttackIfReady();
-
-            }
-            else // submerged
-            {
-                if (PhaseTimer <= diff)
-                {
-                    Submerged = false;
-                    me->InterruptNonMeleeSpells(false); // shouldn't be any
-                    me->RemoveAllAuras();
-                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
-                    me->RemoveFlag(UNIT_NPC_EMOTESTATE, EMOTE_STATE_SUBMERGED);
-                    DoCast(me, SPELL_EMERGE, true);
-                    Spawned = false;
-                    SpoutTimer = 3000; // directly cast Spout after emerging!
-                    PhaseTimer = 120000;
-                    return;
-                } else PhaseTimer-=diff;
-
-                if (me->getThreatManager().getThreatList().empty()) // check if should evade
-                {
-                    EnterEvadeMode();
-                    return;
-                }
-
-                if (!me->IsInCombat())
-                    DoZoneInCombat();
-
-                if (!Spawned)
-                {
-                    me->SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
-                    // spawn adds
-                    for (uint8 i = 0; i < 9; ++i)
-                        if (Creature* summoned = me->SummonCreature(i < 6 ? NPC_COILFANG_AMBUSHER : NPC_COILFANG_GUARDIAN, AddPos[i][0], AddPos[i][1], AddPos[i][2], 0, TEMPSUMMON_CORPSE_DESPAWN, 0))
-                            Summons.Summon(summoned);
-                    Spawned = true;
-                }
-            }
-        }
-     };
-};
-
-class npc_coilfang_ambusher : public CreatureScript
-{
-public:
-    npc_coilfang_ambusher() : CreatureScript("npc_coilfang_ambusher") { }
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new npc_coilfang_ambusherAI(creature);
-    }
-
-    struct npc_coilfang_ambusherAI : public ScriptedAI
-    {
-        npc_coilfang_ambusherAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-            SetCombatMovement(false);
-        }
-
-        void Initialize()
-        {
-            MultiShotTimer = 10000;
-            ShootBowTimer = 4000;
-        }
-
-        uint32 MultiShotTimer;
-        uint32 ShootBowTimer;
-
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void MoveInLineOfSight(Unit* who) override
-
-        {
-            if (!who || me->GetVictim())
-                return;
-
-            if (who->isInAccessiblePlaceFor(me) && me->IsValidAttackTarget(who) && me->IsWithinDistInMap(who, 45))
-                AttackStart(who);
-        }
-
-        void UpdateAI(uint32 diff) override
-        {
-            if (MultiShotTimer <= diff)
-            {
-                if (me->GetVictim())
-                    DoCastVictim(SPELL_SPREAD_SHOT, true);
-
-                MultiShotTimer = 10000 + rand32() % 10000;
-                ShootBowTimer += 1500; // add global cooldown
-            } else MultiShotTimer -= diff;
-
-            if (ShootBowTimer <= diff)
-            {
-                int bp0 = 1100;
-                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                    me->CastCustomSpell(target, SPELL_SHOOT, &bp0, NULL, NULL, true);
-                ShootBowTimer = 4000 + rand32() % 5000;
-                MultiShotTimer += 1500; // add global cooldown
-            } else ShootBowTimer -= diff;
-        }
-    };
-
+				me->resetAttackTimer();
+			}
+		 };
 };
 
 class go_strange_pool : public GameObjectScript
@@ -432,17 +199,14 @@ class go_strange_pool : public GameObjectScript
     public:
         go_strange_pool() : GameObjectScript("go_strange_pool") { }
 
-        bool OnGossipHello(Player* player, GameObject* go) override
+        bool OnGossipHello(Player* player, GameObject* go)
         {
-            // 25%
-            if (InstanceScript* instanceScript = go->GetInstanceScript())
-                if (!urand(0, 3))
+            if (InstanceScript* instance = go->GetInstanceScript())
+				if (roll_chance_i(instance->GetBossState(DATA_THE_LURKER_BELOW) != DONE ? 25 : 0) && !instance->IsEncounterInProgress())
                 {
-                    if (instanceScript->GetData(DATA_STRANGE_POOL) == NOT_STARTED)
-                    {
-                        go->CastSpell(player, 54587);
-                        instanceScript->SetData(DATA_STRANGE_POOL, IN_PROGRESS);
-                    }
+					player->CastSpell(player, SPELL_LURKER_SPAWN_TRIGGER, true);
+					if (Creature* lurker = ObjectAccessor::GetCreature(*go, instance->GetData64(NPC_THE_LURKER_BELOW)))
+						lurker->AI()->DoAction(ACTION_START_EVENT);
                     return true;
                 }
 
@@ -450,9 +214,97 @@ class go_strange_pool : public GameObjectScript
         }
 };
 
+class spell_lurker_below_spout : public SpellScriptLoader
+{
+    public:
+        spell_lurker_below_spout() : SpellScriptLoader("spell_lurker_below_spout") { }
+
+        class spell_lurker_below_spout_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_lurker_below_spout_AuraScript);
+
+			void HandleEffectApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+            {
+                SetDuration(13000);
+            }
+
+			void HandleEffectRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+            {
+				if (Creature* creature = GetUnitOwner()->ToCreature())
+				{
+					creature->resetAttackTimer();
+					creature->SetReactState(REACT_AGGRESSIVE);
+					if (Unit* target = creature->GetVictim())
+						creature->SetTarget(target->GetGUID());
+				}
+            }
+
+            void OnPeriodic(AuraEffect const* aurEff)
+            {
+				PreventDefaultAction();
+				GetUnitOwner()->SetFacingTo(Position::NormalizeOrientation(GetUnitOwner()->GetOrientation()+0.1f));
+				GetUnitOwner()->CastSpell(GetUnitOwner(), aurEff->GetAmount(), true);
+
+			}
+
+            void Register()
+            {
+				OnEffectApply += AuraEffectApplyFn(spell_lurker_below_spout_AuraScript::HandleEffectApply, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
+				OnEffectRemove += AuraEffectRemoveFn(spell_lurker_below_spout_AuraScript::HandleEffectRemove, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
+                OnEffectPeriodic += AuraEffectPeriodicFn(spell_lurker_below_spout_AuraScript::OnPeriodic, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_lurker_below_spout_AuraScript();
+        }
+};
+
+class HasInLineCheck
+{
+	public:
+		HasInLineCheck(Unit* caster) : _caster(caster) { }
+
+		bool operator()(WorldObject* unit)
+		{
+			return !_caster->HasInLine(unit, 5.0f) || (unit->GetTypeId() == TYPEID_UNIT && unit->ToUnit()->IsUnderWater());
+		}
+
+	private:
+		Unit* _caster;
+};
+
+class spell_lurker_below_spout_cone : public SpellScriptLoader
+{
+    public:
+        spell_lurker_below_spout_cone() : SpellScriptLoader("spell_lurker_below_spout_cone") { }
+
+        class spell_lurker_below_spout_cone_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_lurker_below_spout_cone_SpellScript);
+
+            void FilterTargets(std::list<WorldObject*>& targets)
+            {
+				targets.remove_if(HasInLineCheck(GetCaster()));
+            }
+
+            void Register()
+            {
+                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_lurker_below_spout_cone_SpellScript::FilterTargets, EFFECT_ALL, TARGET_UNIT_CONE_ENEMY_24);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_lurker_below_spout_cone_SpellScript();
+        }
+};
+
 void AddSC_boss_the_lurker_below()
 {
     new boss_the_lurker_below();
-    new npc_coilfang_ambusher();
     new go_strange_pool();
+	new spell_lurker_below_spout();
+	new spell_lurker_below_spout_cone();
 }

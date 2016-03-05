@@ -1,18 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
+REWRITTEN BY XINEF
  */
 
 #include "ScriptMgr.h"
@@ -39,7 +26,7 @@ enum Spells
     SPELL_GIFT_OF_THE_DOOMSAYER     = 36173,
     SPELL_WHIRLWIND                 = 36142,
     SPELL_HEAL                      = 36144,
-    SPELL_SHADOW_WAVE               = 39016  // Heroic only
+    SPELL_SHADOW_WAVE               = 39016
 };
 
 enum Events
@@ -47,9 +34,10 @@ enum Events
     EVENT_GIFT_OF_THE_DOOMSAYER     = 1,
     EVENT_WHIRLWIND                 = 2,
     EVENT_HEAL                      = 3,
-    EVENT_SHADOW_WAVE               = 4, // Heroic only
+    EVENT_SHADOW_WAVE               = 4,
     EVENT_ME_FIRST                  = 5,
-    EVENT_SOCCOTHRATES_DEATH        = 6
+    EVENT_SOCCOTHRATES_DEATH        = 6,
+	EVENT_CHECK_HEALTH				= 7,
 };
 
 class boss_dalliah_the_doomsayer : public CreatureScript
@@ -59,137 +47,121 @@ class boss_dalliah_the_doomsayer : public CreatureScript
 
         struct boss_dalliah_the_doomsayerAI : public BossAI
         {
-            boss_dalliah_the_doomsayerAI(Creature* creature) : BossAI(creature, DATA_DALLIAH)
-            {
-                soccothratesTaunt = false;
-                soccothratesDeath = false;
-            }
+            boss_dalliah_the_doomsayerAI(Creature* creature) : BossAI(creature, DATA_DALLIAH) { }
 
-            void Reset() override
+            void Reset()
             {
                 _Reset();
-                soccothratesTaunt = false;
-                soccothratesDeath = false;
+				events2.Reset();
+				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC|UNIT_FLAG_IMMUNE_TO_NPC);
             }
 
-            void JustDied(Unit* /*killer*/) override
+			void InitializeAI()
+			{
+				BossAI::InitializeAI();
+				if (instance->GetBossState(DATA_SOCCOTHRATES) != DONE)
+					me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC|UNIT_FLAG_IMMUNE_TO_NPC);
+			}
+
+            void JustDied(Unit* /*killer*/)
             {
                 _JustDied();
                 Talk(SAY_DEATH);
 
-                if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_SOCCOTHRATES)))
+                if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_SOCCOTHRATES)))
                     if (soccothrates->IsAlive() && !soccothrates->IsInCombat())
                         soccothrates->AI()->SetData(1, 1);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
+                Talk(SAY_AGGRO);
+
                 events.ScheduleEvent(EVENT_GIFT_OF_THE_DOOMSAYER, urand(1000, 4000));
                 events.ScheduleEvent(EVENT_WHIRLWIND, urand(7000, 9000));
+                events.ScheduleEvent(EVENT_ME_FIRST, 6000);
+				events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+
                 if (IsHeroic())
                     events.ScheduleEvent(EVENT_SHADOW_WAVE, urand(11000, 16000));
-                events.ScheduleEvent(EVENT_ME_FIRST, 6000);
-                Talk(SAY_AGGRO);
             }
 
-            void KilledUnit(Unit* /*victim*/) override
+            void KilledUnit(Unit* victim)
             {
-                Talk(SAY_SLAY);
+				if (victim->GetTypeId() == TYPEID_PLAYER)
+					Talk(SAY_SLAY);
             }
 
-            void SetData(uint32 /*type*/, uint32 data) override
+            void SetData(uint32 /*type*/, uint32 data)
             {
-                switch (data)
-                {
-                    case 1:
-                        events.ScheduleEvent(EVENT_SOCCOTHRATES_DEATH, 6000);
-                        soccothratesDeath = true;
-                        break;
-                    default:
-                        break;
-                }
+                if (data == 1)
+                    events2.ScheduleEvent(EVENT_SOCCOTHRATES_DEATH, 6000);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
+				events2.Update(diff);
+				switch (events2.ExecuteEvent())
+				{
+					case EVENT_SOCCOTHRATES_DEATH:
+						Talk(SAY_SOCCOTHRATES_DEATH);
+						break;
+				}
+
                 if (!UpdateVictim())
-                {
-                    if (soccothratesDeath)
-                    {
-                        events.Update(diff);
-
-                        while (uint32 eventId = events.ExecuteEvent())
-                        {
-                            switch (eventId)
-                            {
-                                case EVENT_SOCCOTHRATES_DEATH:
-                                    Talk(SAY_SOCCOTHRATES_DEATH);
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                    }
-
                     return;
-                }
 
                 events.Update(diff);
-
                 if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
-                while (uint32 eventId = events.ExecuteEvent())
+                switch (events.ExecuteEvent())
                 {
-                    switch (eventId)
-                    {
-                        case EVENT_GIFT_OF_THE_DOOMSAYER:
-                            DoCastVictim(SPELL_GIFT_OF_THE_DOOMSAYER, true);
-                            events.ScheduleEvent(EVENT_GIFT_OF_THE_DOOMSAYER, urand(16000, 21000));
-                            break;
-                        case EVENT_WHIRLWIND:
-                            DoCast(me, SPELL_WHIRLWIND);
-                            Talk(SAY_WHIRLWIND);
-                            events.ScheduleEvent(EVENT_WHIRLWIND, urand(19000, 21000));
-                            events.ScheduleEvent(EVENT_HEAL, 6000);
-                            break;
-                        case EVENT_HEAL:
-                            DoCast(me, SPELL_HEAL);
-                            Talk(SAY_HEAL);
-                            break;
-                        case EVENT_SHADOW_WAVE:
-                            DoCastVictim(SPELL_SHADOW_WAVE, true);
-                            events.ScheduleEvent(EVENT_SHADOW_WAVE, urand(11000, 16000));
-                            break;
-                        case EVENT_ME_FIRST:
-                            if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_SOCCOTHRATES)))
-                                if (soccothrates->IsAlive() && !soccothrates->IsInCombat())
-                                    soccothrates->AI()->Talk(SAY_AGGRO_DALLIAH_FIRST);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-
-                if (HealthBelowPct(25) && !soccothratesTaunt)
-                {
-                    if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_SOCCOTHRATES)))
-                        soccothrates->AI()->Talk(SAY_DALLIAH_25_PERCENT);
-                    soccothratesTaunt = true;
-                }
+                    case EVENT_GIFT_OF_THE_DOOMSAYER:
+						me->CastSpell(me->GetVictim(), SPELL_GIFT_OF_THE_DOOMSAYER, false);
+                        events.ScheduleEvent(EVENT_GIFT_OF_THE_DOOMSAYER, urand(16000, 21000));
+                        break;
+                    case EVENT_WHIRLWIND:
+						me->CastSpell(me, SPELL_WHIRLWIND, false);
+                        Talk(SAY_WHIRLWIND);
+                        events.ScheduleEvent(EVENT_WHIRLWIND, urand(19000, 21000));
+                        events.ScheduleEvent(EVENT_HEAL, 6000);
+                        break;
+                    case EVENT_HEAL:
+						me->CastSpell(me, SPELL_HEAL, false);
+                        Talk(SAY_HEAL);
+                        break;
+                    case EVENT_SHADOW_WAVE:
+						me->CastSpell(me->GetVictim(), SPELL_SHADOW_WAVE, false);
+                        events.ScheduleEvent(EVENT_SHADOW_WAVE, urand(11000, 16000));
+                        break;
+                    case EVENT_ME_FIRST:
+                        if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_SOCCOTHRATES)))
+                            if (soccothrates->IsAlive() && !soccothrates->IsInCombat())
+                                soccothrates->AI()->Talk(SAY_AGGRO_DALLIAH_FIRST);
+                        break;
+					case EVENT_CHECK_HEALTH:
+						if (HealthBelowPct(25))
+						{
+							if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_SOCCOTHRATES)))
+								soccothrates->AI()->Talk(SAY_DALLIAH_25_PERCENT);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+						break;
+				}
 
                 DoMeleeAttackIfReady();
             }
 
         private:
-            bool soccothratesTaunt;
-            bool soccothratesDeath;
+            EventMap events2;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
-            return GetArcatrazAI<boss_dalliah_the_doomsayerAI>(creature);
+            return new boss_dalliah_the_doomsayerAI(creature);
         }
 };
 

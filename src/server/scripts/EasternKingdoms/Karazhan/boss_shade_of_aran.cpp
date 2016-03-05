@@ -1,27 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss_Shade_of_Aran
-SD%Complete: 95
-SDComment: Flame wreath missing cast animation, mods won't triggere.
-SDCategory: Karazhan
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -40,7 +19,6 @@ enum ShadeOfAran
     SAY_KILL                    = 6,
     SAY_TIMEOVER                = 7,
     SAY_DEATH                   = 8,
-//  SAY_ATIESH                  = 9, Unused
 
     //Spells
     SPELL_FROSTBOLT             = 29954,
@@ -84,20 +62,37 @@ class boss_shade_of_aran : public CreatureScript
 public:
     boss_shade_of_aran() : CreatureScript("boss_shade_of_aran") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    struct boss_aranAI : public BossAI
     {
-        return GetInstanceAI<boss_aranAI>(creature);
-    }
-
-    struct boss_aranAI : public ScriptedAI
-    {
-        boss_aranAI(Creature* creature) : ScriptedAI(creature)
+        boss_aranAI(Creature* creature) : BossAI(creature, TYPE_ARAN)
         {
-            Initialize();
-            instance = creature->GetInstanceScript();
         }
 
-        void Initialize()
+        uint32 SecondarySpellTimer;
+        uint32 NormalCastTimer;
+        uint32 SuperCastTimer;
+        uint32 BerserkTimer;
+        uint32 CloseDoorTimer;                                  // Don't close the door right on aggro in case some people are still entering.
+
+        uint8 LastSuperSpell;
+
+        uint32 FlameWreathTimer;
+        uint32 FlameWreathCheckTime;
+        uint64 FlameWreathTarget[3];
+        float FWTargPosX[3];
+        float FWTargPosY[3];
+
+        uint32 CurrentNormalSpell;
+        uint32 ArcaneCooldown;
+        uint32 FireCooldown;
+        uint32 FrostCooldown;
+
+        uint32 DrinkInterruptTimer;
+
+        bool ElementalsSpawned;
+        bool Drinking;
+        bool DrinkInturrupted;
+        void Reset()
         {
             SecondarySpellTimer = 5000;
             NormalCastTimer = 0;
@@ -105,7 +100,7 @@ public:
             BerserkTimer = 720000;
             CloseDoorTimer = 15000;
 
-            LastSuperSpell = rand32() % 3;
+            LastSuperSpell = rand()%3;
 
             FlameWreathTimer = 0;
             FlameWreathCheckTime = 0;
@@ -120,63 +115,31 @@ public:
             ElementalsSpawned = false;
             Drinking = false;
             DrinkInturrupted = false;
-        }
-
-        InstanceScript* instance;
-
-        uint32 SecondarySpellTimer;
-        uint32 NormalCastTimer;
-        uint32 SuperCastTimer;
-        uint32 BerserkTimer;
-        uint32 CloseDoorTimer;                                  // Don't close the door right on aggro in case some people are still entering.
-
-        uint8 LastSuperSpell;
-
-        uint32 FlameWreathTimer;
-        uint32 FlameWreathCheckTime;
-        ObjectGuid FlameWreathTarget[3];
-        float FWTargPosX[3];
-        float FWTargPosY[3];
-
-        uint32 CurrentNormalSpell;
-        uint32 ArcaneCooldown;
-        uint32 FireCooldown;
-        uint32 FrostCooldown;
-
-        uint32 DrinkInterruptTimer;
-
-        bool ElementalsSpawned;
-        bool Drinking;
-        bool DrinkInturrupted;
-
-        void Reset() override
-        {
-            Initialize();
 
             // Not in progress
             instance->SetData(TYPE_ARAN, NOT_STARTED);
-            instance->HandleGameObject(instance->GetGuidData(DATA_GO_LIBRARY_DOOR), true);
+            instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), true);
         }
 
-        void KilledUnit(Unit* /*victim*/) override
+        void KilledUnit(Unit* /*victim*/)
         {
             Talk(SAY_KILL);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             Talk(SAY_DEATH);
 
             instance->SetData(TYPE_ARAN, DONE);
-            instance->HandleGameObject(instance->GetGuidData(DATA_GO_LIBRARY_DOOR), true);
+            instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), true);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             Talk(SAY_AGGRO);
 
             instance->SetData(TYPE_ARAN, IN_PROGRESS);
-            instance->HandleGameObject(instance->GetGuidData(DATA_GO_LIBRARY_DOOR), false);
+            instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), false);
         }
 
         void FlameWreathEffect()
@@ -198,7 +161,7 @@ public:
 
             //cut down to size if we have more than 3 targets
             while (targets.size() > 3)
-                targets.erase(targets.begin() + rand32() % targets.size());
+                targets.erase(targets.begin()+rand()%targets.size());
 
             uint32 i = 0;
             for (std::vector<Unit*>::const_iterator itr = targets.begin(); itr!= targets.end(); ++itr)
@@ -214,7 +177,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -223,7 +186,7 @@ public:
             {
                 if (CloseDoorTimer <= diff)
                 {
-                    instance->HandleGameObject(instance->GetGuidData(DATA_GO_LIBRARY_DOOR), false);
+                    instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), false);
                     CloseDoorTimer = 0;
                 } else CloseDoorTimer -= diff;
             }
@@ -328,7 +291,7 @@ public:
                     //If no available spells wait 1 second and try again
                     if (AvailableSpells)
                     {
-                        CurrentNormalSpell = Spells[rand32() % AvailableSpells];
+                        CurrentNormalSpell = Spells[rand() % AvailableSpells];
                         DoCast(target, CurrentNormalSpell);
                     }
                 }
@@ -368,10 +331,6 @@ public:
                         Available[0] = SUPER_FLAME;
                         Available[1] = SUPER_AE;
                         break;
-                    default:
-                        Available[0] = 0;
-                        Available[1] = 0;
-                        break;
                 }
 
                 LastSuperSpell = Available[urand(0, 1)];
@@ -393,9 +352,9 @@ public:
                         FlameWreathTimer = 20000;
                         FlameWreathCheckTime = 500;
 
-                        FlameWreathTarget[0].Clear();
-                        FlameWreathTarget[1].Clear();
-                        FlameWreathTarget[2].Clear();
+                        FlameWreathTarget[0] = 0;
+                        FlameWreathTarget[1] = 0;
+                        FlameWreathTarget[2] = 0;
 
                         FlameWreathEffect();
                         break;
@@ -465,7 +424,7 @@ public:
                         {
                             unit->CastSpell(unit, 20476, true, 0, 0, me->GetGUID());
                             unit->CastSpell(unit, 11027, true);
-                            FlameWreathTarget[i].Clear();
+                            FlameWreathTarget[i] = 0;
                         }
                     }
                     FlameWreathCheckTime = 500;
@@ -476,13 +435,13 @@ public:
                 DoMeleeAttackIfReady();
         }
 
-        void DamageTaken(Unit* /*pAttacker*/, uint32 &damage) override
+        void DamageTaken(Unit*, uint32 &damage, DamageEffectType, SpellSchoolMask)
         {
             if (!DrinkInturrupted && Drinking && damage)
                 DrinkInturrupted = true;
         }
 
-        void SpellHit(Unit* /*pAttacker*/, const SpellInfo* Spell) override
+        void SpellHit(Unit* /*pAttacker*/, const SpellInfo* Spell)
         {
             //We only care about interrupt effects and only if they are durring a spell currently being cast
             if ((Spell->Effects[0].Effect != SPELL_EFFECT_INTERRUPT_CAST &&
@@ -504,6 +463,11 @@ public:
             }
         }
     };
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return GetInstanceAI<boss_aranAI>(creature);
+    }
 };
 
 class npc_aran_elemental : public CreatureScript
@@ -511,33 +475,25 @@ class npc_aran_elemental : public CreatureScript
 public:
     npc_aran_elemental() : CreatureScript("npc_aran_elemental") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new water_elementalAI(creature);
     }
 
     struct water_elementalAI : public ScriptedAI
     {
-        water_elementalAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            CastTimer = 2000 + (rand32() % 3000);
-        }
+        water_elementalAI(Creature* creature) : ScriptedAI(creature) { }
 
         uint32 CastTimer;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            CastTimer = 2000 + (rand()%3000);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;

@@ -1,174 +1,155 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
-#include "InstanceScript.h"
 #include "drak_tharon_keep.h"
+
+DoorData const doorData[] =
+{
+    { GO_NOVOS_CRYSTAL_1,	DATA_NOVOS_CRYSTALS,	DOOR_TYPE_ROOM,		BOUNDARY_NONE },
+    { GO_NOVOS_CRYSTAL_2,	DATA_NOVOS_CRYSTALS,	DOOR_TYPE_ROOM,		BOUNDARY_NONE },
+    { GO_NOVOS_CRYSTAL_3,	DATA_NOVOS_CRYSTALS,	DOOR_TYPE_ROOM,		BOUNDARY_NONE },
+    { GO_NOVOS_CRYSTAL_4,	DATA_NOVOS_CRYSTALS,	DOOR_TYPE_ROOM,		BOUNDARY_NONE },
+    { 0,					0,						DOOR_TYPE_ROOM,     BOUNDARY_NONE }
+};
 
 class instance_drak_tharon_keep : public InstanceMapScript
 {
+	public:
+		instance_drak_tharon_keep() : InstanceMapScript("instance_drak_tharon_keep", 600) { }
+
+		struct instance_drak_tharon_keep_InstanceScript : public InstanceScript
+		{
+			instance_drak_tharon_keep_InstanceScript(Map* map) : InstanceScript(map)
+			{
+				SetBossNumber(MAX_ENCOUNTERS);
+				LoadDoorData(doorData);
+			}
+			
+			void OnGameObjectCreate(GameObject* go)
+			{
+				switch (go->GetEntry())
+				{
+					case GO_NOVOS_CRYSTAL_1:
+					case GO_NOVOS_CRYSTAL_2:
+					case GO_NOVOS_CRYSTAL_3:
+					case GO_NOVOS_CRYSTAL_4:
+                        AddDoor(go, true);
+						break;
+				}
+			}
+			
+			void OnGameObjectRemove(GameObject* go)
+			{
+				switch (go->GetEntry())
+				{
+					case GO_NOVOS_CRYSTAL_1:
+					case GO_NOVOS_CRYSTAL_2:
+					case GO_NOVOS_CRYSTAL_3:
+					case GO_NOVOS_CRYSTAL_4:
+                        AddDoor(go, false);
+						break;
+				}
+			}
+
+			std::string GetSaveData()
+			{
+				std::ostringstream saveStream;
+				saveStream << "D K " << GetBossSaveData();
+				return saveStream.str();
+			}
+
+			void Load(const char* in)
+			{
+				if( !in )
+					return;
+
+				char dataHead1, dataHead2;
+				std::istringstream loadStream(in);
+				loadStream >> dataHead1 >> dataHead2;
+				if (dataHead1 == 'D' && dataHead2 == 'K')
+				{
+					for (uint8 i = 0; i < MAX_ENCOUNTERS; ++i)
+					{
+						uint32 tmpState;
+						loadStream >> tmpState;
+						if (tmpState == IN_PROGRESS || tmpState > SPECIAL)
+							tmpState = NOT_STARTED;
+						SetBossState(i, EncounterState(tmpState));
+					}
+				}
+			}
+		};
+
+		InstanceScript* GetInstanceScript(InstanceMap *map) const
+		{
+			return new instance_drak_tharon_keep_InstanceScript(map);
+		}
+};
+
+class spell_dtk_raise_dead : public SpellScriptLoader
+{
+	public:
+		spell_dtk_raise_dead() : SpellScriptLoader("spell_dtk_raise_dead") { }
+
+		class spell_dtk_raise_dead_AuraScript : public AuraScript
+		{
+			PrepareAuraScript(spell_dtk_raise_dead_AuraScript)
+
+			bool Load()
+			{
+				return GetUnitOwner()->GetTypeId() == TYPEID_UNIT;
+			}
+
+			void HandleEffectRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+			{
+				GetUnitOwner()->ToCreature()->DespawnOrUnsummon(1);
+				GetUnitOwner()->SummonCreature(NPC_RISEN_DRAKKARI_WARRIOR, *GetUnitOwner());
+			}
+
+			void Register()
+			{
+				AfterEffectRemove += AuraEffectRemoveFn(spell_dtk_raise_dead_AuraScript::HandleEffectRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+			}
+		};
+
+		AuraScript* GetAuraScript() const
+		{
+			return new spell_dtk_raise_dead_AuraScript();
+		}
+};
+
+class spell_dtk_summon_random_drakkari : public SpellScriptLoader
+{
     public:
-        instance_drak_tharon_keep() : InstanceMapScript(DrakTharonKeepScriptName, 600) { }
+        spell_dtk_summon_random_drakkari() : SpellScriptLoader("spell_dtk_summon_random_drakkari") { }
 
-        struct instance_drak_tharon_keep_InstanceScript : public InstanceScript
+        class spell_dtk_summon_random_drakkari_SpellScript : public SpellScript
         {
-            instance_drak_tharon_keep_InstanceScript(Map* map) : InstanceScript(map)
+            PrepareSpellScript(spell_dtk_summon_random_drakkari_SpellScript);
+
+            void HandleScriptEffect(SpellEffIndex /*effIndex*/)
             {
-                SetHeaders(DataHeader);
-                SetBossNumber(EncounterCount);
+                GetCaster()->CastSpell(GetCaster(), RAND(SPELL_SUMMON_DRAKKARI_SHAMAN, SPELL_SUMMON_DRAKKARI_GUARDIAN), true);
             }
 
-            void OnCreatureCreate(Creature* creature) override
+            void Register()
             {
-                switch (creature->GetEntry())
-                {
-                    case NPC_TROLLGORE:
-                        TrollgoreGUID = creature->GetGUID();
-                        break;
-                    case NPC_NOVOS:
-                        NovosGUID = creature->GetGUID();
-                        break;
-                    case NPC_KING_DRED:
-                        KingDredGUID = creature->GetGUID();
-                        break;
-                    case NPC_THARON_JA:
-                        TharonJaGUID = creature->GetGUID();
-                        break;
-                    case NPC_WORLD_TRIGGER:
-                        InitializeTrollgoreInvaderSummoner(creature);
-                        break;
-                    case NPC_CRYSTAL_CHANNEL_TARGET:
-                        InitializeNovosSummoner(creature);
-                        break;
-                    default:
-                        break;
-                }
+                OnEffectHitTarget += SpellEffectFn(spell_dtk_summon_random_drakkari_SpellScript::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
-
-            void OnGameObjectCreate(GameObject* go) override
-            {
-                switch (go->GetEntry())
-                {
-                    case GO_NOVOS_CRYSTAL_1:
-                        NovosCrystalGUIDs[0] = go->GetGUID();
-                        break;
-                    case GO_NOVOS_CRYSTAL_2:
-                        NovosCrystalGUIDs[1] = go->GetGUID();
-                        break;
-                    case GO_NOVOS_CRYSTAL_3:
-                        NovosCrystalGUIDs[2] = go->GetGUID();
-                        break;
-                    case GO_NOVOS_CRYSTAL_4:
-                        NovosCrystalGUIDs[3] = go->GetGUID();
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            void InitializeTrollgoreInvaderSummoner(Creature* creature)
-            {
-                float y = creature->GetPositionY();
-                float z = creature->GetPositionZ();
-
-                if (z < 50.0f)
-                    return;
-
-                if (y < -650.0f && y > -660.0f)
-                    TrollgoreInvaderSummonerGuids[0] = creature->GetGUID();
-                else if (y < -660.0f && y > -670.0f)
-                    TrollgoreInvaderSummonerGuids[1] = creature->GetGUID();
-                else if (y < -675.0f && y > -685.0f)
-                    TrollgoreInvaderSummonerGuids[2] = creature->GetGUID();
-            }
-
-            void InitializeNovosSummoner(Creature* creature)
-            {
-                float x = creature->GetPositionX();
-                float y = creature->GetPositionY();
-                float z = creature->GetPositionZ();
-
-                if (x < -374.0f && x > -379.0f && y > -820.0f && y < -815.0f && z < 60.0f && z > 58.0f)
-                    NovosSummonerGUIDs[0] = creature->GetGUID();
-                else if (x < -379.0f && x > -385.0f && y > -820.0f && y < -815.0f && z < 60.0f && z > 58.0f)
-                    NovosSummonerGUIDs[1] = creature->GetGUID();
-                else if (x < -374.0f && x > -385.0f && y > -827.0f && y < -820.0f && z < 60.0f && z > 58.0f)
-                    NovosSummonerGUIDs[2] = creature->GetGUID();
-                else if (x < -338.0f && x > -344.0f && y > -727.0f && y < 721.0f && z < 30.0f && z > 26.0f)
-                    NovosSummonerGUIDs[3] = creature->GetGUID();
-            }
-
-            ObjectGuid GetGuidData(uint32 type) const override
-            {
-                switch (type)
-                {
-                    case DATA_TROLLGORE:
-                        return TrollgoreGUID;
-                    case DATA_NOVOS:
-                        return NovosGUID;
-                    case DATA_KING_DRED:
-                        return KingDredGUID;
-                    case DATA_THARON_JA:
-                        return TharonJaGUID;
-                    case DATA_TROLLGORE_INVADER_SUMMONER_1:
-                    case DATA_TROLLGORE_INVADER_SUMMONER_2:
-                    case DATA_TROLLGORE_INVADER_SUMMONER_3:
-                        return TrollgoreInvaderSummonerGuids[type - DATA_TROLLGORE_INVADER_SUMMONER_1];
-                    case DATA_NOVOS_CRYSTAL_1:
-                    case DATA_NOVOS_CRYSTAL_2:
-                    case DATA_NOVOS_CRYSTAL_3:
-                    case DATA_NOVOS_CRYSTAL_4:
-                        return NovosCrystalGUIDs[type - DATA_NOVOS_CRYSTAL_1];
-                    case DATA_NOVOS_SUMMONER_1:
-                    case DATA_NOVOS_SUMMONER_2:
-                    case DATA_NOVOS_SUMMONER_3:
-                    case DATA_NOVOS_SUMMONER_4:
-                        return NovosSummonerGUIDs[type - DATA_NOVOS_SUMMONER_1];
-                }
-
-                return ObjectGuid::Empty;
-            }
-
-            void OnUnitDeath(Unit* unit) override
-            {
-                if (unit->GetEntry() == NPC_CRYSTAL_HANDLER)
-                    if (Creature* novos = instance->GetCreature(NovosGUID))
-                        novos->AI()->DoAction(ACTION_CRYSTAL_HANDLER_DIED);
-            }
-
-        protected:
-            ObjectGuid TrollgoreGUID;
-            ObjectGuid NovosGUID;
-            ObjectGuid KingDredGUID;
-            ObjectGuid TharonJaGUID;
-
-            ObjectGuid TrollgoreInvaderSummonerGuids[3];
-            ObjectGuid NovosCrystalGUIDs[4];
-            ObjectGuid NovosSummonerGUIDs[4];
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* map) const override
+        SpellScript* GetSpellScript() const
         {
-            return new instance_drak_tharon_keep_InstanceScript(map);
+            return new spell_dtk_summon_random_drakkari_SpellScript();
         }
 };
 
 void AddSC_instance_drak_tharon_keep()
 {
-    new instance_drak_tharon_keep();
+	new instance_drak_tharon_keep();
+	new spell_dtk_raise_dead();
+	new spell_dtk_summon_random_drakkari();
 }

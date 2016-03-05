@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,7 +22,7 @@
 namespace lfg
 {
 
-std::string ConcatenateDungeons(LfgDungeonSet const& dungeons)
+/*std::string ConcatenateDungeons(LfgDungeonSet const& dungeons)
 {
     std::string dungeonstr = "";
     if (!dungeons.empty())
@@ -91,6 +91,9 @@ std::string GetStateString(LfgState state)
         case LFG_STATE_DUNGEON:
             entry = LANG_LFG_STATE_DUNGEON;
             break;
+        case LFG_STATE_BOOT:
+            entry = LANG_LFG_STATE_BOOT;
+            break;
         case LFG_STATE_FINISHED_DUNGEON:
             entry = LANG_LFG_STATE_FINISHED_DUNGEON;
             break;
@@ -100,6 +103,6 @@ std::string GetStateString(LfgState state)
     }
 
     return std::string(sObjectMgr->GetTrinityStringForDBCLocale(entry));
-}
+}*/
 
 } // namespace lfg

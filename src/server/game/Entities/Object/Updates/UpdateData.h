@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,9 +20,6 @@
 #define __UPDATEDATA_H
 
 #include "ByteBuffer.h"
-#include "ObjectGuid.h"
-#include <set>
-
 class WorldPacket;
 
 enum OBJECT_UPDATE_TYPE
@@ -54,30 +51,20 @@ class UpdateData
 {
     public:
         UpdateData();
-        UpdateData(UpdateData&& right) : m_blockCount(right.m_blockCount),
-            m_outOfRangeGUIDs(std::move(right.m_outOfRangeGUIDs)),
-            m_data(std::move(right.m_data))
-        {
-        }
 
-        void AddOutOfRangeGUID(GuidSet& guids);
-        void AddOutOfRangeGUID(ObjectGuid guid);
+        void AddOutOfRangeGUID(uint64 guid);
         void AddUpdateBlock(const ByteBuffer &block);
+        void AddUpdateBlock(const UpdateData &block);
         bool BuildPacket(WorldPacket* packet);
         bool HasData() const { return m_blockCount > 0 || !m_outOfRangeGUIDs.empty(); }
         void Clear();
 
-        GuidSet const& GetOutOfRangeGUIDs() const { return m_outOfRangeGUIDs; }
-
     protected:
         uint32 m_blockCount;
-        GuidSet m_outOfRangeGUIDs;
+        std::vector<uint64> m_outOfRangeGUIDs;
         ByteBuffer m_data;
 
         void Compress(void* dst, uint32 *dst_size, void* src, int src_size);
-
-        UpdateData(UpdateData const& right) = delete;
-        UpdateData& operator=(UpdateData const& right) = delete;
 };
 #endif
 

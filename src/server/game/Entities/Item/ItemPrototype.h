@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,6 +21,7 @@
 
 #include "Common.h"
 #include "SharedDefines.h"
+#include "WorldPacket.h"
 
 enum ItemModType
 {
@@ -102,8 +103,10 @@ enum ItemBondingType
 
 #define MAX_BIND_TYPE                             6
 
-/* /// @todo: Requiring actual cases in which using (an) item isn't allowed while shapeshifted. Else, this flag would need an implementation.
-    ITEM_PROTO_FLAG_USABLE_WHEN_SHAPESHIFTED    = 0x00800000, // Item can be used in shapeshift forms */
+/* TODO
+    // need to know cases when using item is not allowed in shapeshift
+    ITEM_PROTO_FLAG_USABLE_WHEN_SHAPESHIFTED    = 0x00800000, // Item can be used in shapeshift forms
+*/
 
 enum ItemProtoFlags
 {
@@ -141,6 +144,9 @@ enum ItemProtoFlags
     ITEM_PROTO_FLAG_UNK12                       = 0x80000000  // ?
 };
 
+/* TODO
+*/
+
 enum ItemFieldFlags
 {
     ITEM_FLAG_SOULBOUND     = 0x00000001, // Item is soulbound and cannot be traded <<--
@@ -176,7 +182,7 @@ enum ItemFieldFlags
     ITEM_FLAG_UNK25         = 0x40000000, // ?
     ITEM_FLAG_UNK26         = 0x80000000, // ?
 
-    ITEM_FLAG_MAIL_TEXT_MASK = ITEM_FLAG_READABLE | ITEM_FLAG_UNK13 | ITEM_FLAG_UNK14
+    ITEM_FLAG_MAIL_TEXT_MASK = ITEM_FLAG_READABLE | ITEM_FLAG_UNK13 | ITEM_FLAG_UNK14,
 };
 
 enum ItemFlagsExtra
@@ -191,7 +197,7 @@ enum ItemFlagsCustom
 {
     ITEM_FLAGS_CU_DURATION_REAL_TIME    = 0x0001,   // Item duration will tick even if player is offline
     ITEM_FLAGS_CU_IGNORE_QUEST_STATUS   = 0x0002,   // No quest status will be checked when this item drops
-    ITEM_FLAGS_CU_FOLLOW_LOOT_RULES     = 0x0004    // Item will always follow group/master/need before greed looting rules
+    ITEM_FLAGS_CU_FOLLOW_LOOT_RULES     = 0x0004,   // Item will always follow group/master/need before greed looting rules
 };
 
 enum BAG_FAMILY_MASK
@@ -653,7 +659,7 @@ struct ItemTemplate
     uint32 GemProperties;                                   // id from GemProperties.dbc
     uint32 RequiredDisenchantSkill;
     float  ArmorDamageModifier;
-    uint32 Duration;
+    uint32  Duration;
     uint32 ItemLimitCategory;                               // id from ItemLimitCategory.dbc
     uint32 HolidayId;                                       // id from Holidays.dbc
     uint32 ScriptId;
@@ -661,7 +667,8 @@ struct ItemTemplate
     uint32 FoodType;
     uint32 MinMoneyLoot;
     uint32 MaxMoneyLoot;
-    uint32 FlagsCu;
+	uint32 FlagsCu;
+    WorldPacket queryData; // pussywizard
 
     // helpers
     bool CanChangeEquipStateInCombat() const
@@ -684,7 +691,7 @@ struct ItemTemplate
         return false;
     }
 
-    bool IsCurrencyToken() const { return (BagFamily & BAG_FAMILY_MASK_CURRENCY_TOKENS) != 0; }
+    bool IsCurrencyToken() const { return BagFamily & BAG_FAMILY_MASK_CURRENCY_TOKENS; }
 
     uint32 GetMaxStackSize() const
     {
@@ -696,7 +703,7 @@ struct ItemTemplate
         if (Delay == 0)
             return 0;
         float temp = 0;
-        for (int i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+        for (uint8 i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
             temp+=Damage[i].DamageMin + Damage[i].DamageMax;
         return temp*500/Delay;
     }
@@ -714,7 +721,7 @@ struct ItemTemplate
         return 0;
     }
 
-    float GetItemLevelIncludingQuality() const
+    float GetItemLevelIncludingQuality(uint8 pLevel) const
     {
         float itemLevel = (float)ItemLevel;
         switch (Quality)
@@ -722,13 +729,15 @@ struct ItemTemplate
             case ITEM_QUALITY_POOR:
             case ITEM_QUALITY_NORMAL:
             case ITEM_QUALITY_UNCOMMON:
-            case ITEM_QUALITY_ARTIFACT:
-            case ITEM_QUALITY_HEIRLOOM:
-                itemLevel -= 13; // leaving this as a separate statement since we do not know the real behavior in this case
+                itemLevel -= 26.0f;
                 break;
             case ITEM_QUALITY_RARE:
-                itemLevel -= 13;
+                itemLevel -= 13.0f;
                 break;
+            case ITEM_QUALITY_HEIRLOOM:
+                itemLevel = pLevel*2.33f;
+                break;
+            case ITEM_QUALITY_ARTIFACT:
             case ITEM_QUALITY_EPIC:
             case ITEM_QUALITY_LEGENDARY:
             default:
@@ -741,10 +750,12 @@ struct ItemTemplate
     bool IsWeaponVellum() const { return Class == ITEM_CLASS_TRADE_GOODS && SubClass == ITEM_SUBCLASS_WEAPON_ENCHANTMENT; }
     bool IsArmorVellum() const { return Class == ITEM_CLASS_TRADE_GOODS && SubClass == ITEM_SUBCLASS_ARMOR_ENCHANTMENT; }
     bool IsConjuredConsumable() const { return Class == ITEM_CLASS_CONSUMABLE && (Flags & ITEM_PROTO_FLAG_CONJURED); }
+
+    void InitializeQueryData();
 };
 
 // Benchmarked: Faster than std::map (insert/find)
-typedef std::unordered_map<uint32, ItemTemplate> ItemTemplateContainer;
+typedef UNORDERED_MAP<uint32, ItemTemplate> ItemTemplateContainer;
 
 struct ItemLocale
 {

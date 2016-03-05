@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -66,24 +66,23 @@ enum Events
 
 class boss_hakkar : public CreatureScript
 {
-    public:
-        boss_hakkar() : CreatureScript("boss_hakkar") { }
+    public: boss_hakkar() : CreatureScript("boss_hakkar") { }
 
         struct boss_hakkarAI : public BossAI
         {
             boss_hakkarAI(Creature* creature) : BossAI(creature, DATA_HAKKAR) { }
 
-            void Reset() override
+            void Reset()
             {
                 _Reset();
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 _JustDied();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 events.ScheduleEvent(EVENT_BLOOD_SIPHON, 90000);
@@ -104,7 +103,7 @@ class boss_hakkar : public CreatureScript
                 Talk(SAY_AGGRO);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -131,7 +130,8 @@ class boss_hakkar : public CreatureScript
                             // events.ScheduleEvent(EVENT_CAUSE_INSANITY, urand(35000, 45000));
                             break;
                         case EVENT_WILL_OF_HAKKAR:
-                            DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true), SPELL_WILL_OF_HAKKAR);
+							// Xinef: Skip Tank
+                            DoCast(SelectTarget(SELECT_TARGET_RANDOM, 1, 100, true), SPELL_WILL_OF_HAKKAR);
                             events.ScheduleEvent(EVENT_WILL_OF_HAKKAR, urand(25000, 35000));
                             break;
                         case EVENT_ENRAGE:
@@ -168,7 +168,7 @@ class boss_hakkar : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<boss_hakkarAI>(creature);
         }

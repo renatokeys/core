@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -55,6 +55,9 @@ class HostileRefManager : public RefManager<Unit, ThreatManager>
         // Remove specific faction references
         void deleteReferencesForFaction(uint32 faction);
 
+        // pussywizard: for combat bugs
+        void deleteReferencesOutOfRange(float range);
+
         HostileReference* getFirst() { return ((HostileReference*) RefManager<Unit, ThreatManager>::getFirst()); }
 
         void updateThreatTables();
@@ -67,7 +70,8 @@ class HostileRefManager : public RefManager<Unit, ThreatManager>
         // delete one reference, defined by Unit
         void deleteReference(Unit* creature);
 
-        void UpdateVisibility();
+        void UpdateVisibility(bool checkThreat);
 };
 //=================================================
 #endif
+

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -103,7 +103,7 @@ public:
 
     float length() const
     {
-        return std::sqrt(x*x+y*y+z*z);
+        return sqrt(x*x+y*y+z*z);
     }
 
     Vec3D& normalize()
@@ -209,7 +209,7 @@ public:
 
     float length() const
     {
-        return std::sqrt(x*x+y*y);
+        return sqrt(x*x+y*y);
     }
 
     Vec2D& normalize()

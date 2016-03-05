@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,21 +18,8 @@
 #ifndef OUTDOOR_PVP_EP_
 #define OUTDOOR_PVP_EP_
 
+#include "DBCStructure.h"
 #include "OutdoorPvP.h"
-
-enum DefenseMessages
-{
-    TEXT_PLAGUEWOOD_TOWER_TAKEN_ALLIANCE    = 13629, // '|cffffff00The Plaguewood Tower has been taken by the Alliance!|r'
-    TEXT_NORTHPASS_TOWER_TAKEN_ALLIANCE     = 13630, // '|cffffff00Northpass Tower has been taken by the Alliance!|r'
-    TEXT_EASTWALL_TOWER_TAKEN_ALLIANCE      = 13631, // '|cffffff00Eastwall Tower has been taken by the Alliance!|r'
-    TEXT_CROWN_GUARD_TOWER_TAKEN_ALLIANCE   = 13632, // '|cffffff00Crown Guard Tower has been taken by the Alliance!|r'
-    TEXT_PLAGUEWOOD_TOWER_TAKEN_HORDE       = 13634, // '|cffffff00The Plaguewood Tower has been taken by the Horde!|r'
-    TEXT_NORTHPASS_TOWER_TAKEN_HORDE        = 13635, // '|cffffff00Northpass Tower has been taken by the Horde!|r'
-    TEXT_EASTWALL_TOWER_TAKEN_HORDE         = 13636, // '|cffffff00Eastwall Tower has been taken by the Horde!|r'
-    TEXT_CROWN_GUARD_TOWER_TAKEN_HORDE      = 13633, // '|cffffff00Crown Guard Tower has been taken by the Horde!|r'
-    TEXT_ALL_TOWERS_IN_CONTROL_ALLIANCE     = 13638, // (NYI) '|cff33ccffAll four towers are now in control of the Alliance!|r'
-    TEXT_ALL_TOWERS_IN_CONTROL_HORDE        = 13637, // (NYI) '|cffff0000All four towers are now in control of the Horde!|r'
-};
 
 const uint32 EP_AllianceBuffs[4] = {11413, 11414, 11415, 1386};
 
@@ -97,6 +84,10 @@ enum EP_CrownGuardTowerWorldStates
 
 enum EP_WorldStates
 {
+    EP_UI_TOWER_SLIDER_DISPLAY = 2426,
+    EP_UI_TOWER_SLIDER_POS = 2427,
+    EP_UI_TOWER_SLIDER_N = 2428,
+
     EP_UI_TOWER_COUNT_A = 2327,
     EP_UI_TOWER_COUNT_H = 2328
 };
@@ -194,79 +185,115 @@ class OutdoorPvPEP;
 class OPvPCapturePointEP_EWT : public OPvPCapturePoint
 {
     public:
+
         OPvPCapturePointEP_EWT(OutdoorPvP* pvp);
 
         void ChangeState();
 
+        void SendChangePhase();
+
         void FillInitialWorldStates(WorldPacket & data);
 
+        // used when player is activated/inactivated in the area
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
+
     protected:
-        void SummonSupportUnitAtNorthpassTower(uint32 team);
+
+        void SummonSupportUnitAtNorthpassTower(TeamId teamId);
 
         void UpdateTowerState();
 
     protected:
+
         uint32 m_TowerState;
 
-        uint32 m_UnitsSummonedSide;
+        TeamId m_UnitsSummonedSideId;
 };
 
 class OPvPCapturePointEP_NPT : public OPvPCapturePoint
 {
     public:
+
         OPvPCapturePointEP_NPT(OutdoorPvP* pvp);
 
         void ChangeState();
 
+        void SendChangePhase();
+
         void FillInitialWorldStates(WorldPacket & data);
 
+        // used when player is activated/inactivated in the area
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
+
     protected:
-        void SummonGO(uint32 team);
+
+        void SummonGO(TeamId teamId);
 
         void UpdateTowerState();
 
     protected:
+
         uint32 m_TowerState;
 
-        uint32 m_SummonedGOSide;
+        TeamId m_SummonedGOSideId;
 };
 
 class OPvPCapturePointEP_CGT : public OPvPCapturePoint
 {
     public:
+
         OPvPCapturePointEP_CGT(OutdoorPvP* pvp);
 
         void ChangeState();
 
+        void SendChangePhase();
+
         void FillInitialWorldStates(WorldPacket & data);
 
+        // used when player is activated/inactivated in the area
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
+
     protected:
-        void LinkGraveYard(uint32 team);
+
+        void LinkGraveyard(TeamId teamId);
 
         void UpdateTowerState();
 
     protected:
+
         uint32 m_TowerState;
 
-        uint32 m_GraveyardSide;
+        TeamId m_GraveyardSide;
 };
 
 class OPvPCapturePointEP_PWT : public OPvPCapturePoint
 {
     public:
+
         OPvPCapturePointEP_PWT(OutdoorPvP* pvp);
 
         void ChangeState();
 
+        void SendChangePhase();
+
         void FillInitialWorldStates(WorldPacket & data);
 
+        // used when player is activated/inactivated in the area
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
+
     protected:
-        void SummonFlightMaster(uint32 team);
+
+        void SummonFlightMaster(TeamId teamId);
 
         void UpdateTowerState();
 
     protected:
-        uint32 m_FlightMasterSpawned;
+
+        TeamId m_FlightMasterSpawnedId;
 
         uint32 m_TowerState;
 };
@@ -274,6 +301,7 @@ class OPvPCapturePointEP_PWT : public OPvPCapturePoint
 class OutdoorPvPEP : public OutdoorPvP
 {
     public:
+
         OutdoorPvPEP();
 
         bool SetupOutdoorPvP();
@@ -289,11 +317,12 @@ class OutdoorPvPEP : public OutdoorPvP
 
         void BuffTeams();
 
-        void SetControlledState(uint32 index, uint32 state);
+        void SetControlledState(uint32 index, TeamId teamId);
 
     private:
+
         // how many towers are controlled
-        uint32 EP_Controls[EP_TOWER_NUM];
+        TeamId EP_ControlsId[EP_TOWER_NUM];
 
         uint32 m_AllianceTowersControlled;
         uint32 m_HordeTowersControlled;

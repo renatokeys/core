@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -31,6 +31,10 @@
 template<class T>
 inline void Trinity::VisibleNotifier::Visit(GridRefManager<T> &m)
 {
+    // Xinef: Update gameobjects only
+    if (i_gobjOnly)
+        return;
+
     for (typename GridRefManager<T>::iterator iter = m.begin(); iter != m.end(); ++iter)
     {
         vis_guids.erase(iter->GetSource()->GetGUID());
@@ -474,6 +478,25 @@ void Trinity::PlayerListSearcher<Check>::Visit(PlayerMapType &m)
         if (itr->GetSource()->InSamePhase(i_phaseMask))
             if (i_check(itr->GetSource()))
                 i_objects.push_back(itr->GetSource());
+}
+
+template<class Check>
+void Trinity::PlayerListSearcherWithSharedVision<Check>::Visit(PlayerMapType &m)
+{
+    for (PlayerMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
+        if (itr->GetSource()->InSamePhase(i_phaseMask))
+            if (i_check(itr->GetSource(), true))
+                i_objects.push_back(itr->GetSource());
+}
+
+template<class Check>
+void Trinity::PlayerListSearcherWithSharedVision<Check>::Visit(CreatureMapType &m)
+{
+    for (CreatureMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
+        if (itr->GetSource()->InSamePhase(i_phaseMask) && itr->GetSource()->HasSharedVision())
+            for (SharedVisionList::const_iterator i = itr->GetSource()->GetSharedVisionList().begin(); i != itr->GetSource()->GetSharedVisionList().end(); ++i)
+                if (i_check(*i, false))
+                    i_objects.push_back(*i);
 }
 
 template<class Check>

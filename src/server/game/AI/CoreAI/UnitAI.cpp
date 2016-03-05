@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,15 +29,7 @@
 void UnitAI::AttackStart(Unit* victim)
 {
     if (victim && me->Attack(victim, true))
-    {
-        // Clear distracted state on attacking
-        if (me->HasUnitState(UNIT_STATE_DISTRACTED))
-        {
-            me->ClearUnitState(UNIT_STATE_DISTRACTED);
-            me->GetMotionMaster()->Clear();
-        }
         me->GetMotionMaster()->MoveChase(victim);
-    }
 }
 
 void UnitAI::AttackStartCaster(Unit* victim, float dist)
@@ -51,7 +43,9 @@ void UnitAI::DoMeleeAttackIfReady()
     if (me->HasUnitState(UNIT_STATE_CASTING))
         return;
 
-    Unit* victim = me->GetVictim();
+    Unit *victim = me->GetVictim();
+    if (!victim || !victim->IsInWorld())
+        return;
 
     if (!me->IsWithinMeleeRange(victim))
         return;
@@ -59,12 +53,21 @@ void UnitAI::DoMeleeAttackIfReady()
     //Make sure our attack is ready and we aren't currently casting before checking distance
     if (me->isAttackReady())
     {
+		// xinef: prevent base and off attack in same time, delay attack at 0.2 sec
+		if (me->haveOffhandWeapon())
+			if (me->getAttackTimer(OFF_ATTACK) < ATTACK_DISPLAY_DELAY)
+				me->setAttackTimer(OFF_ATTACK, ATTACK_DISPLAY_DELAY);
+
         me->AttackerStateUpdate(victim);
         me->resetAttackTimer();
     }
 
     if (me->haveOffhandWeapon() && me->isAttackReady(OFF_ATTACK))
     {
+		// xinef: delay main hand attack if both will hit at the same time (players code)
+		if (me->getAttackTimer(BASE_ATTACK) < ATTACK_DISPLAY_DELAY)
+            me->setAttackTimer(BASE_ATTACK, ATTACK_DISPLAY_DELAY);
+
         me->AttackerStateUpdate(victim, OFF_ATTACK);
         me->resetAttackTimer(OFF_ATTACK);
     }
@@ -135,45 +138,34 @@ void UnitAI::DoCastToAllHostilePlayers(uint32 spellid, bool triggered)
 void UnitAI::DoCast(uint32 spellId)
 {
     Unit* target = NULL;
-
+    //sLog->outError("aggre %u %u", spellId, (uint32)AISpellInfo[spellId].target);
     switch (AISpellInfo[spellId].target)
     {
         default:
-        case AITARGET_SELF:
-            target = me;
-            break;
-        case AITARGET_VICTIM:
-            target = me->GetVictim();
-            break;
+        case AITARGET_SELF:     target = me; break;
+        case AITARGET_VICTIM:   target = me->GetVictim(); break;
         case AITARGET_ENEMY:
         {
-            if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId))
-            {
-                bool playerOnly = spellInfo->HasAttribute(SPELL_ATTR3_ONLY_TARGET_PLAYERS);
-                target = SelectTarget(SELECT_TARGET_RANDOM, 0, spellInfo->GetMaxRange(false), playerOnly);
-            }
+            const SpellInfo* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+            bool playerOnly = spellInfo->HasAttribute(SPELL_ATTR3_ONLY_TARGET_PLAYERS);
+            //float range = GetSpellMaxRange(spellInfo, false);
+            target = SelectTarget(SELECT_TARGET_RANDOM, 0, spellInfo->GetMaxRange(false), playerOnly);
             break;
         }
-        case AITARGET_ALLY:
-            target = me;
-            break;
-        case AITARGET_BUFF:
-            target = me;
-            break;
+        case AITARGET_ALLY:     target = me; break;
+        case AITARGET_BUFF:     target = me; break;
         case AITARGET_DEBUFF:
         {
-            if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId))
-            {
-                bool playerOnly = spellInfo->HasAttribute(SPELL_ATTR3_ONLY_TARGET_PLAYERS);
-                float range = spellInfo->GetMaxRange(false);
+            const SpellInfo* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+            bool playerOnly = spellInfo->HasAttribute(SPELL_ATTR3_ONLY_TARGET_PLAYERS);
+            float range = spellInfo->GetMaxRange(false);
 
-                DefaultTargetSelector targetSelector(me, range, playerOnly, -(int32)spellId);
-                if (!(spellInfo->AuraInterruptFlags & AURA_INTERRUPT_FLAG_NOT_VICTIM)
-                    && targetSelector(me->GetVictim()))
-                    target = me->GetVictim();
-                else
-                    target = SelectTarget(SELECT_TARGET_RANDOM, 0, targetSelector);
-            }
+            DefaultTargetSelector targetSelector(me, range, playerOnly, -(int32)spellId);
+            if (!(spellInfo->AuraInterruptFlags & AURA_INTERRUPT_FLAG_NOT_VICTIM)
+                && targetSelector(me->GetVictim()))
+                target = me->GetVictim();
+            else
+                target = SelectTarget(SELECT_TARGET_RANDOM, 0, targetSelector);
             break;
         }
     }
@@ -265,7 +257,7 @@ void PlayerAI::OnCharmed(bool apply)
     me->IsAIEnabled = apply;
 }
 
-void SimpleCharmedAI::UpdateAI(const uint32 /*diff*/)
+void SimpleCharmedAI::UpdateAI(uint32 /*diff*/)
 {
   Creature* charmer = me->GetCharmer()->ToCreature();
 
@@ -276,7 +268,7 @@ void SimpleCharmedAI::UpdateAI(const uint32 /*diff*/)
         for (Unit::AuraEffectList::const_iterator iter = auras.begin(); iter != auras.end(); ++iter)
             if ((*iter)->GetCasterGUID() == charmer->GetGUID() && (*iter)->GetBase()->IsPermanent())
             {
-                charmer->Kill(me);
+                Unit::Kill(charmer, me);
                 return;
             }
     }
@@ -286,7 +278,7 @@ void SimpleCharmedAI::UpdateAI(const uint32 /*diff*/)
 
     Unit* target = me->GetVictim();
     if (!target || !charmer->IsValidAttackTarget(target))
-        AttackStart(charmer->SelectNearestTargetInAttackDistance());
+        AttackStart(charmer->SelectNearestTargetInAttackDistance(ATTACK_DISTANCE));
 }
 
 SpellTargetSelector::SpellTargetSelector(Unit* caster, uint32 spellId) :

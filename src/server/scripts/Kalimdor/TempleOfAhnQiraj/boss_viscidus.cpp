@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -91,26 +91,18 @@ class boss_viscidus : public CreatureScript
 
         struct boss_viscidusAI : public BossAI
         {
-            boss_viscidusAI(Creature* creature) : BossAI(creature, DATA_VISCIDUS)
-            {
-                Initialize();
-            }
+            boss_viscidusAI(Creature* creature) : BossAI(creature, DATA_VISCIDUS) { }
 
-            void Initialize()
+            void Reset()
             {
+                _Reset();
                 _hitcounter = 0;
                 _phase = PHASE_FROST;
             }
 
-            void Reset() override
+            void DamageTaken(Unit* attacker, uint32& /*damage*/, DamageEffectType, SpellSchoolMask)
             {
-                _Reset();
-                Initialize();
-            }
-
-            void DamageTaken(Unit* attacker, uint32& /*damage*/) override
-            {
-                if (_phase != PHASE_MELEE)
+                if (!attacker || _phase != PHASE_MELEE)
                     return;
 
                 ++_hitcounter;
@@ -128,7 +120,7 @@ class boss_viscidus : public CreatureScript
                     uint8 NumGlobes = me->GetHealthPct() / 5.0f;
                     for (uint8 i = 0; i < NumGlobes; ++i)
                     {
-                        float Angle = i * 2 * float(M_PI) / NumGlobes;
+                        float Angle = i * 2 * M_PI / NumGlobes;
                         float X = ViscidusCoord.GetPositionX() + std::cos(Angle) * RoomRadius;
                         float Y = ViscidusCoord.GetPositionY() + std::sin(Angle) * RoomRadius;
                         float Z = -35.0f;
@@ -147,7 +139,7 @@ class boss_viscidus : public CreatureScript
                     Talk(EMOTE_CRACK);
             }
 
-            void SpellHit(Unit* /*caster*/, SpellInfo const* spell) override
+            void SpellHit(Unit* /*caster*/, SpellInfo const* spell)
             {
                 if ((spell->GetSchoolMask() & SPELL_SCHOOL_MASK_FROST) && _phase == PHASE_FROST && me->GetHealthPct() > 5.0f)
                 {
@@ -176,7 +168,7 @@ class boss_viscidus : public CreatureScript
                 }
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 events.Reset();
@@ -190,19 +182,19 @@ class boss_viscidus : public CreatureScript
                 events.ScheduleEvent(EVENT_POISON_SHOCK, urand(7000, 12000));
             }
 
-            void EnterEvadeMode(EvadeReason why) override
+            void EnterEvadeMode()
             {
                 summons.DespawnAll();
-                ScriptedAI::EnterEvadeMode(why);
+                ScriptedAI::EnterEvadeMode();
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 DoCast(me, SPELL_VISCIDUS_SUICIDE);
                 summons.DespawnAll();
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -253,7 +245,7 @@ class boss_viscidus : public CreatureScript
             Phases _phase;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new boss_viscidusAI(creature);
         }
@@ -268,11 +260,11 @@ class npc_glob_of_viscidus : public CreatureScript
         {
             npc_glob_of_viscidusAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 InstanceScript* Instance = me->GetInstanceScript();
 
-                if (Creature* Viscidus = me->GetMap()->GetCreature(Instance->GetGuidData(DATA_VISCIDUS)))
+                if (Creature* Viscidus = me->GetMap()->GetCreature(Instance->GetData64(DATA_VISCIDUS)))
                 {
                     if (BossAI* ViscidusAI = dynamic_cast<BossAI*>(Viscidus->GetAI()))
                         ViscidusAI->SummonedCreatureDespawn(me);
@@ -280,8 +272,7 @@ class npc_glob_of_viscidus : public CreatureScript
                     if (Viscidus->IsAlive() && Viscidus->GetHealthPct() < 5.0f)
                     {
                         Viscidus->SetVisible(true);
-                        if (Viscidus->GetVictim())
-                            Viscidus->EnsureVictim()->Kill(Viscidus);
+						Unit::Kill(Viscidus->GetVictim(), Viscidus);
                     }
                     else
                     {
@@ -291,7 +282,7 @@ class npc_glob_of_viscidus : public CreatureScript
                 }
             }
 
-            void MovementInform(uint32 /*type*/, uint32 id) override
+            void MovementInform(uint32 /*type*/, uint32 id)
             {
                 if (id == ROOM_CENTER)
                 {
@@ -302,7 +293,7 @@ class npc_glob_of_viscidus : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<npc_glob_of_viscidusAI>(creature);
         }

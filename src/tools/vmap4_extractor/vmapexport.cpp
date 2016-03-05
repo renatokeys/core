@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -17,15 +17,14 @@
  */
 
 #define _CRT_SECURE_NO_DEPRECATE
-
-#include "adtfile.h"
-#include "wdtfile.h"
-#include "dbcfile.h"
-#include "wmo.h"
-#include "mpq_libmpq04.h"
-#include "vmapexport.h"
+#include <cstdio>
+#include <iostream>
+#include <vector>
+#include <list>
+#include <errno.h>
 
 #ifdef WIN32
+    #include <Windows.h>
     #include <sys/stat.h>
     #include <direct.h>
     #define mkdir _mkdir
@@ -33,13 +32,22 @@
     #include <sys/stat.h>
 #endif
 
-#include <cstdio>
-#include <iostream>
-#include <vector>
-#include <errno.h>
-
 #undef min
 #undef max
+
+//#pragma warning(disable : 4505)
+//#pragma comment(lib, "Winmm.lib")
+
+#include <map>
+
+//From Extractor
+#include "adtfile.h"
+#include "wdtfile.h"
+#include "dbcfile.h"
+#include "wmo.h"
+#include "mpq_libmpq04.h"
+
+#include "vmapexport.h"
 
 //------------------------------------------------------------------------------
 // Defines
@@ -121,12 +129,12 @@ bool ExtractWmo()
 
     for (ArchiveSet::const_iterator ar_itr = gOpenArchives.begin(); ar_itr != gOpenArchives.end() && success; ++ar_itr)
     {
-        std::vector<std::string> filelist;
+        vector<string> filelist;
 
         (*ar_itr)->GetFileListTo(filelist);
-        for (std::vector<std::string>::iterator fname = filelist.begin(); fname != filelist.end() && success; ++fname)
+        for (vector<string>::iterator fname = filelist.begin(); fname != filelist.end() && success; ++fname)
         {
-            if (fname->find(".wmo") != std::string::npos)
+            if (fname->find(".wmo") != string::npos)
                 success = ExtractSingleWmo(*fname);
         }
     }
@@ -189,13 +197,13 @@ bool ExtractSingleWmo(std::string& fname)
         for (uint32 i = 0; i < froot.nGroups; ++i)
         {
             char temp[1024];
-            strncpy(temp, fname.c_str(), 1024);
+            strcpy(temp, fname.c_str());
             temp[fname.length()-4] = 0;
             char groupFileName[1024];
             sprintf(groupFileName, "%s_%03u.wmo", temp, i);
             //printf("Trying to open groupfile %s\n",groupFileName);
 
-            std::string s = groupFileName;
+            string s = groupFileName;
             WMOGroup fgroup(s);
             if(!fgroup.open())
             {
@@ -297,7 +305,7 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
     printf("\nGame path: %s\n", input_path);
 
     char path[512];
-    std::string in_path(input_path);
+    string in_path(input_path);
     std::vector<std::string> locales, searchLocales;
 
     searchLocales.push_back("enGB");
@@ -337,10 +345,10 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
     }
 
     // open expansion and common files
-    pArchiveNames.push_back(input_path + std::string("common.MPQ"));
-    pArchiveNames.push_back(input_path + std::string("common-2.MPQ"));
-    pArchiveNames.push_back(input_path + std::string("expansion.MPQ"));
-    pArchiveNames.push_back(input_path + std::string("lichking.MPQ"));
+    pArchiveNames.push_back(input_path + string("common.MPQ"));
+    pArchiveNames.push_back(input_path + string("common-2.MPQ"));
+    pArchiveNames.push_back(input_path + string("expansion.MPQ"));
+    pArchiveNames.push_back(input_path + string("lichking.MPQ"));
 
     // now, scan for the patch levels in the core dir
     printf("Scanning patch levels from data directory.\n");
@@ -387,9 +395,7 @@ bool processArgv(int argc, char ** argv, const char *versionString)
             if((i+1)<argc)
             {
                 hasInputPathParam = true;
-                strncpy(input_path, argv[i + 1], sizeof(input_path));
-                input_path[sizeof(input_path) - 1] = '\0';
-
+                strcpy(input_path, argv[i+1]);
                 if (input_path[strlen(input_path) - 1] != '\\' && input_path[strlen(input_path) - 1] != '/')
                     strcat(input_path, "/");
                 ++i;
@@ -505,22 +511,11 @@ int main(int argc, char ** argv)
         map_ids=new map_id[map_count];
         for (unsigned int x=0;x<map_count;++x)
         {
-            map_ids[x].id = dbc->getRecord(x).getUInt(0);
-
-            const char* map_name = dbc->getRecord(x).getString(1);
-            size_t max_map_name_length = sizeof(map_ids[x].name);
-            if (strlen(map_name) >= max_map_name_length)
-            {
-                delete dbc;
-                delete[] map_ids;
-                printf("FATAL ERROR: Map name too long.\n");
-                return 1;
-            }
-
-            strncpy(map_ids[x].name, map_name, max_map_name_length);
-            map_ids[x].name[max_map_name_length - 1] = '\0';
-            printf("Map - %s\n", map_ids[x].name);
+            map_ids[x].id=dbc->getRecord (x).getUInt(0);
+            strcpy(map_ids[x].name,dbc->getRecord(x).getString(1));
+            printf("Map - %s\n",map_ids[x].name);
         }
+
 
         delete dbc;
         ParsMapFiles();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -17,7 +17,7 @@
 
 /*
 Blasted_Lands
-Quest support: 3628.
+Quest support: 3628. Teleporter to Rise of the Defiler.
 */
 
 #include "ScriptMgr.h"
@@ -27,16 +27,16 @@ Quest support: 3628.
 #include "Player.h"
 #include "Group.h"
 
+/*#####
+# spell_razelikh_teleport_group
+#####*/
+
 enum DeathlyUsher
 {
     SPELL_TELEPORT_SINGLE               = 12885,
     SPELL_TELEPORT_SINGLE_IN_GROUP      = 13142,
     SPELL_TELEPORT_GROUP                = 27686
 };
-
-/*#####
-# spell_razelikh_teleport_group
-#####*/
 
 class spell_razelikh_teleport_group : public SpellScriptLoader
 {
@@ -46,7 +46,7 @@ class spell_razelikh_teleport_group : public SpellScriptLoader
         {
             PrepareSpellScript(spell_razelikh_teleport_group_SpellScript);
 
-            bool Validate(SpellInfo const* /*spell*/) override
+            bool Validate(SpellInfo const* /*spell*/)
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_TELEPORT_SINGLE) && !sSpellMgr->GetSpellInfo(SPELL_TELEPORT_SINGLE_IN_GROUP))
                     return false;
@@ -69,13 +69,13 @@ class spell_razelikh_teleport_group : public SpellScriptLoader
                 }
             }
 
-            void Register() override
+            void Register()
             {
                 OnEffectHitTarget += SpellEffectFn(spell_razelikh_teleport_group_SpellScript::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const override
+        SpellScript* GetSpellScript() const
         {
             return new spell_razelikh_teleport_group_SpellScript();
         }

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -52,7 +52,7 @@ class Grid
         /** destructor to clean up its resources. This includes unloading the
         grid if it has not been unload.
         */
-        ~Grid() { }
+        ~Grid() {}
 
         /** an object of interested enters the grid
          */
@@ -96,15 +96,6 @@ class Grid
         void Visit(TypeContainerVisitor<T, TypeMapContainer<WORLD_OBJECT_TYPES> > &visitor)
         {
             visitor.Visit(i_objects);
-        }
-
-        /** Returns the number of object within the grid.
-         */
-        //unsigned int ActiveObjectsInGrid(void) const { return i_objects.template Count<ACTIVE_OBJECT>(); }
-        template<class T>
-        uint32 GetWorldObjectCountInGrid() const
-        {
-            return i_objects.template Count<T>();
         }
 
         /** Inserts a container type object into the grid.

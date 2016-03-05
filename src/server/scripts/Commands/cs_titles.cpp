@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -33,27 +33,30 @@ class titles_commandscript : public CommandScript
 public:
     titles_commandscript() : CommandScript("titles_commandscript") { }
 
-    std::vector<ChatCommand> GetCommands() const override
+    ChatCommand* GetCommands() const
     {
-        static std::vector<ChatCommand> titlesSetCommandTable =
+        static ChatCommand titlesSetCommandTable[] =
         {
-            { "mask", rbac::RBAC_PERM_COMMAND_TITLES_SET_MASK, false, &HandleTitlesSetMaskCommand, "" },
+            { "mask",           SEC_GAMEMASTER,     false, &HandleTitlesSetMaskCommand,        "", NULL },
+            { NULL,             0,                  false, NULL,                               "", NULL }
         };
-        static std::vector<ChatCommand> titlesCommandTable =
+        static ChatCommand titlesCommandTable[] =
         {
-            { "add",     rbac::RBAC_PERM_COMMAND_TITLES_ADD,     false, &HandleTitlesAddCommand,     "" },
-            { "current", rbac::RBAC_PERM_COMMAND_TITLES_CURRENT, false, &HandleTitlesCurrentCommand, "" },
-            { "remove",  rbac::RBAC_PERM_COMMAND_TITLES_REMOVE,  false, &HandleTitlesRemoveCommand,  "" },
-            { "set",     rbac::RBAC_PERM_COMMAND_TITLES_SET,     false, NULL,       "", titlesSetCommandTable },
+            { "add",            SEC_GAMEMASTER,     false, &HandleTitlesAddCommand,            "", NULL },
+            { "current",        SEC_GAMEMASTER,     false, &HandleTitlesCurrentCommand,        "", NULL },
+            { "remove",         SEC_GAMEMASTER,     false, &HandleTitlesRemoveCommand,         "", NULL },
+            { "set",            SEC_GAMEMASTER,     false, NULL,              "", titlesSetCommandTable },
+            { NULL,             0,                  false, NULL,                               "", NULL }
         };
-        static std::vector<ChatCommand> commandTable =
+        static ChatCommand commandTable[] =
         {
-            { "titles", rbac::RBAC_PERM_COMMAND_TITLES, false, NULL, "", titlesCommandTable },
+            { "titles",         SEC_GAMEMASTER,     false, NULL,                 "", titlesCommandTable },
+            { NULL,             0,                  false, NULL,                               "", NULL }
         };
         return commandTable;
     }
 
-    static bool HandleTitlesCurrentCommand(ChatHandler* handler, char const* args)
+    static bool HandleTitlesCurrentCommand(ChatHandler* handler, const char* args)
     {
         // number or [name] Shift-click form |color|Htitle:title_id|h[name]|h|r
         char* id_p = handler->extractKeyFromLink((char*)args, "Htitle");
@@ -77,7 +80,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
+        if (handler->HasLowerSecurity(target, 0))
             return false;
 
         CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(id);
@@ -98,7 +101,7 @@ public:
         return true;
     }
 
-    static bool HandleTitlesAddCommand(ChatHandler* handler, char const* args)
+    static bool HandleTitlesAddCommand(ChatHandler* handler, const char* args)
     {
         // number or [name] Shift-click form |color|Htitle:title_id|h[name]|h|r
         char* id_p = handler->extractKeyFromLink((char*)args, "Htitle");
@@ -122,7 +125,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
+        if (handler->HasLowerSecurity(target, 0))
             return false;
 
         CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(id);
@@ -168,7 +171,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
+        if (handler->HasLowerSecurity(target, 0))
             return false;
 
         CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(id);
@@ -216,7 +219,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
+        if (handler->HasLowerSecurity(target, 0))
             return false;
 
         uint64 titles2 = titles;
@@ -225,7 +228,7 @@ public:
             if (CharTitlesEntry const* tEntry = sCharTitlesStore.LookupEntry(i))
                 titles2 &= ~(uint64(1) << tEntry->bit_index);
 
-        titles &= ~titles2;                                     // remove non-existing titles
+        titles &= ~titles2;                                     // remove not existed titles
 
         target->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES, titles);
         handler->SendSysMessage(LANG_DONE);

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,8 +16,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TRINITYCORE_WORLDPACKET_H
-#define TRINITYCORE_WORLDPACKET_H
+#ifndef SUNWELLCORE_WORLDPACKET_H
+#define SUNWELLCORE_WORLDPACKET_H
 
 #include "Common.h"
 #include "ByteBuffer.h"
@@ -29,29 +29,11 @@ class WorldPacket : public ByteBuffer
         WorldPacket()                                       : ByteBuffer(0), m_opcode(0)
         {
         }
-
         explicit WorldPacket(uint16 opcode, size_t res=200) : ByteBuffer(res), m_opcode(opcode) { }
-
-        WorldPacket(WorldPacket&& packet) : ByteBuffer(std::move(packet)), m_opcode(packet.m_opcode)
+                                                            // copy constructor
+        WorldPacket(const WorldPacket &packet)              : ByteBuffer(packet), m_opcode(packet.m_opcode)
         {
         }
-
-        WorldPacket(WorldPacket const& right) : ByteBuffer(right), m_opcode(right.m_opcode)
-        {
-        }
-
-        WorldPacket& operator=(WorldPacket const& right)
-        {
-            if (this != &right)
-            {
-                m_opcode = right.m_opcode;
-                ByteBuffer::operator =(right);
-            }
-
-            return *this;
-        }
-
-        WorldPacket(uint16 opcode, MessageBuffer&& buffer) : ByteBuffer(std::move(buffer)), m_opcode(opcode) { }
 
         void Initialize(uint16 opcode, size_t newres=200)
         {
@@ -66,5 +48,5 @@ class WorldPacket : public ByteBuffer
     protected:
         uint16 m_opcode;
 };
-
 #endif
+

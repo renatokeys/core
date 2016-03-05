@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,7 +21,6 @@
 uint32 const EncounterCount         = 23;
 
 #define BRSScriptName "instance_blackrock_spire"
-#define DataHeader    "BRS"
 
 enum DataTypes
 {
@@ -115,7 +114,9 @@ enum GameObjectsIds
     // For Gyth event
     GO_DR_PORTCULLIS                = 175185,
     GO_PORTCULLIS_ACTIVE            = 164726,
-    GO_PORTCULLIS_TOBOSSROOMS       = 175186
+    GO_PORTCULLIS_TOBOSSROOMS       = 175186,
+	// Urok Doomhowl
+	GO_UROK_PILE					= 175621,
 };
 
 #endif

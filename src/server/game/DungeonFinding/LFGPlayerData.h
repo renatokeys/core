@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -26,6 +26,7 @@ namespace lfg
 /**
     Stores all lfg data needed about the player.
 */
+
 class LfgPlayerData
 {
     public:
@@ -35,8 +36,10 @@ class LfgPlayerData
         // General
         void SetState(LfgState state);
         void RestoreState();
-        void SetTeam(uint8 team);
-        void SetGroup(ObjectGuid group);
+        void SetLockedDungeons(LfgLockMap const& lock);
+        void SetTeam(TeamId teamId);
+        void SetGroup(uint64 group);
+		void SetRandomPlayersCount(uint8 count);
 
         // Queue
         void SetRoles(uint8 roles);
@@ -46,8 +49,12 @@ class LfgPlayerData
         // General
         LfgState GetState() const;
         LfgState GetOldState() const;
-        uint8 GetTeam() const;
-        ObjectGuid GetGroup() const;
+        LfgLockMap const& GetLockedDungeons() const;
+        TeamId GetTeam() const;
+        uint64 GetGroup() const;
+		uint8 GetRandomPlayersCount() const;
+		void SetCanOverrideRBState(bool val) { m_canOverrideRBState = val; }
+		bool CanOverrideRBState() const { return m_canOverrideRBState; }
 
         // Queue
         uint8 GetRoles() const;
@@ -58,9 +65,12 @@ class LfgPlayerData
         // General
         LfgState m_State;                                  ///< State if group in LFG
         LfgState m_OldState;                               ///< Old State - Used to restore state after failed Rolecheck/Proposal
+		bool m_canOverrideRBState;                         ///< pussywizard
         // Player
-        uint8 m_Team;                                      ///< Player team - determines the queue to join
-        ObjectGuid m_Group;                                ///< Original group of player when joined LFG
+        LfgLockMap m_LockedDungeons;                       ///< Dungeons player can't do and reason
+        TeamId m_TeamId;                                   ///< Player team - determines the queue to join
+        uint64 m_Group;                                    ///< Original group of player when joined LFG
+		uint8 m_randomPlayers;                             ///< Xinef: Amount of random players you raid with
 
         // Queue
         uint8 m_Roles;                                     ///< Roles the player selected when joined LFG

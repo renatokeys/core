@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -49,7 +49,7 @@ class boss_shazzrah : public CreatureScript
         {
             boss_shazzrahAI(Creature* creature) : BossAI(creature, BOSS_SHAZZRAH) { }
 
-            void EnterCombat(Unit* target) override
+            void EnterCombat(Unit* target)
             {
                 BossAI::EnterCombat(target);
                 events.ScheduleEvent(EVENT_ARCANE_EXPLOSION, 6000);
@@ -59,7 +59,7 @@ class boss_shazzrah : public CreatureScript
                 events.ScheduleEvent(EVENT_SHAZZRAH_GATE, 45000);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -110,7 +110,7 @@ class boss_shazzrah : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new boss_shazzrahAI(creature);
         }
@@ -126,7 +126,7 @@ class spell_shazzrah_gate_dummy : public SpellScriptLoader
         {
             PrepareSpellScript(spell_shazzrah_gate_dummy_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) override
+            bool Validate(SpellInfo const* /*spellInfo*/)
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_SHAZZRAH_GATE))
                     return false;
@@ -153,14 +153,14 @@ class spell_shazzrah_gate_dummy : public SpellScriptLoader
                 }
             }
 
-            void Register() override
+            void Register()
             {
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_shazzrah_gate_dummy_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
                 OnEffectHitTarget += SpellEffectFn(spell_shazzrah_gate_dummy_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const override
+        SpellScript* GetSpellScript() const
         {
             return new spell_shazzrah_gate_dummy_SpellScript();
         }

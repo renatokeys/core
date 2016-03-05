@@ -1,206 +1,402 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/*
-* Comment: No Waves atm and the doors spells are crazy...
-*
-* When your group enters the main room (the one after the bridge), you will notice a group of 3 Nerubians.
-* When you engage them, 2 more groups like this one spawn behind the first one - it is important to pull the first group back,
-* so you don't aggro all 3. Hadronox will be under you, fighting Nerubians.
-*
-* This is the timed gauntlet - waves of non-elite spiders
-* will spawn from the 3 doors located a little above the main room, and will then head down to fight Hadronox. After clearing the
-* main room, it is recommended to just stay in it, kill the occasional non-elites that will attack you instead of the boss, and wait for
-* Hadronox to make his way to you. When Hadronox enters the main room, she will web the doors, and no more non-elites will spawn.
+REWRITTEN BY XINEF
 */
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "azjol_nerub.h"
+#include "ScriptedEscortAI.h"
+#include "Player.h"
 
 enum Spells
 {
-    SPELL_ACID_CLOUD                              = 53400, // Victim
-    SPELL_LEECH_POISON                            = 53030, // Victim
-    SPELL_PIERCE_ARMOR                            = 53418, // Victim
-    SPELL_WEB_GRAB                                = 57731, // Victim
-    SPELL_WEB_FRONT_DOORS                         = 53177, // Self
-    SPELL_WEB_SIDE_DOORS                          = 53185, // Self
-    H_SPELL_ACID_CLOUD                            = 59419,
-    H_SPELL_LEECH_POISON                          = 59417,
-    H_SPELL_WEB_GRAB                              = 59421
+	SPELL_SUMMON_ANUBAR_CHAMPION			= 53064,
+	SPELL_SUMMON_ANUBAR_CRYPT_FIEND			= 53065,
+	SPELL_SUMMON_ANUBAR_NECROMANCER			= 53066,
+    SPELL_WEB_FRONT_DOORS					= 53177,
+    SPELL_WEB_SIDE_DOORS					= 53185,
+    SPELL_ACID_CLOUD						= 53400,
+    SPELL_LEECH_POISON						= 53030,
+	SPELL_LEECH_POISON_HEAL					= 53800,
+	SPELL_WEB_GRAB							= 57731,
+    SPELL_PIERCE_ARMOR						= 53418,
+   
+	SPELL_SMASH								= 53318,
+	SPELL_FRENZY							= 53801
+};
+
+enum Events
+{
+	EVENT_HADRONOX_MOVE1		= 1,
+	EVENT_HADRONOX_MOVE2		= 2,
+	EVENT_HADRONOX_MOVE3		= 3,
+	EVENT_HADRONOX_MOVE4		= 4,
+	EVENT_HADRONOX_ACID			= 5,
+	EVENT_HADRONOX_LEECH		= 6,
+	EVENT_HADRONOX_PIERCE		= 7,
+	EVENT_HADRONOX_GRAB			= 8,
+	EVENT_HADRONOX_SUMMON		= 9,
+
+	EVENT_CRUSHER_SMASH			= 20,
+	EVENT_CHECK_HEALTH			= 21
+};
+
+enum Misc
+{
+	NPC_ANUB_AR_CRUSHER			= 28922,
+
+	SAY_CRUSHER_AGGRO			= 0,
+	SAY_CRUSHER_EMOTE			= 1,
+	SAY_HADRONOX_EMOTE			= 0,
+
+	ACTION_DESPAWN_ADDS			= 1,
+	ACTION_START_EVENT			= 2
+};
+
+const Position hadronoxSteps[4] = 
+{
+	{607.9f, 512.8f, 695.3f, 0.0f},
+	{611.67f, 564.11f, 720.0f, 0.0f},
+	{576.1f, 580.0f, 727.5f, 0.0f},
+	{534.87f, 554.0f, 733.0f, 0.0f}
 };
 
 class boss_hadronox : public CreatureScript
 {
-public:
-    boss_hadronox() : CreatureScript("boss_hadronox") { }
+	public:
+		boss_hadronox() : CreatureScript("boss_hadronox") { }
 
-    struct boss_hadronoxAI : public ScriptedAI
-    {
-        boss_hadronoxAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-            instance = creature->GetInstanceScript();
-            fMaxDistance = 50.0f;
-            bFirstTime = true;
-        }
+		struct boss_hadronoxAI : public BossAI
+		{
+			boss_hadronoxAI(Creature* creature) : BossAI(creature, DATA_HADRONOX_EVENT)
+			{
+			}
 
-        void Initialize()
-        {
-            uiAcidTimer = urand(10 * IN_MILLISECONDS, 14 * IN_MILLISECONDS);
-            uiLeechTimer = urand(3 * IN_MILLISECONDS, 9 * IN_MILLISECONDS);
-            uiPierceTimer = urand(1 * IN_MILLISECONDS, 3 * IN_MILLISECONDS);
-            uiGrabTimer = urand(15 * IN_MILLISECONDS, 19 * IN_MILLISECONDS);
-            uiDoorsTimer = urand(20 * IN_MILLISECONDS, 30 * IN_MILLISECONDS);
-            uiCheckDistanceTimer = 2 * IN_MILLISECONDS;
-        }
+			void Reset()
+			{
+				summons.DoAction(ACTION_DESPAWN_ADDS);
+				BossAI::Reset();				
+				me->SummonCreature(NPC_ANUB_AR_CRUSHER, 542.9f, 519.5f, 741.24f, 2.14f);
+			}
 
-        InstanceScript* instance;
+			void DoAction(int32 param)
+			{
+				if (param == ACTION_START_EVENT)
+				{
+					instance->SetBossState(DATA_HADRONOX_EVENT, IN_PROGRESS);
+					me->setActive(true);
+					events.ScheduleEvent(EVENT_HADRONOX_MOVE1, 20000);
+					events.ScheduleEvent(EVENT_HADRONOX_MOVE2, 40000);
+					events.ScheduleEvent(EVENT_HADRONOX_MOVE3, 60000);
+					events.ScheduleEvent(EVENT_HADRONOX_MOVE4, 80000);
+				}
+			}
 
-        uint32 uiAcidTimer;
-        uint32 uiLeechTimer;
-        uint32 uiPierceTimer;
-        uint32 uiGrabTimer;
-        uint32 uiDoorsTimer;
-        uint32 uiCheckDistanceTimer;
+			uint32 GetData(uint32 data) const
+			{
+				if (data == me->GetEntry())
+					return !me->isActiveObject() || events.GetNextEventTime(EVENT_HADRONOX_MOVE4) != 0;
+				return 0;
+			}
 
-        bool bFirstTime;
+			void JustSummoned(Creature* summon)
+			{
+				summons.Summon(summon);
 
-        float fMaxDistance;
+				// Xinef: cannot use pathfinding...
+				if (summon->GetDistance(477.0f, 618.0f, 771.0f) < 5.0f)
+					summon->GetMotionMaster()->MovePath(3000012, false);
+				else if (summon->GetDistance(583.0f, 617.0f, 771.0f) < 5.0f)
+					summon->GetMotionMaster()->MovePath(3000013, false);
+				else if (summon->GetDistance(581.0f, 608.5f, 739.0f) < 5.0f)
+					summon->GetMotionMaster()->MovePath(3000014, false);
+			}
 
-        void Reset() override
-        {
-            me->SetFloatValue(UNIT_FIELD_BOUNDINGRADIUS, 9.0f);
-            me->SetFloatValue(UNIT_FIELD_COMBATREACH, 9.0f);
+			void KilledUnit(Unit* victim)
+			{
+				if (!me->IsAlive() || !victim->HasAura(SPELL_LEECH_POISON))
+					return;
 
-            Initialize();
+				me->ModifyHealth(int32(me->CountPctFromMaxHealth(10)));
+			}
 
-            if (instance->GetBossState(DATA_HADRONOX) != DONE && !bFirstTime)
-                instance->SetBossState(DATA_HADRONOX, FAIL);
+			void JustDied(Unit* killer)
+			{
+				BossAI::JustDied(killer);
+			}
 
-            bFirstTime = false;
-        }
+			void EnterCombat(Unit*)
+			{
+				events.RescheduleEvent(EVENT_HADRONOX_ACID, 10000);
+				events.RescheduleEvent(EVENT_HADRONOX_LEECH, 4000);
+				events.RescheduleEvent(EVENT_HADRONOX_PIERCE, 1000);
+				events.RescheduleEvent(EVENT_HADRONOX_GRAB, 15000);
+			}
 
-        //when Hadronox kills any enemy (that includes a party member) she will regain 10% of her HP if the target had Leech Poison on
-        void KilledUnit(Unit* Victim) override
-        {
-            // not sure if this aura check is correct, I think it is though
-            if (!Victim || !Victim->HasAura(DUNGEON_MODE(SPELL_LEECH_POISON, H_SPELL_LEECH_POISON)) || !me->IsAlive())
-                return;
+			bool AnyPlayerValid() const
+			{
+				Map::PlayerList const& playerList = me->GetMap()->GetPlayers();
+				for(Map::PlayerList::const_iterator itr = playerList.begin(); itr != playerList.end(); ++itr)
+					if (me->GetDistance(itr->GetSource()) < 130.0f && itr->GetSource()->IsAlive() && !itr->GetSource()->IsGameMaster() && me->CanCreatureAttack(itr->GetSource()) && me->_CanDetectFeignDeathOf(itr->GetSource()))
+						return true;
 
-            me->ModifyHealth(int32(me->CountPctFromMaxHealth(10)));
-        }
+				return false;
+			}
 
-        void JustDied(Unit* /*killer*/) override
-        {
-            instance->SetBossState(DATA_HADRONOX, DONE);
-        }
+			void UpdateAI(uint32 diff)
+			{
+				if (!UpdateVictim())
+					return;
 
-        void EnterCombat(Unit* /*who*/) override
-        {
-            instance->SetBossState(DATA_HADRONOX, IN_PROGRESS);
-            me->SetInCombatWithZone();
-        }
+				events.Update(diff);
+				if (me->HasUnitState(UNIT_STATE_CASTING))
+					return;
 
-        void CheckDistance(float dist, const uint32 uiDiff)
-        {
-            if (!me->IsInCombat())
-                return;
+				switch (uint32 eventId = events.ExecuteEvent())
+				{
+					case EVENT_HADRONOX_PIERCE:
+						me->CastSpell(me->GetVictim(), SPELL_PIERCE_ARMOR, false);
+						events.ScheduleEvent(EVENT_HADRONOX_PIERCE, 8000);
+						break;
+					case EVENT_HADRONOX_ACID:
+						if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, false))
+							me->CastSpell(target, SPELL_ACID_CLOUD, false);
+						events.ScheduleEvent(EVENT_HADRONOX_ACID, 25000);
+						break;
+					case EVENT_HADRONOX_LEECH:
+						me->CastSpell(me, SPELL_LEECH_POISON, false);
+						events.ScheduleEvent(EVENT_HADRONOX_LEECH, 12000);
+						break;
+					case EVENT_HADRONOX_GRAB:
+						me->CastSpell(me, SPELL_WEB_GRAB, false);
+						events.ScheduleEvent(EVENT_HADRONOX_GRAB, 25000);
+						break;
+					case EVENT_HADRONOX_MOVE4:
+						me->CastSpell(me, SPELL_WEB_FRONT_DOORS, true);
+					case EVENT_HADRONOX_MOVE1:
+					case EVENT_HADRONOX_MOVE2:
+					case EVENT_HADRONOX_MOVE3:
+						Talk(SAY_HADRONOX_EMOTE);
+						me->GetMotionMaster()->MoveCharge(hadronoxSteps[eventId-1].GetPositionX(), hadronoxSteps[eventId-1].GetPositionY(), hadronoxSteps[eventId-1].GetPositionZ(), 10.0f, 0, NULL, true);
+						break;
 
-            float x=0.0f, y=0.0f, z=0.0f;
-            me->GetRespawnPosition(x, y, z);
+				}
 
-            if (uiCheckDistanceTimer <= uiDiff)
-                uiCheckDistanceTimer = 5*IN_MILLISECONDS;
-            else
-            {
-                uiCheckDistanceTimer -= uiDiff;
-                return;
+				DoMeleeAttackIfReady();
+                EnterEvadeIfOutOfCombatArea();
             }
-            if (me->IsInEvadeMode() || !me->GetVictim())
-                return;
-            if (me->GetDistance(x, y, z) > dist)
-                EnterEvadeMode();
-        }
+					
+			bool CheckEvadeIfOutOfCombatArea() const
+			{
+				return me->isActiveObject() && !AnyPlayerValid();
+			}
+		};
 
-        void UpdateAI(uint32 diff) override
+		CreatureAI* GetAI(Creature* creature) const
+		{
+			return new boss_hadronoxAI(creature);
+		}
+};
+
+class npc_anub_ar_crusher : public CreatureScript
+{
+	public:
+		npc_anub_ar_crusher() : CreatureScript("npc_anub_ar_crusher") { }
+
+		struct npc_anub_ar_crusherAI : public ScriptedAI
+		{
+			npc_anub_ar_crusherAI(Creature *c) : ScriptedAI(c), summons(me) {}
+
+			EventMap events;
+			SummonList summons;
+
+			void Reset()
+			{
+				summons.DespawnAll();
+				events.Reset();
+
+				if (me->ToTempSummon())
+					if (Unit* summoner = me->ToTempSummon()->GetSummoner())
+						if (summoner->GetEntry() == me->GetEntry())
+						{
+							me->CastSpell(me, RAND(SPELL_SUMMON_ANUBAR_CHAMPION, SPELL_SUMMON_ANUBAR_CRYPT_FIEND, SPELL_SUMMON_ANUBAR_NECROMANCER), true);
+							me->CastSpell(me, RAND(SPELL_SUMMON_ANUBAR_CHAMPION, SPELL_SUMMON_ANUBAR_CRYPT_FIEND, SPELL_SUMMON_ANUBAR_NECROMANCER), true);
+						}
+			}
+
+			void JustSummoned(Creature* summon)
+			{
+				if(summon->GetEntry() != me->GetEntry())
+				{
+					summon->GetMotionMaster()->MovePoint(0, *me, false);
+					summon->GetMotionMaster()->MoveFollow(me, 0.1f, 0.0f + M_PI*0.3f*summons.size());
+				}
+				summons.Summon(summon);
+			}
+
+			void DoAction(int32 param)
+			{
+				if (param == ACTION_DESPAWN_ADDS)
+				{
+					summons.DoAction(ACTION_DESPAWN_ADDS);
+					summons.DespawnAll();
+				}
+			}
+
+			void EnterCombat(Unit*)
+			{
+				if (me->ToTempSummon())
+					if (Unit* summoner = me->ToTempSummon()->GetSummoner())
+						if (summoner->GetEntry() != me->GetEntry())
+						{
+							summoner->GetAI()->DoAction(ACTION_START_EVENT);
+							me->SummonCreature(NPC_ANUB_AR_CRUSHER, 519.58f, 573.73f, 734.30f, 4.50f);
+							me->SummonCreature(NPC_ANUB_AR_CRUSHER, 539.38f, 573.25f, 732.20f, 4.738f);
+							Talk(SAY_CRUSHER_AGGRO);
+						}
+
+				events.ScheduleEvent(EVENT_CRUSHER_SMASH, 8000, 0, 0);
+				events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+			}
+
+			void UpdateAI(uint32 diff)
+			{
+				if (!UpdateVictim())
+					return;
+
+				events.Update(diff);
+				if (me->HasUnitState(UNIT_STATE_CASTING))
+					return;
+
+				switch (events.ExecuteEvent())
+				{
+					case EVENT_CRUSHER_SMASH:
+						me->CastSpell(me->GetVictim(), SPELL_SMASH, false);
+						events.ScheduleEvent(EVENT_CRUSHER_SMASH, 15000);
+						break;
+					case EVENT_CHECK_HEALTH:
+						if (me->HealthBelowPct(30))
+						{
+							Talk(SAY_CRUSHER_EMOTE);
+							me->CastSpell(me, SPELL_FRENZY, false);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+						break;
+				}
+
+				DoMeleeAttackIfReady();
+			}
+		};
+
+		CreatureAI* GetAI(Creature* creature) const
+		{
+			return new npc_anub_ar_crusherAI(creature);
+		}
+};
+
+class spell_hadronox_summon_periodic : public SpellScriptLoader
+{
+    public:
+        spell_hadronox_summon_periodic(const char* name, uint32 delay, uint32 spellEntry) : SpellScriptLoader(name), _delay(delay), _spellEntry(spellEntry) { }
+
+        class spell_hadronox_summon_periodic_AuraScript : public AuraScript
         {
-            //Return since we have no target
-            if (!UpdateVictim())
-                return;
+		public:
+			spell_hadronox_summon_periodic_AuraScript(uint32 delay, uint32 spellEntry) : _delay(delay), _spellEntry(spellEntry) { }
+            PrepareAuraScript(spell_hadronox_summon_periodic_AuraScript);
 
-            // Without he comes up through the air to players on the bridge after krikthir if players crossing this bridge!
-            CheckDistance(fMaxDistance, diff);
-
-            if (me->HasAura(SPELL_WEB_FRONT_DOORS) || me->HasAura(SPELL_WEB_SIDE_DOORS))
+            void HandlePeriodic(AuraEffect const* /*aurEff*/)
             {
-                if (IsCombatMovementAllowed())
-                    SetCombatMovement(false);
+                PreventDefaultAction();
+				Unit* owner = GetUnitOwner();
+				if (InstanceScript* instance = owner->GetInstanceScript())
+					if (instance->GetBossState(DATA_HADRONOX_EVENT) != DONE)
+					{
+						if (!owner->HasAura(SPELL_WEB_FRONT_DOORS))
+							owner->CastSpell(owner, _spellEntry, true);
+						else if (!instance->IsEncounterInProgress())
+							owner->RemoveAurasDueToSpell(SPELL_WEB_FRONT_DOORS);
+					}
             }
-            else if (!IsCombatMovementAllowed())
-                SetCombatMovement(true);
 
-            if (uiPierceTimer <= diff)
+            void OnApply(AuraEffect const* auraEffect, AuraEffectHandleModes)
             {
-                DoCastVictim(SPELL_PIERCE_ARMOR);
-                uiPierceTimer = 8*IN_MILLISECONDS;
-            } else uiPierceTimer -= diff;
+                GetAura()->GetEffect(auraEffect->GetEffIndex())->SetPeriodicTimer(_delay);
+            }
 
-            if (uiAcidTimer <= diff)
+            void Register()
             {
-                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(target, SPELL_ACID_CLOUD);
+                OnEffectPeriodic += AuraEffectPeriodicFn(spell_hadronox_summon_periodic_AuraScript::HandlePeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+                OnEffectApply += AuraEffectApplyFn(spell_hadronox_summon_periodic_AuraScript::OnApply, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
+            }
 
-                uiAcidTimer = urand(20*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-            } else uiAcidTimer -= diff;
+		private:
+			uint32 _spellEntry;
+			uint32 _delay;
+        };
 
-            if (uiLeechTimer <= diff)
-            {
-                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(target, SPELL_LEECH_POISON);
-
-                uiLeechTimer = urand(11*IN_MILLISECONDS, 14*IN_MILLISECONDS);
-            } else uiLeechTimer -= diff;
-
-            if (uiGrabTimer <= diff)
-            {
-                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0)) // Draws all players (and attacking Mobs) to itself.
-                    DoCast(target, SPELL_WEB_GRAB);
-
-                uiGrabTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-            } else uiGrabTimer -= diff;
-
-            if (uiDoorsTimer <= diff)
-            {
-                uiDoorsTimer = urand(30*IN_MILLISECONDS, 60*IN_MILLISECONDS);
-            } else uiDoorsTimer -= diff;
-
-            DoMeleeAttackIfReady();
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_hadronox_summon_periodic_AuraScript(_delay, _spellEntry);
         }
-    };
 
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return GetInstanceAI<boss_hadronoxAI>(creature);
-    }
+	private:
+		uint32 _spellEntry;
+		uint32 _delay;
+};
+
+class spell_hadronox_leech_poison : public SpellScriptLoader
+{
+	public:
+		spell_hadronox_leech_poison() : SpellScriptLoader("spell_hadronox_leech_poison") { }
+
+		class spell_hadronox_leech_poison_AuraScript : public AuraScript
+		{
+			PrepareAuraScript(spell_hadronox_leech_poison_AuraScript)
+
+			void HandleEffectRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+			{                
+                if (GetTargetApplication()->GetRemoveMode() == AURA_REMOVE_BY_DEATH)
+					if (Unit* caster = GetCaster())
+						caster->CastSpell(caster, SPELL_LEECH_POISON_HEAL, true);
+			}
+
+			void Register()
+			{
+				AfterEffectRemove += AuraEffectRemoveFn(spell_hadronox_leech_poison_AuraScript::HandleEffectRemove, EFFECT_0, SPELL_AURA_PERIODIC_LEECH, AURA_EFFECT_HANDLE_REAL);
+			}
+		};
+
+		AuraScript* GetAuraScript() const
+		{
+			return new spell_hadronox_leech_poison_AuraScript();
+		}
+};
+
+class achievement_hadronox_denied : public AchievementCriteriaScript
+{
+    public:
+        achievement_hadronox_denied() : AchievementCriteriaScript("achievement_hadronox_denied")
+        {
+        }
+
+        bool OnCheck(Player* /*player*/, Unit* target)
+        {
+            if (!target)
+                return false;
+
+			return target->GetAI()->GetData(target->GetEntry());
+        }
 };
 
 void AddSC_boss_hadronox()
 {
     new boss_hadronox();
+	new npc_anub_ar_crusher();
+	new spell_hadronox_summon_periodic("spell_hadronox_summon_periodic_champion", 15000, SPELL_SUMMON_ANUBAR_CHAMPION);
+	new spell_hadronox_summon_periodic("spell_hadronox_summon_periodic_necromancer", 10000, SPELL_SUMMON_ANUBAR_NECROMANCER);
+	new spell_hadronox_summon_periodic("spell_hadronox_summon_periodic_crypt_fiend", 5000, SPELL_SUMMON_ANUBAR_CRYPT_FIEND);
+	new spell_hadronox_leech_poison();
+	new achievement_hadronox_denied();
 }

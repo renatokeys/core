@@ -1,87 +1,142 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY PUSSYWIZARD, IT OWNS NOW!
+*/
 
 #ifndef DEF_EYE_OF_ETERNITY_H
 #define DEF_EYE_OF_ETERNITY_H
 
-#define DataHeader "EOE"
-
-enum InstanceData
+enum Objects
 {
-    DATA_MALYGOS_EVENT,
-    MAX_ENCOUNTER,
+	GO_NEXUS_PLATFORM			= 193070,
+	GO_IRIS_N					= 193958,
+	GO_IRIS_H					= 193960,
+	GO_EXIT_PORTAL				= 193908,
+};
+#define ALEXSTRASZA_GIFT		DUNGEON_MODE(193905, 193967)
+#define HEART_OF_MAGIC			DUNGEON_MODE(194158, 194159)
 
-    DATA_VORTEX_HANDLING,
-    DATA_POWER_SPARKS_HANDLING,
-    DATA_RESPAWN_IRIS
+enum NPCs
+{
+	NPC_MALYGOS					= 28859,
+	NPC_PORTAL					= 30118,
+	NPC_WORLD_TRIGGER_LAOI		= 22517,
+	NPC_POWER_SPARK				= 30084,
+	NPC_VORTEX					= 30090,
+	NPC_NEXUS_LORD				= 30245,
+	NPC_SCION_OF_ETERNITY		= 30249,
+	NPC_HOVER_DISK				= 30248,
+	NPC_ARCANE_OVERLOAD			= 30282,
+	NPC_SURGE_OF_POWER			= 30334,
+	NPC_WYRMREST_SKYTALON		= 30161,
+	NPC_STATIC_FIELD			= 30592,
+	NPC_ALEXSTRASZA				= 32295,
 };
 
-enum InstanceData64
+enum Data
 {
-    DATA_TRIGGER,
-    DATA_MALYGOS,
-    DATA_PLATFORM,
-    DATA_ALEXSTRASZA_BUNNY_GUID,
-    DATA_HEART_OF_MAGIC_GUID,
-    DATA_FOCUSING_IRIS_GUID,
-    DATA_GIFT_BOX_BUNNY_GUID
+	DATA_IRIS_ACTIVATED,
+	DATA_ENCOUNTER_STATUS,
+	DATA_SET_IRIS_INACTIVE,
+	DATA_HIDE_IRIS_AND_PORTAL,
+	DATA_MALYGOS_GUID,
 };
 
-enum InstanceNpcs
+enum eSpells
 {
-    NPC_MALYGOS             = 28859,
-    NPC_VORTEX_TRIGGER      = 30090,
-    NPC_PORTAL_TRIGGER      = 30118,
-    NPC_POWER_SPARK         = 30084,
-    NPC_HOVER_DISK_MELEE    = 30234,
-    NPC_HOVER_DISK_CASTER   = 30248,
-    NPC_ARCANE_OVERLOAD     = 30282,
-    NPC_WYRMREST_SKYTALON   = 30161,
-    NPC_ALEXSTRASZA         = 32295,
-    NPC_ALEXSTRASZA_BUNNY   = 31253,
-    NPC_ALEXSTRASZAS_GIFT   = 32448,
-    NPC_SURGE_OF_POWER      = 30334
+	SPELL_PORTAL_BEAM					= 56046,
+	SPELL_IRIS_ACTIVATED				= 61012,
+	SPELL_POWER_SPARK_VISUAL			= 55845,
+	SPELL_POWER_SPARK_GROUND_BUFF		= 55852,
+	SPELL_POWER_SPARK_MALYGOS_BUFF		= 56152,
+
+	SPELL_TELEPORT_VISUAL				= 52096,
+
+	SPELL_SCION_ARCANE_BARRAGE			= 56397,
+	SPELL_ARCANE_SHOCK_N				= 57058,
+	SPELL_ARCANE_SHOCK_H				= 60073,
+	SPELL_HASTE							= 57060,
+
+	SPELL_ALEXSTRASZA_GIFT				= 61028,
 };
 
-enum InstanceGameObjects
+#define SPELL_ARCANE_SHOCK				DUNGEON_MODE(SPELL_ARCANE_SHOCK_N, SPELL_ARCANE_SHOCK_H)
+
+enum eAchiev
 {
-    GO_NEXUS_RAID_PLATFORM      = 193070,
-    GO_EXIT_PORTAL              = 193908,
-    GO_FOCUSING_IRIS_10         = 193958,
-    GO_FOCUSING_IRIS_25         = 193960,
-    GO_ALEXSTRASZA_S_GIFT_10    = 193905,
-    GO_ALEXSTRASZA_S_GIFT_25    = 193967,
-    GO_HEART_OF_MAGIC_10        = 194158,
-    GO_HEART_OF_MAGIC_25        = 194159
+	ACHIEV_CRITERIA_DENYIN_THE_SCION_10		= 7573,
+	ACHIEV_CRITERIA_DENYIN_THE_SCION_25		= 7574,
+	ACHIEV_CRITERIA_A_POKE_IN_THE_EYE_10	= 7174,
+	ACHIEV_CRITERIA_A_POKE_IN_THE_EYE_25	= 7175,
+	ACHIEV_YOU_DONT_HAVE_AN_ENTERNITY_EVENT	= 20387,
 };
 
-enum InstanceEvents
+/*** POSITIONS/WAYPOINTS BELOW ***/
+
+#define INTRO_MOVEMENT_INTERVAL	25000
+
+const Position CenterPos = {754.395f, 1301.27f, 266.10f, 0.0f};
+
+const Position FourSidesPos[] =
 {
-    EVENT_FOCUSING_IRIS = 20711
+    {686.417f, 1235.52f, 288.17f, M_PI/4},
+    {828.182f, 1379.05f, 288.17f, 5*M_PI/4},
+    {681.278f, 1375.796f, 288.17f, 7*M_PI/4},
+    {821.182f, 1235.42f, 288.17f, 3*M_PI/4},
 };
 
-enum InstanceSpells
+const Position Phase2NorthPos = {837.22f, 1301.676f, 296.10f, M_PI};
+
+/*** TEXTS/SOUNDS BELOW ***/
+
+enum sounds
 {
-    SPELL_VORTEX_4                        = 55853, // damage | used to enter to the vehicle
-    SPELL_VORTEX_5                        = 56263, // damage | used to enter to the vehicle
-    SPELL_PORTAL_OPENED                   = 61236,
-    SPELL_RIDE_RED_DRAGON_TRIGGERED       = 56072,
-    SPELL_IRIS_OPENED                     = 61012, // visual when starting encounter
-    SPELL_SUMMOM_RED_DRAGON_BUDDY         = 56070
+	SOUND_VORTEX							= 14525,
+	SOUND_SPARK_BUFF						= 14533,
+
+	SOUND_SLAY_1_1							= 14519,
+	SOUND_SLAY_1_2							= 14520,
+	SOUND_SLAY_1_3							= 14521,
+	SOUND_SLAY_2_1							 = 14526,
+	SOUND_SLAY_2_2							 = 14527,
+	SOUND_SLAY_2_3							 = 14528,
+	SOUND_SLAY_3_1							 = 14534,
+	SOUND_SLAY_3_2							 = 14535,
+	SOUND_SLAY_3_3							 = 14536,
+	
+	SOUND_AGGRO_1							 = 14517,
+	SOUND_AGGRO_2							 = 14523,
+	SOUND_DEEP_BREATH                        = 14518,
+	SOUND_DEATH								 = 14540,
+	SOUND_PHASE_1_END						 = 14522,
+	SOUND_PHASE_2_END						 = 14529,
+	SOUND_PHASE_3_START						 = 14530
+};
+
+struct Speech
+{
+	uint32 sound;
+	const char* text;
+};
+
+const Speech MalygosIntroTexts[] =
+{
+	{14512, "Lesser beings, intruding here! A shame that your excess courage does not compensate for your stupidity!"},
+	{14513, "None but the blue dragonflight are welcome here! Perhaps this is the work of Alexstrasza? Well then, she has sent you to your deaths."},
+	{14514, "What could you hope to accomplish, to storm brazenly into my domain? To employ MAGIC? Against ME?"},
+	{14515, "I am without limits here... the rules of your cherished reality do not apply... In this realm, I am in control..."},
+	{14516, "I give you one chance. Pledge fealty to me, and perhaps I won\'t slaughter you for your insolence!"},
+};
+
+const uint32 MalygosIntroIntervals[] = {18000, 19000, 21000, 18000, 15000};
+
+class EoEDrakeEnterVehicleEvent : public BasicEvent
+{
+    public:
+        EoEDrakeEnterVehicleEvent(Creature& owner, uint64 playerGUID) : _owner(owner), _playerGUID(playerGUID) { }
+        bool Execute(uint64 /*eventTime*/, uint32 /*updateTime*/);
+	private:
+        Creature& _owner;
+		uint64 _playerGUID;
 };
 
 #endif

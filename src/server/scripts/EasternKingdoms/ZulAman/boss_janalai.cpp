@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -121,27 +121,7 @@ class boss_janalai : public CreatureScript
         {
             boss_janalaiAI(Creature* creature) : ScriptedAI(creature)
             {
-                Initialize();
                 instance = creature->GetInstanceScript();
-            }
-
-            void Initialize()
-            {
-                FireBreathTimer = 8000;
-                BombTimer = 30000;
-                BombSequenceTimer = 1000;
-                BombCount = 0;
-                HatcherTimer = 10000;
-                EnrageTimer = MINUTE * 5 * IN_MILLISECONDS;
-
-                noeggs = false;
-                isBombing = false;
-                enraged = false;
-
-                isFlameBreathing = false;
-
-                for (uint8 i = 0; i < 40; ++i)
-                    FireBombGUIDs[i].Clear();
             }
 
             InstanceScript* instance;
@@ -159,30 +139,44 @@ class boss_janalai : public CreatureScript
 
             bool isFlameBreathing;
 
-            ObjectGuid FireBombGUIDs[40];
+            uint64 FireBombGUIDs[40];
 
-            void Reset() override
+            void Reset()
             {
                 instance->SetData(DATA_JANALAIEVENT, NOT_STARTED);
 
-                Initialize();
+                FireBreathTimer = 8000;
+                BombTimer = 30000;
+                BombSequenceTimer = 1000;
+                BombCount = 0;
+                HatcherTimer = 10000;
+                EnrageTimer = MINUTE*5*IN_MILLISECONDS;
+
+                noeggs = false;
+                isBombing =false;
+                enraged = false;
+
+                isFlameBreathing = false;
+
+                for (uint8 i = 0; i < 40; ++i)
+                    FireBombGUIDs[i] = 0;
 
                 HatchAllEggs(1);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 Talk(SAY_DEATH);
 
                 instance->SetData(DATA_JANALAIEVENT, DONE);
             }
 
-            void KilledUnit(Unit* /*victim*/) override
+            void KilledUnit(Unit* /*victim*/)
             {
                 Talk(SAY_SLAY);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 instance->SetData(DATA_JANALAIEVENT, IN_PROGRESS);
 
@@ -190,11 +184,11 @@ class boss_janalai : public CreatureScript
         //        DoZoneInCombat();
             }
 
-            void DamageDealt(Unit* target, uint32 &damage, DamageEffectType /*damagetype*/) override
+            void DamageDealt(Unit* target, uint32 &damage, DamageEffectType /*damagetype*/)
             {
                 if (isFlameBreathing)
                 {
-                    if (!me->HasInArc(float(M_PI) / 6, target))
+                    if (!me->HasInArc(M_PI/6, target))
                         damage = 0;
                 }
             }
@@ -323,7 +317,7 @@ class boss_janalai : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (isFlameBreathing)
                 {
@@ -371,8 +365,8 @@ class boss_janalai : public CreatureScript
 
                     me->AttackStop();
                     me->GetMotionMaster()->Clear();
-                    DoTeleportTo(JanalainPos[0][0], JanalainPos[0][1], JanalainPos[0][2]);
-                    me->StopMoving();
+                    me->NearTeleportTo(JanalainPos[0][0], JanalainPos[0][1], JanalainPos[0][2], me->GetOrientation());
+                    me->StopMovingOnCurrentPos();
                     DoCast(me, SPELL_FIRE_BOMB_CHANNEL, false);
                     //DoTeleportPlayer(me, JanalainPos[0][0], JanalainPos[0][1], JanalainPos[0][2], 0);
                     //DoCast(me, SPELL_TELE_TO_CENTER, true);
@@ -391,7 +385,7 @@ class boss_janalai : public CreatureScript
                     for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
                         if (Player* i_pl = i->GetSource())
                             if (i_pl->IsAlive())
-                                DoTeleportPlayer(i_pl, JanalainPos[0][0] - 5 + rand32() % 10, JanalainPos[0][1] - 5 + rand32() % 10, JanalainPos[0][2], 0);
+                                DoTeleportPlayer(i_pl, JanalainPos[0][0]-5+rand()%10, JanalainPos[0][1]-5+rand()%10, JanalainPos[0][2], 0);
                     //DoCast(Temp, SPELL_SUMMON_PLAYERS, true) // core bug, spell does not work if too far
                     return;
                 } else BombTimer -= diff;
@@ -404,8 +398,8 @@ class boss_janalai : public CreatureScript
 
                         me->AttackStop();
                         me->GetMotionMaster()->Clear();
-                        DoTeleportTo(JanalainPos[0][0], JanalainPos[0][1], JanalainPos[0][2]);
-                        me->StopMoving();
+                        me->NearTeleportTo(JanalainPos[0][0], JanalainPos[0][1], JanalainPos[0][2], me->GetOrientation());
+                        me->StopMovingOnCurrentPos();
                         DoCast(me, SPELL_HATCH_ALL, false);
                         HatchAllEggs(2);
                         noeggs = true;
@@ -424,6 +418,8 @@ class boss_janalai : public CreatureScript
                     } else HatcherTimer -= diff;
                 }
 
+                EnterEvadeIfOutOfCombatArea();
+
                 DoMeleeAttackIfReady();
 
                 if (FireBreathTimer <= diff)
@@ -439,9 +435,14 @@ class boss_janalai : public CreatureScript
                     FireBreathTimer = 8000;
                 } else FireBreathTimer -= diff;
             }
+					
+			bool CheckEvadeIfOutOfCombatArea() const
+			{
+				return me->GetPositionZ() <= 12.0f;
+			}
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<boss_janalaiAI>(creature);
         }
@@ -460,25 +461,25 @@ class npc_janalai_firebomb : public CreatureScript
         {
             npc_janalai_firebombAI(Creature* creature) : ScriptedAI(creature){ }
 
-            void Reset() override { }
+            void Reset() { }
 
-            void SpellHit(Unit* /*caster*/, const SpellInfo* spell) override
+            void SpellHit(Unit* /*caster*/, const SpellInfo* spell)
             {
                 if (spell->Id == SPELL_FIRE_BOMB_THROW)
                     DoCast(me, SPELL_FIRE_BOMB_DUMMY, true);
             }
 
-            void EnterCombat(Unit* /*who*/) override { }
+            void EnterCombat(Unit* /*who*/) { }
 
-            void AttackStart(Unit* /*who*/) override { }
+            void AttackStart(Unit* /*who*/) { }
 
-            void MoveInLineOfSight(Unit* /*who*/) override { }
+            void MoveInLineOfSight(Unit* /*who*/) { }
 
 
-            void UpdateAI(uint32 /*diff*/) override { }
+            void UpdateAI(uint32 /*diff*/) { }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new npc_janalai_firebombAI(creature);
         }
@@ -497,18 +498,7 @@ class npc_janalai_hatcher : public CreatureScript
         {
             npc_janalai_hatcherAI(Creature* creature) : ScriptedAI(creature)
             {
-                Initialize();
                 instance = creature->GetInstanceScript();
-            }
-
-            void Initialize()
-            {
-                waypoint = 0;
-                isHatching = false;
-                hasChangedSide = false;
-                WaitTimer = 1;
-                HatchNum = 0;
-                side = false;
             }
 
             InstanceScript* instance;
@@ -521,11 +511,15 @@ class npc_janalai_hatcher : public CreatureScript
             bool hasChangedSide;
             bool isHatching;
 
-            void Reset() override
+            void Reset()
             {
                 me->SetWalk(true);
-                Initialize();
                 side =(me->GetPositionY() < 1150);
+                waypoint = 0;
+                isHatching = false;
+                hasChangedSide = false;
+                WaitTimer = 1;
+                HatchNum = 0;
             }
 
             bool HatchEggs(uint32 num)
@@ -559,11 +553,11 @@ class npc_janalai_hatcher : public CreatureScript
                 return num == 0;   // if num == 0, no more templist
             }
 
-            void EnterCombat(Unit* /*who*/) override { }
-            void AttackStart(Unit* /*who*/) override { }
-            void MoveInLineOfSight(Unit* /*who*/) override { }
+            void EnterCombat(Unit* /*who*/) { }
+            void AttackStart(Unit* /*who*/) { }
+            void MoveInLineOfSight(Unit* /*who*/) { }
 
-            void MovementInform(uint32, uint32) override
+            void MovementInform(uint32, uint32)
             {
                 if (waypoint == 5)
                 {
@@ -575,7 +569,7 @@ class npc_janalai_hatcher : public CreatureScript
                     WaitTimer = 1;
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!instance || !(instance->GetData(DATA_JANALAIEVENT) == IN_PROGRESS))
                 {
@@ -618,7 +612,7 @@ class npc_janalai_hatcher : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<npc_janalai_hatcherAI>(creature);
         }
@@ -637,32 +631,26 @@ class npc_janalai_hatchling : public CreatureScript
         {
             npc_janalai_hatchlingAI(Creature* creature) : ScriptedAI(creature)
             {
-                Initialize();
                 instance = creature->GetInstanceScript();
-            }
-
-            void Initialize()
-            {
-                BuffetTimer = 7000;
             }
 
             InstanceScript* instance;
             uint32 BuffetTimer;
 
-            void Reset() override
+            void Reset()
             {
-                Initialize();
+                BuffetTimer = 7000;
                 if (me->GetPositionY() > 1150)
-                    me->GetMotionMaster()->MovePoint(0, hatcherway[0][3][0] + rand32() % 4 - 2, 1150.0f + rand32() % 4 - 2, hatcherway[0][3][2]);
+                    me->GetMotionMaster()->MovePoint(0, hatcherway[0][3][0]+rand()%4-2, 1150.0f+rand()%4-2, hatcherway[0][3][2]);
                 else
-                    me->GetMotionMaster()->MovePoint(0, hatcherway[1][3][0] + rand32() % 4 - 2, 1150.0f + rand32() % 4 - 2, hatcherway[1][3][2]);
+                    me->GetMotionMaster()->MovePoint(0, hatcherway[1][3][0]+rand()%4-2, 1150.0f+rand()%4-2, hatcherway[1][3][2]);
 
                 me->SetDisableGravity(true);
             }
 
-            void EnterCombat(Unit* /*who*/) override {/*DoZoneInCombat();*/ }
+            void EnterCombat(Unit* /*who*/) {/*DoZoneInCombat();*/ }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!instance || !(instance->GetData(DATA_JANALAIEVENT) == IN_PROGRESS))
                 {
@@ -683,7 +671,7 @@ class npc_janalai_hatchling : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<npc_janalai_hatchlingAI>(creature);
         }
@@ -694,7 +682,7 @@ class npc_janalai_egg : public CreatureScript
 public:
     npc_janalai_egg(): CreatureScript("npc_janalai_egg") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_janalai_eggAI(creature);
     }
@@ -703,11 +691,11 @@ public:
     {
         npc_janalai_eggAI(Creature* creature) : ScriptedAI(creature){ }
 
-        void Reset() override { }
+        void Reset() { }
 
-        void UpdateAI(uint32 /*diff*/) override { }
+        void UpdateAI(uint32 /*diff*/) { }
 
-        void SpellHit(Unit* /*caster*/, const SpellInfo* spell) override
+        void SpellHit(Unit* /*caster*/, const SpellInfo* spell)
         {
             if (spell->Id == SPELL_HATCH_EGG)
             {

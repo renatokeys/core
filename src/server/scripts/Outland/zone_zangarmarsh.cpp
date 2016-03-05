@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -39,6 +39,83 @@ EndContentData */
 #include "Player.h"
 #include "WorldSession.h"
 
+// Ours
+enum eNaturalist
+{
+	SPELL_MARK_OF_BITE			= 34906,
+	GO_CAGE_ENTRY				= 182094,
+};
+
+class npc_natrualist_bite : public CreatureScript
+{
+public:
+    npc_natrualist_bite() : CreatureScript("npc_natrualist_bite") { }
+
+    bool OnGossipHello(Player* player, Creature* creature)
+    {
+		uint32 menuId = creature->AI()->GetData(1) ? 7540 : 7520;
+		player->PrepareGossipMenu(creature, menuId, false);
+        player->SendPreparedGossip(creature);
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
+    {
+        player->PlayerTalkClass->ClearMenus();
+        player->CLOSE_GOSSIP_MENU();
+		if (creature->AI()->GetData(1))
+		{
+			creature->CastSpell(player, SPELL_MARK_OF_BITE, true);
+			player->KilledMonsterCredit(creature->GetEntry(), 0);
+			creature->DespawnOrUnsummon(1000);
+		}
+		else
+		{
+			creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC|UNIT_FLAG_IMMUNE_TO_NPC);
+			Creature* cr;
+			if (cr = creature->SummonCreature(17957, -186, -790, 43.8f, 4.2f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000))
+				cr->AI()->AttackStart(creature);
+			if (cr = creature->SummonCreature(17960, -188, -783, 43.8f, 4.2f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000))
+				cr->AI()->AttackStart(player);
+			if (cr = creature->SummonCreature(17957, -196, -783, 43.8f, 4.4f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000))
+				cr->AI()->AttackStart(player);
+			if (GameObject* cage = creature->FindNearestGameObject(GO_CAGE_ENTRY, 20.0f))
+				cage->SetGoState(GO_STATE_ACTIVE);
+			creature->SetHomePosition(-195.39f, -795.91f, 43.8f, 1.0f);
+			creature->AI()->Talk(1);
+		}
+        return true;
+    }
+
+    struct npc_natrualist_biteAI : public ScriptedAI
+    {
+        npc_natrualist_biteAI(Creature* creature) : ScriptedAI(creature)
+        {
+			_spoken = 0;
+        }
+
+		uint8 _spoken;
+        void MoveInLineOfSight(Unit* who)
+		{
+			if (!_spoken && !me->IsHostileTo(who))
+			{
+				_spoken = 1;
+				Talk(0);
+			}
+			ScriptedAI::MoveInLineOfSight(who);
+		}
+		void EnterCombat(Unit*) { _spoken = 2; }
+		uint32 GetData(uint32) const { return _spoken == 2; }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new npc_natrualist_biteAI (creature);
+    }
+};
+
+
+// Theirs
 /*######
 ## npcs_ashyen_and_keleth
 ######*/
@@ -48,6 +125,8 @@ EndContentData */
 
 enum AshyenAndKeleth
 {
+    GOSSIP_REWARD_BLESS         = 0,
+
     NPC_ASHYEN                  = 17900,
     NPC_KELETH                  = 17901,
 
@@ -67,7 +146,7 @@ class npcs_ashyen_and_keleth : public CreatureScript
 public:
     npcs_ashyen_and_keleth() : CreatureScript("npcs_ashyen_and_keleth") { }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (player->GetReputationRank(942) > REP_NEUTRAL)
         {
@@ -82,7 +161,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_INFO_DEF+1)
@@ -115,6 +194,7 @@ public:
                 if (spell)
                 {
                     creature->CastSpell(player, spell, true);
+                    creature->AI()->Talk(GOSSIP_REWARD_BLESS);
                 }
             }
 
@@ -142,6 +222,7 @@ public:
                 if (spell)
                 {
                     creature->CastSpell(player, spell, true);
+                    creature->AI()->Talk(GOSSIP_REWARD_BLESS);
                 }
             }
             player->CLOSE_GOSSIP_MENU();
@@ -174,27 +255,21 @@ public:
         npc_cooshcooshAI(Creature* creature) : ScriptedAI(creature)
         {
             m_uiNormFaction = creature->getFaction();
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            LightningBolt_Timer = 2000;
         }
 
         uint32 m_uiNormFaction;
         uint32 LightningBolt_Timer;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            LightningBolt_Timer = 2000;
             if (me->getFaction() != m_uiNormFaction)
                 me->setFaction(m_uiNormFaction);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -209,12 +284,12 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_cooshcooshAI(creature);
     }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (player->GetQuestStatus(QUEST_CRACK_SKULLS) == QUEST_STATUS_INCOMPLETE)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_COOSH, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
@@ -223,7 +298,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_INFO_DEF)
@@ -249,7 +324,7 @@ class npc_elder_kuruti : public CreatureScript
 public:
     npc_elder_kuruti() : CreatureScript("npc_elder_kuruti") { }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (player->GetQuestStatus(9803) == QUEST_STATUS_INCOMPLETE)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KUR1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
@@ -259,7 +334,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         switch (action)
@@ -302,7 +377,7 @@ class npc_mortog_steamhead : public CreatureScript
 public:
     npc_mortog_steamhead() : CreatureScript("npc_mortog_steamhead") { }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (creature->IsVendor() && player->GetReputationRank(942) == REP_EXALTED)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
@@ -312,7 +387,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_TRADE)
@@ -346,9 +421,9 @@ public:
     {
         npc_kayra_longmaneAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Reset() override { }
+        void Reset() { }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -381,7 +456,7 @@ public:
         }
     };
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
         if (quest->GetQuestId() == QUEST_ESCAPE_FROM)
         {
@@ -393,7 +468,7 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_kayra_longmaneAI(creature);
     }
@@ -416,7 +491,7 @@ class npc_timothy_daniels : public CreatureScript
 public:
     npc_timothy_daniels() : CreatureScript("npc_timothy_daniels") { }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
@@ -429,7 +504,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         switch (action)
@@ -452,6 +527,10 @@ public:
 
 void AddSC_zangarmarsh()
 {
+	// Ours
+	new npc_natrualist_bite();
+
+	// Theris
     new npcs_ashyen_and_keleth();
     new npc_cooshcoosh();
     new npc_elder_kuruti();

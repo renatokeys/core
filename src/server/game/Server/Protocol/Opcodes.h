@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,6 +24,12 @@
 #define _OPCODES_H
 
 #include "Common.h"
+
+// Note: this include need for be sure have full definition of class WorldSession
+//       if this class definition not complete then VS for x64 release use different size for
+//       struct OpcodeHandler in this header and Opcode.cpp and get totally wrong data from
+//       table opcodeTable in source when Opcode.h included but WorldSession.h not included
+#include "WorldSession.h"
 
 /// List of Opcodes
 enum Opcodes
@@ -1345,12 +1351,11 @@ enum Opcodes
 /// Player state
 enum SessionStatus
 {
-    STATUS_AUTHED = 0,                                      // Player authenticated (_player == NULL, m_playerRecentlyLogout = false or will be reset before handler call, m_GUID have garbage)
+    STATUS_AUTHED = 0,                                      // Player authenticated (_player == NULL, m_GUID has garbage)
     STATUS_LOGGEDIN,                                        // Player in game (_player != NULL, m_GUID == _player->GetGUID(), inWorld())
     STATUS_TRANSFER,                                        // Player transferring to another map (_player != NULL, m_GUID == _player->GetGUID(), !inWorld())
-    STATUS_LOGGEDIN_OR_RECENTLY_LOGGOUT,                    // _player != NULL or _player == NULL && m_playerRecentlyLogout && m_playerLogout, m_GUID store last _player guid)
     STATUS_NEVER,                                           // Opcode not accepted from client (deprecated or server side only)
-    STATUS_UNHANDLED                                        // Opcode not handled yet
+    STATUS_UNHANDLED,                                       // Opcode not handled yet
 };
 
 enum PacketProcessing
@@ -1360,10 +1365,7 @@ enum PacketProcessing
     PROCESS_THREADSAFE                                      //packet is thread-safe - process it in Map::Update()
 };
 
-class WorldSession;
 class WorldPacket;
-
-#pragma pack(push, 1)
 
 struct OpcodeHandler
 {
@@ -1371,11 +1373,10 @@ struct OpcodeHandler
     SessionStatus status;
     PacketProcessing packetProcessing;
     void (WorldSession::*handler)(WorldPacket& recvPacket);
+    bool isGrouppedMovementOpcode; // pussywizard
 };
 
 extern OpcodeHandler opcodeTable[NUM_MSG_TYPES];
-
-#pragma pack(pop)
 
 /// Lookup opcode name for human understandable logging
 inline const char* LookupOpcodeName(uint16 id)
@@ -1384,13 +1385,5 @@ inline const char* LookupOpcodeName(uint16 id)
         return "Received unknown opcode, it's more than max!";
     return opcodeTable[id].name;
 }
-
-inline std::string GetOpcodeNameForLogging(uint16 opcode)
-{
-    std::ostringstream ss;
-    ss << '[' << LookupOpcodeName(opcode) << " 0x" << std::hex << std::uppercase << opcode << std::nouppercase << " (" << std::dec << opcode << ")]";
-    return ss.str();
-}
-
 #endif
 /// @}

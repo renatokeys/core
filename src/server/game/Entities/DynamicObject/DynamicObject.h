@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,8 +16,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TRINITYCORE_DYNAMICOBJECT_H
-#define TRINITYCORE_DYNAMICOBJECT_H
+#ifndef SUNWELLCORE_DYNAMICOBJECT_H
+#define SUNWELLCORE_DYNAMICOBJECT_H
 
 #include "Object.h"
 
@@ -29,20 +29,22 @@ enum DynamicObjectType
 {
     DYNAMIC_OBJECT_PORTAL           = 0x0,      // unused
     DYNAMIC_OBJECT_AREA_SPELL       = 0x1,
-    DYNAMIC_OBJECT_FARSIGHT_FOCUS   = 0x2
+    DYNAMIC_OBJECT_FARSIGHT_FOCUS   = 0x2,
 };
 
-class DynamicObject : public WorldObject, public GridObject<DynamicObject>, public MapObject
+class DynamicObject : public WorldObject, public GridObject<DynamicObject>, public MovableMapObject
 {
     public:
         DynamicObject(bool isWorldObject);
         ~DynamicObject();
 
-        void AddToWorld() override;
-        void RemoveFromWorld() override;
+        void AddToWorld();
+        void RemoveFromWorld();
+  
+        void CleanupsBeforeDelete(bool finalCleanup = true);
 
-        bool CreateDynamicObject(ObjectGuid::LowType guidlow, Unit* caster, uint32 spellId, Position const& pos, float radius, DynamicObjectType type);
-        void Update(uint32 p_time) override;
+        bool CreateDynamicObject(uint32 guidlow, Unit* caster, uint32 spellId, Position const& pos, float radius, DynamicObjectType type);
+        void Update(uint32 p_time);
         void Remove();
         void SetDuration(int32 newDuration);
         int32 GetDuration() const;
@@ -55,8 +57,9 @@ class DynamicObject : public WorldObject, public GridObject<DynamicObject>, publ
         void BindToCaster();
         void UnbindFromCaster();
         uint32 GetSpellId() const {  return GetUInt32Value(DYNAMICOBJECT_SPELLID); }
-        ObjectGuid GetCasterGUID() const { return GetGuidValue(DYNAMICOBJECT_CASTER); }
+        uint64 GetCasterGUID() const { return GetUInt64Value(DYNAMICOBJECT_CASTER); }
         float GetRadius() const { return GetFloatValue(DYNAMICOBJECT_RADIUS); }
+		bool IsViewpoint() const { return _isViewpoint; }
 
     protected:
         Aura* _aura;

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,6 +19,9 @@
 #include "GuardAI.h"
 #include "Errors.h"
 #include "Player.h"
+#include "ObjectAccessor.h"
+#include "World.h"
+#include "CreatureAIImpl.h"
 
 int GuardAI::Permissible(Creature const* creature)
 {
@@ -28,22 +31,17 @@ int GuardAI::Permissible(Creature const* creature)
     return PERMIT_BASE_NO;
 }
 
-GuardAI::GuardAI(Creature* creature) : ScriptedAI(creature) { }
-
-bool GuardAI::CanSeeAlways(WorldObject const* obj)
+GuardAI::GuardAI(Creature* creature) : ScriptedAI(creature)
 {
-    if (!obj->isType(TYPEMASK_UNIT))
-        return false;
-
-    ThreatContainer::StorageType threatList = me->getThreatManager().getThreatList();
-    for (ThreatContainer::StorageType::const_iterator itr = threatList.begin(); itr != threatList.end(); ++itr)
-        if ((*itr)->getUnitGuid() == obj->GetGUID())
-            return true;
-
-    return false;
 }
 
-void GuardAI::EnterEvadeMode(EvadeReason /*why*/)
+void GuardAI::Reset()
+{
+	ScriptedAI::Reset();
+	me->CastSpell(me, 18950 /*SPELL_INVISIBILITY_AND_STEALTH_DETECTION*/, true);
+}
+
+void GuardAI::EnterEvadeMode()
 {
     if (!me->IsAlive())
     {
@@ -53,7 +51,7 @@ void GuardAI::EnterEvadeMode(EvadeReason /*why*/)
         return;
     }
 
-    TC_LOG_DEBUG("entities.unit", "Guard entry: %u enters evade mode.", me->GetEntry());
+    ;//sLog->outDebug(LOG_FILTER_UNITS, "Guard entry: %u enters evade mode.", me->GetEntry());
 
     me->RemoveAllAuras();
     me->DeleteThreatList();

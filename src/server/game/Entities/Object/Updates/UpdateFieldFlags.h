@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -32,7 +32,7 @@ enum UpdatefieldFlags
     UF_FLAG_SPECIAL_INFO = 0x020,
     UF_FLAG_PARTY_MEMBER = 0x040,
     UF_FLAG_UNUSED2      = 0x080,
-    UF_FLAG_DYNAMIC      = 0x100
+    UF_FLAG_DYNAMIC      = 0x100,
 };
 
 extern uint32 ItemUpdateFieldFlags[CONTAINER_END];

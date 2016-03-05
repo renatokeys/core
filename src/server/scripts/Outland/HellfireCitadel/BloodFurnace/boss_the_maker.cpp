@@ -1,110 +1,128 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "blood_furnace.h"
 
-enum Yells
+enum eEnums
 {
     SAY_AGGRO                   = 0,
     SAY_KILL                    = 1,
-    SAY_DIE                     = 2
-};
+    SAY_DIE                     = 2,
 
-enum Spells
-{
     SPELL_ACID_SPRAY            = 38153,
     SPELL_EXPLODING_BREAKER     = 30925,
     SPELL_KNOCKDOWN             = 20276,
-    SPELL_DOMINATION            = 25772
-};
+    SPELL_DOMINATION            = 25772,
 
-enum Events
-{
-    EVENT_ACID_SPRAY            = 1,
-    EVENT_EXPLODING_BREAKER,
-    EVENT_DOMINATION,
-    EVENT_KNOCKDOWN
+	EVENT_SPELL_ACID				= 1,
+	EVENT_SPELL_EXPLODING			= 2,
+	EVENT_SPELL_DOMINATION			= 3,
+	EVENT_SPELL_KNOCKDOWN			= 4,
 };
 
 class boss_the_maker : public CreatureScript
 {
     public:
-        boss_the_maker() : CreatureScript("boss_the_maker") { }
 
-        struct boss_the_makerAI : public BossAI
+        boss_the_maker() : CreatureScript("boss_the_maker")
         {
-            boss_the_makerAI(Creature* creature) : BossAI(creature, DATA_THE_MAKER) { }
+        }
 
-            void EnterCombat(Unit* /*who*/) override
+        struct boss_the_makerAI : public ScriptedAI
+        {
+            boss_the_makerAI(Creature* creature) : ScriptedAI(creature)
             {
-                _EnterCombat();
+                instance = creature->GetInstanceScript();
+            }
+
+            InstanceScript* instance;
+			EventMap events;
+
+            void Reset()
+            {
+				events.Reset();
+                if (!instance)
+                    return;
+
+                instance->SetData(DATA_THE_MAKER, NOT_STARTED);
+                instance->HandleGameObject(instance->GetData64(DATA_DOOR2), true);
+            }
+
+            void EnterCombat(Unit* /*who*/)
+            {
                 Talk(SAY_AGGRO);
+				events.ScheduleEvent(EVENT_SPELL_ACID, 15000);
+				events.ScheduleEvent(EVENT_SPELL_EXPLODING, 6000);
+				events.ScheduleEvent(EVENT_SPELL_DOMINATION, 120000);
+				events.ScheduleEvent(EVENT_SPELL_KNOCKDOWN, 10000);
 
-                events.ScheduleEvent(EVENT_ACID_SPRAY, 15000);
-                events.ScheduleEvent(EVENT_EXPLODING_BREAKER, 6000);
-                events.ScheduleEvent(EVENT_DOMINATION, 120000);
-                events.ScheduleEvent(EVENT_KNOCKDOWN, 10000);
+                if (!instance)
+                    return;
+
+                instance->SetData(DATA_THE_MAKER, IN_PROGRESS);
+                instance->HandleGameObject(instance->GetData64(DATA_DOOR2), false);
             }
 
-            void KilledUnit(Unit* who) override
+            void KilledUnit(Unit* victim)
             {
-                if (who->GetTypeId() == TYPEID_PLAYER)
-                    Talk(SAY_KILL);
+				if (victim->GetTypeId() == TYPEID_PLAYER && urand(0,1))
+					Talk(SAY_KILL);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
-                _JustDied();
                 Talk(SAY_DIE);
-            }
 
-            void ExecuteEvent(uint32 eventId) override
+                if (!instance)
+                    return;
+
+                instance->SetData(DATA_THE_MAKER, DONE);
+                instance->HandleGameObject(instance->GetData64(DATA_DOOR2), true);
+                instance->HandleGameObject(instance->GetData64(DATA_DOOR3), true);
+
+             }
+
+            void UpdateAI(uint32 diff)
             {
-                switch (eventId)
-                {
-                    case EVENT_ACID_SPRAY:
-                        DoCastVictim(SPELL_ACID_SPRAY);
-                        events.ScheduleEvent(EVENT_ACID_SPRAY, urand(15000, 23000));
-                        break;
-                    case EVENT_EXPLODING_BREAKER:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 30.0f, true))
-                            DoCast(target, SPELL_EXPLODING_BREAKER);
-                        events.ScheduleEvent(EVENT_EXPLODING_BREAKER, urand(4000, 12000));
-                        break;
-                    case EVENT_DOMINATION:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 0.0f, true))
-                            DoCast(target, SPELL_DOMINATION);
-                        events.ScheduleEvent(EVENT_DOMINATION, 120000);
-                        break;
-                    case EVENT_KNOCKDOWN:
-                        DoCastVictim(SPELL_KNOCKDOWN);
-                        events.ScheduleEvent(EVENT_KNOCKDOWN, urand(4000, 12000));
-                        break;
-                    default:
-                        break;
-                }
+                if (!UpdateVictim())
+                    return;
+
+				events.Update(diff);
+				if (me->HasUnitState(UNIT_STATE_CASTING))
+					return;
+
+				switch (events.GetEvent())
+				{
+					case EVENT_SPELL_ACID:
+						me->CastSpell(me->GetVictim(), SPELL_ACID_SPRAY, false);
+						events.RepeatEvent(urand(15000, 23000));
+						break;
+					case EVENT_SPELL_EXPLODING:
+						if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+							me->CastSpell(target, SPELL_EXPLODING_BREAKER, false);
+						events.RepeatEvent(urand(7000, 11000));
+						break;
+					case EVENT_SPELL_DOMINATION:
+						if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+							me->CastSpell(target, SPELL_DOMINATION, false);
+						events.RepeatEvent(120000);
+						break;
+					case EVENT_SPELL_KNOCKDOWN:
+						me->CastSpell(me->GetVictim(), SPELL_KNOCKDOWN, false);
+						events.RepeatEvent(urand(4000, 12000));
+						break;
+				}
+
+                DoMeleeAttackIfReady();
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
-            return GetBloodFurnaceAI<boss_the_makerAI>(creature);
+            return new boss_the_makerAI(creature);
         }
 };
 
@@ -112,3 +130,4 @@ void AddSC_boss_the_maker()
 {
     new boss_the_maker();
 }
+

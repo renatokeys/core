@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -9,16 +9,9 @@
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 add_subdirectory(genrev)
-add_subdirectory(common)
-
-if(SERVERS)
-  add_subdirectory(server)
-endif(SERVERS)
+add_subdirectory(server)
 
 if(TOOLS)
   add_subdirectory(tools)
 endif(TOOLS)
 
-if ( ELUNA )
-  add_subdirectory(LuaEngine)
-endif(ELUNA)

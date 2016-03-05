@@ -1,63 +1,41 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY XINEF, IT OWNS NOW!
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
-#include "SpellScript.h"
 #include "naxxramas.h"
 #include "Player.h"
 
-enum Spells
+enum Says
 {
-    SPELL_DECREPIT_FEVER    = 29998, // 25-man: 55011
-    SPELL_SPELL_DISRUPTION  = 29310,
-    SPELL_PLAGUE_CLOUD      = 29350,
-    SPELL_TELEPORT_SELF     = 30211,
+    SAY_AGGRO                   = 0,
+    SAY_SLAY                    = 1,
+    SAY_TAUNT                   = 2,
+    SAY_DEATH                   = 3
 };
 
-enum Yells
+enum Spells
 {
-    SAY_AGGRO               = 0,
-    SAY_SLAY                = 1,
-    SAY_TAUNT               = 2,
-    SAY_DEATH               = 3,
-
-    EMOTE_DANCE             = 4,
-    EMOTE_DANCE_END         = 5,
+	SPELL_SPELL_DISRUPTION			= 29310,
+	SPELL_DECREPIT_FEVER_10			= 29998,
+	SPELL_DECREPIT_FEVER_25			= 55011,
+	SPELL_PLAGUE_CLOUD				= 29350,
 };
 
 enum Events
 {
-    EVENT_DISRUPT = 1,
-    EVENT_FEVER,
-    EVENT_ERUPT,
-    EVENT_DANCE,
-    EVENT_DANCE_END
-};
-
-enum Phases
-{
-    PHASE_FIGHT = 1,
-    PHASE_DANCE
+	EVENT_SPELL_SPELL_DISRUPTION	= 1,
+	EVENT_SPELL_DECEPIT_FEVER		= 2,
+	EVENT_ERUPT_SECTION				= 3,
+	EVENT_SWITCH_PHASE				= 4,
+	EVENT_SAFETY_DANCE				= 5,
 };
 
 enum Misc
 {
-    DATA_SAFETY_DANCE               = 19962139
+	PHASE_SLOW_DANCE				= 0,
+	PHASE_FAST_DANCE				= 1,
 };
 
 class boss_heigan : public CreatureScript
@@ -65,183 +43,179 @@ class boss_heigan : public CreatureScript
 public:
     boss_heigan() : CreatureScript("boss_heigan") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* pCreature) const
     {
-        return GetInstanceAI<boss_heiganAI>(creature);
+        return new boss_heiganAI (pCreature);
     }
 
-    struct boss_heiganAI : public BossAI
-    {
-        boss_heiganAI(Creature* creature) : BossAI(creature, BOSS_HEIGAN), eruptSection(0), eruptDirection(false), safetyDance(false) { }
+	struct boss_heiganAI : public ScriptedAI
+	{
+		boss_heiganAI(Creature *c) : ScriptedAI(c)
+		{
+			pInstance = me->GetInstanceScript();
+		}
 
-        void Reset() override
-        {
-            me->SetReactState(REACT_AGGRESSIVE);
-            _Reset();
-        }
+		InstanceScript* pInstance;
+		EventMap events;
+		uint8 currentPhase;
+		uint8 currentSection;
+		bool moveRight;
 
-        void KilledUnit(Unit* who) override
-        {
-            Talk(SAY_SLAY);
+		void Reset()
+		{
+			events.Reset();
+			currentPhase = 0;
+			currentSection = 3;
+			moveRight = true;
 
-            if (who->GetTypeId() == TYPEID_PLAYER)
-                safetyDance = false;
-        }
+			if (pInstance)
+			{
+				pInstance->SetData(EVENT_HEIGAN, NOT_STARTED);
+				if (GameObject* go = me->GetMap()->GetGameObject(pInstance->GetData64(DATA_HEIGAN_ENTER_GATE)))
+					go->SetGoState(GO_STATE_ACTIVE);
+			}
+		}
 
-        uint32 GetData(uint32 type) const override
-        {
-            return (type == DATA_SAFETY_DANCE && safetyDance) ? 1u : 0u;
-        }
+		void KilledUnit(Unit* who)
+		{
+			if (who->GetTypeId() != TYPEID_PLAYER)
+				return;
 
-        void JustDied(Unit* /*killer*/) override
-        {
-            _JustDied();
-            Talk(SAY_DEATH);
-        }
+			if (!urand(0,3))
+				Talk(SAY_SLAY);
 
-        void EnterCombat(Unit* /*who*/) override
-        {
-            _EnterCombat();
-            Talk(SAY_AGGRO);
+			if (pInstance)
+				pInstance->SetData(DATA_IMMORTAL_FAIL, 0);
+		}
 
-            eruptSection = 3;
-            events.ScheduleEvent(EVENT_DISRUPT, urand(15 * IN_MILLISECONDS, 20 * IN_MILLISECONDS), 0, PHASE_FIGHT);
-            events.ScheduleEvent(EVENT_FEVER, urand(10 * IN_MILLISECONDS, 20 * IN_MILLISECONDS), 0, PHASE_FIGHT);
-            events.ScheduleEvent(EVENT_DANCE, 90 * IN_MILLISECONDS, 0, PHASE_FIGHT);
-            events.ScheduleEvent(EVENT_ERUPT, 15 * IN_MILLISECONDS, 0, PHASE_FIGHT);
+		void JustDied(Unit* Killer)
+		{
+			Talk(SAY_DEATH);
+			if (pInstance)
+				pInstance->SetData(EVENT_HEIGAN, DONE);
+		}
 
-            safetyDance = true;
-        }
+		void EnterCombat(Unit *who)
+		{
+			me->SetInCombatWithZone();
+			Talk(SAY_AGGRO);
+			if (pInstance)
+			{
+				pInstance->SetData(EVENT_HEIGAN, IN_PROGRESS);
+				if (GameObject* go = me->GetMap()->GetGameObject(pInstance->GetData64(DATA_HEIGAN_ENTER_GATE)))
+					go->SetGoState(GO_STATE_READY);
+			}
 
-        void UpdateAI(uint32 diff) override
-        {
-            if (!UpdateVictim())
-                return;
+			StartFightPhase(PHASE_SLOW_DANCE);
+		}
 
-            events.Update(diff);
+		void StartFightPhase(uint8 phase)
+		{
+			currentSection = 3;
+			currentPhase = phase;
+			events.Reset();
+			if (phase == PHASE_SLOW_DANCE)
+			{
+				events.ScheduleEvent(EVENT_SPELL_SPELL_DISRUPTION, 0);
+				events.ScheduleEvent(EVENT_SPELL_DECEPIT_FEVER, 12000);
+				events.ScheduleEvent(EVENT_ERUPT_SECTION, 10000);
+				events.ScheduleEvent(EVENT_SWITCH_PHASE, 90000);
+			}
+			else // if (phase == PHASE_FAST_DANCE)
+			{
+				me->MonsterTextEmote("%s teleports and begins to channel a spell!", 0, true);
+				// teleport
+				float x, y, z, o;
+				me->GetHomePosition(x, y, z, o);
+				me->NearTeleportTo(x, y, z, o);
 
-            while (uint32 eventId = events.ExecuteEvent())
-            {
-                switch (eventId)
-                {
-                    case EVENT_DISRUPT:
-                        DoCastAOE(SPELL_SPELL_DISRUPTION);
-                        events.ScheduleEvent(EVENT_DISRUPT, 11 * IN_MILLISECONDS);
-                        break;
-                    case EVENT_FEVER:
-                        DoCastAOE(SPELL_DECREPIT_FEVER);
-                        events.ScheduleEvent(EVENT_FEVER, urand(20 * IN_MILLISECONDS, 25 * IN_MILLISECONDS));
-                        break;
-                    case EVENT_DANCE:
-                        events.SetPhase(PHASE_DANCE);
-                        Talk(SAY_TAUNT);
-                        Talk(EMOTE_DANCE);
-                        eruptSection = 3;
-                        me->SetReactState(REACT_PASSIVE);
-                        me->AttackStop();
-                        me->StopMoving();
-                        DoCast(SPELL_TELEPORT_SELF);
-                        DoCastAOE(SPELL_PLAGUE_CLOUD);
-                        events.ScheduleEvent(EVENT_DANCE_END, 45 * IN_MILLISECONDS, 0, PHASE_DANCE);
-                        events.ScheduleEvent(EVENT_ERUPT, 10 * IN_MILLISECONDS);
-                        break;
-                    case EVENT_DANCE_END:
-                        events.SetPhase(PHASE_FIGHT);
-                        Talk(EMOTE_DANCE_END);
-                        eruptSection = 3;
-                        events.ScheduleEvent(EVENT_DISRUPT, urand(10, 25) * IN_MILLISECONDS, 0, PHASE_FIGHT);
-                        events.ScheduleEvent(EVENT_FEVER, urand(15, 20) * IN_MILLISECONDS, 0, PHASE_FIGHT);
-                        events.ScheduleEvent(EVENT_DANCE, 90 * IN_MILLISECONDS, 0, PHASE_FIGHT);
-                        events.ScheduleEvent(EVENT_ERUPT, 15 * IN_MILLISECONDS, 0, PHASE_FIGHT);
-                        me->CastStop();
-                        me->SetReactState(REACT_AGGRESSIVE);
-                        DoZoneInCombat();
-                        break;
-                    case EVENT_ERUPT:
-                        instance->SetData(DATA_HEIGAN_ERUPT, eruptSection);
-                        TeleportCheaters();
+				me->CastSpell(me, SPELL_PLAGUE_CLOUD, false);
+				events.ScheduleEvent(EVENT_ERUPT_SECTION, 4000);
+				events.ScheduleEvent(EVENT_SWITCH_PHASE, 45000);
+			}
+			events.ScheduleEvent(EVENT_SAFETY_DANCE, 5000);
+		}
 
-                        if (eruptSection == 0)
-                            eruptDirection = true;
-                        else if (eruptSection == 3)
-                            eruptDirection = false;
+		bool IsInRoom(Unit* who)
+		{
+			if (who->GetPositionX() > 2826 || who->GetPositionX() < 2723 || who->GetPositionY() > -3641 || who->GetPositionY() < -3736)
+			{
+				if (who->GetGUID() == me->GetGUID())
+					EnterEvadeMode();
+				return false;
+			}
 
-                        eruptDirection ? ++eruptSection : --eruptSection;
+			return true;
+		}
 
-                        if (events.IsInPhase(PHASE_DANCE))
-                            events.ScheduleEvent(EVENT_ERUPT, 3 * IN_MILLISECONDS, 0, PHASE_DANCE);
-                        else
-                            events.ScheduleEvent(EVENT_ERUPT, 10 * IN_MILLISECONDS, 0, PHASE_FIGHT);
-                        break;
-                }
-            }
+		void UpdateAI(uint32 diff)
+		{
+			if (!IsInRoom(me))
+				return;
 
-            DoMeleeAttackIfReady();
-        }
+			if (!UpdateVictim())
+				return;
 
-        private:
-            uint32 eruptSection;
-            bool eruptDirection;
+			events.Update(diff);
+			//if (me->HasUnitState(UNIT_STATE_CASTING))
+			//	return;
 
-            bool safetyDance; // is achievement still possible? (= no player deaths yet)
-    };
+			switch (events.GetEvent())
+			{
+				case EVENT_SPELL_SPELL_DISRUPTION:
+					me->CastSpell(me, SPELL_SPELL_DISRUPTION, false);
+					events.RepeatEvent(10000);
+					break;
+				case EVENT_SPELL_DECEPIT_FEVER:
+					me->CastSpell(me, RAID_MODE(SPELL_DECREPIT_FEVER_10, SPELL_DECREPIT_FEVER_25), false);
+					events.RepeatEvent(20000);
+					break;
+				case EVENT_SWITCH_PHASE:
+					StartFightPhase(currentPhase == PHASE_SLOW_DANCE ? PHASE_FAST_DANCE : PHASE_SLOW_DANCE);
+					// no pop, there is reset in start fight
+					break;
+				case EVENT_ERUPT_SECTION:
+					if (pInstance)
+					{
+						pInstance->SetData(DATA_HEIGAN_ERUPTION, currentSection);
+						if (currentSection == 3)
+							moveRight = false;
+						else if (currentSection == 0)
+							moveRight = true;
 
-};
+						moveRight ? currentSection++ : currentSection--;
+					}
 
-class spell_heigan_eruption : public SpellScriptLoader
-{
-    public:
-        spell_heigan_eruption() : SpellScriptLoader("spell_heigan_eruption") { }
+					if (currentPhase == PHASE_SLOW_DANCE && !urand(0,3))
+						Talk(SAY_TAUNT);
 
-        class spell_heigan_eruption_SpellScript : public SpellScript
-        {
-            PrepareSpellScript(spell_heigan_eruption_SpellScript);
+					events.RepeatEvent(currentPhase == PHASE_SLOW_DANCE ? 10000 : 4000);
+					break;
+				case EVENT_SAFETY_DANCE:
+				{
+					Map::PlayerList const& pList = me->GetMap()->GetPlayers();
+					for(Map::PlayerList::const_iterator itr = pList.begin(); itr != pList.end(); ++itr)
+					{
+						if (IsInRoom(itr->GetSource()) && !itr->GetSource()->IsAlive())
+						{
+							events.PopEvent();
+							pInstance->SetData(DATA_DANCE_FAIL, 0);
+							pInstance->SetData(DATA_IMMORTAL_FAIL, 0);
+							return;
+						}
 
-            void HandleScript(SpellEffIndex /*eff*/)
-            {
-                Unit* caster = GetCaster();
-                if (!caster || !GetHitPlayer())
-                    return;
+					}
+					events.RepeatEvent(5000);
+					return;
+				}
+			}
 
-                if (GetHitDamage() >= int32(GetHitPlayer()->GetHealth()))
-                    if (InstanceScript* instance = caster->GetInstanceScript())
-                        if (Creature* Heigan = ObjectAccessor::GetCreature(*caster, instance->GetGuidData(DATA_HEIGAN)))
-                            Heigan->AI()->KilledUnit(GetHitPlayer());
-            }
-
-            void Register() override
-            {
-                OnEffectHitTarget += SpellEffectFn(spell_heigan_eruption_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
-            }
-        };
-
-        SpellScript* GetSpellScript() const override
-        {
-            return new spell_heigan_eruption_SpellScript();
-        }
-};
-
-class achievement_safety_dance : public AchievementCriteriaScript
-{
-    public:
-        achievement_safety_dance() : AchievementCriteriaScript("achievement_safety_dance") { }
-
-        bool OnCheck(Player* /*player*/, Unit* target) override
-        {
-            if (!target)
-                return false;
-
-            if (Creature* Heigan = target->ToCreature())
-                if (Heigan->AI()->GetData(DATA_SAFETY_DANCE))
-                    return true;
-
-            return false;
-        }
+			DoMeleeAttackIfReady();
+		}
+	};
 };
 
 void AddSC_boss_heigan()
 {
-    new boss_heigan();
-    new spell_heigan_eruption();
-    new achievement_safety_dance();
+	new boss_heigan();
 }

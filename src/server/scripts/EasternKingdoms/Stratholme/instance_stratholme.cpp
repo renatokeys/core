@@ -1,27 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: instance_stratholme
-SD%Complete: 50
-SDComment: In progress. Undead side 75% implemented. Save/load not implemented.
-SDCategory: Stratholme
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -29,15 +8,19 @@ EndScriptData */
 #include "stratholme.h"
 #include "Player.h"
 
-enum Misc
+const Position BlackGuardPos[10] = 
 {
-    MAX_ENCOUNTER           = 6
-};
-
-enum InstanceEvents
-{
-    EVENT_BARON_RUN         = 1,
-    EVENT_SLAUGHTER_SQUARE  = 2
+	{4032.73f+0.0f, -3378.26f+0.0f, 119.76f, 4.67f},
+	{4032.73f+2.0f, -3378.26f+2.0f, 119.76f, 4.67f},
+	{4032.73f+2.0f, -3378.26f-2.0f, 119.76f, 4.67f},
+	{4032.73f-2.0f, -3378.26f+2.0f, 119.76f, 4.67f},
+	{4032.73f-2.0f, -3378.26f-2.0f, 119.76f, 4.67f},
+	
+	{4032.73f+0.0f, -3407.38f+0.0f, 115.56f, 0.0f},
+	{4032.73f+2.0f, -3407.38f+2.0f, 115.56f, 0.0f},
+	{4032.73f+2.0f, -3407.38f-2.0f, 115.56f, 0.0f},
+	{4032.73f-2.0f, -3407.38f+2.0f, 115.56f, 0.0f},
+	{4032.73f-2.0f, -3407.38f-2.0f, 115.56f, 0.0f}
 };
 
 class instance_stratholme : public InstanceMapScript
@@ -49,399 +32,411 @@ class instance_stratholme : public InstanceMapScript
         {
             instance_stratholme_InstanceMapScript(Map* map) : InstanceScript(map)
             {
-                SetHeaders(DataHeader);
-                for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                    EncounterState[i] = NOT_STARTED;
-
-                for (uint8 i = 0; i < 5; ++i)
-                    IsSilverHandDead[i] = false;
             }
 
-            uint32 EncounterState[MAX_ENCOUNTER];
-
-            bool IsSilverHandDead[5];
-
-            ObjectGuid serviceEntranceGUID;
-            ObjectGuid gauntletGate1GUID;
-            ObjectGuid ziggurat1GUID;
-            ObjectGuid ziggurat2GUID;
-            ObjectGuid ziggurat3GUID;
-            ObjectGuid ziggurat4GUID;
-            ObjectGuid ziggurat5GUID;
-            ObjectGuid portGauntletGUID;
-            ObjectGuid portSlaugtherGUID;
-            ObjectGuid portElderGUID;
-
-            ObjectGuid baronGUID;
-            ObjectGuid ysidaTriggerGUID;
-            GuidSet crystalsGUID;
-            GuidSet abomnationGUID;
-            EventMap events;
-
-            bool StartSlaugtherSquare()
+            void Initialize()
             {
-                //change to DONE when crystals implemented
-                if (EncounterState[1] == IN_PROGRESS && EncounterState[2] == IN_PROGRESS && EncounterState[3] == IN_PROGRESS)
-                {
-                    HandleGameObject(portGauntletGUID, true);
-                    HandleGameObject(portSlaugtherGUID, true);
-                    return true;
-                }
+				_baronRunProgress = 0;
+				_baronRunTime = 0;
+				_zigguratState1 = 0;
+				_zigguratState2 = 0;
+				_zigguratState3 = 0;
+				_slaughterProgress = 0;
+				_slaughterNPCs = 0;
+				_postboxesOpened = 0;
 
-                TC_LOG_DEBUG("scripts", "Instance Stratholme: Cannot open slaugther square yet.");
-                return false;
+				_zigguratDoorsGUID1 = 0;
+				_zigguratDoorsGUID2 = 0;
+				_zigguratDoorsGUID3 = 0;
+				_zigguratDoorsGUID4 = 0;
+				_zigguratDoorsGUID5 = 0;
+				_gauntletGateGUID = 0;
+				_slaughterGateGUID = 0;
+				_baronRivendareGUID = 0;
+
+				events.Reset();
             }
 
-            //if withRestoreTime true, then newState will be ignored and GO should be restored to original state after 10 seconds
-            void UpdateGoState(ObjectGuid goGuid, uint32 newState, bool withRestoreTime)
-            {
-                if (!goGuid)
-                    return;
+			void OnPlayerEnter(Player* player)
+			{
+				if (_baronRunTime > 0)
+					if (Aura* aura = player->AddAura(SPELL_BARON_ULTIMATUM, player))
+						aura->SetDuration(_baronRunTime*MINUTE*IN_MILLISECONDS);
+			}
 
-                if (GameObject* go = instance->GetGameObject(goGuid))
-                {
-                    if (withRestoreTime)
-                        go->UseDoorOrButton(10);
-                    else
-                        go->SetGoState((GOState)newState);
-                }
-            }
-
-            void OnCreatureCreate(Creature* creature) override
+            void OnCreatureCreate(Creature* creature)
             {
                 switch (creature->GetEntry())
                 {
-                    case NPC_BARON:
-                        baronGUID = creature->GetGUID();
+                    case NPC_BARON_RIVENDARE:
+                        _baronRivendareGUID = creature->GetGUID();
                         break;
-                    case NPC_YSIDA_TRIGGER:
-                        ysidaTriggerGUID = creature->GetGUID();
-                        break;
-                    case NPC_CRYSTAL:
-                        crystalsGUID.insert(creature->GetGUID());
-                        break;
-                    case NPC_ABOM_BILE:
-                    case NPC_ABOM_VENOM:
-                        abomnationGUID.insert(creature->GetGUID());
-                        break;
+					case NPC_VENOM_BELCHER:
+					case NPC_BILE_SPEWER:
+						if (_slaughterProgress == 0)
+							++_slaughterNPCs;
+						break;
+					case NPC_RAMSTEIN_THE_GORGER:
+						if (_slaughterProgress == 1)
+							++_slaughterNPCs;
+						break;
+					case NPC_MINDLESS_UNDEAD:
+						if (_slaughterProgress == 2)
+							++_slaughterNPCs;
+						break;
+					case NPC_BLACK_GUARD:
+						if (_slaughterProgress == 3)
+							++_slaughterNPCs;
+						break;
                 }
             }
 
-            void OnCreatureRemove(Creature* creature) override
-            {
-                switch (creature->GetEntry())
-                {
-                    case NPC_CRYSTAL:
-                        crystalsGUID.erase(creature->GetGUID());
-                        break;
-                    case NPC_ABOM_BILE:
-                    case NPC_ABOM_VENOM:
-                        abomnationGUID.erase(creature->GetGUID());
-                        break;
-                }
-            }
+			void ProcessSlaughterEvent()
+			{
+				if (_slaughterProgress == 1)
+				{
+					if (Creature* baron = instance->GetCreature(_baronRivendareGUID))
+						baron->AI()->Talk(SAY_BRAON_SUMMON_RAMSTEIN);
 
-            void OnGameObjectCreate(GameObject* go) override
+					Position pos = {4032.20f, -3378.06f, 119.75f, 4.67f};
+					instance->SummonCreature(NPC_RAMSTEIN_THE_GORGER, pos);
+				}
+				if (_slaughterProgress == 2)
+				{
+					for (uint32 i = 0; i < 33; ++i)
+						events.ScheduleEvent(EVENT_SPAWN_MINDLESS, 5000 + i*210);
+					if (Creature* baron = instance->GetCreature(_baronRivendareGUID))
+						if (GameObject* gate = baron->FindNearestGameObject(GO_SLAUGHTER_GATE_SIDE, 200.0f))
+							gate->SetGoState(GO_STATE_ACTIVE);
+				}
+				if (_slaughterProgress == 3)
+				{
+					events.ScheduleEvent(EVENT_SPAWN_BLACK_GUARD, 20000);
+				}
+				if (_slaughterProgress == 4)
+				{
+					if (Creature* baron = instance->GetCreature(_baronRivendareGUID))
+						baron->AI()->Talk(SAY_BARON_GUARD_DEAD);
+					if (GameObject* gate = instance->GetGameObject(_zigguratDoorsGUID5))
+						gate->SetGoState(GO_STATE_ACTIVE);
+
+				}
+			}
+
+			void OnUnitDeath(Unit* unit)
+			{
+				switch (unit->GetEntry())
+				{
+					case NPC_VENOM_BELCHER:
+					case NPC_BILE_SPEWER:
+					case NPC_RAMSTEIN_THE_GORGER:
+					case NPC_MINDLESS_UNDEAD:
+					case NPC_BLACK_GUARD:
+						if (--_slaughterNPCs == 0)
+						{
+							++_slaughterProgress;
+							ProcessSlaughterEvent();
+							SaveToDB();
+						}
+						break;
+				}
+			}
+
+            void OnGameObjectCreate(GameObject* go)
             {
                 switch (go->GetEntry())
                 {
-                    case GO_SERVICE_ENTRANCE:
-                        serviceEntranceGUID = go->GetGUID();
+                    case GO_ZIGGURAT_DOORS1:
+                        _zigguratDoorsGUID1 = go->GetGUID();
+                        if (GetData(TYPE_ZIGGURAT1) >= 1)
+                            go->SetGoState(GO_STATE_ACTIVE);
                         break;
-                    case GO_GAUNTLET_GATE1:
-                        //weird, but unless flag is set, client will not respond as expected. DB bug?
-                        go->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
-                        gauntletGate1GUID = go->GetGUID();
+                    case GO_ZIGGURAT_DOORS2:
+                        _zigguratDoorsGUID2 = go->GetGUID();
+                        if (GetData(TYPE_ZIGGURAT2) >= 1)
+                            go->SetGoState(GO_STATE_ACTIVE);
                         break;
-                    case GO_ZIGGURAT1:
-                        ziggurat1GUID = go->GetGUID();
-                        if (GetData(TYPE_BARONESS) == IN_PROGRESS)
-                            HandleGameObject(ObjectGuid::Empty, true, go);
+                    case GO_ZIGGURAT_DOORS3:
+                        _zigguratDoorsGUID3 = go->GetGUID();
+                        if (GetData(TYPE_ZIGGURAT3) >= 1)
+                            go->SetGoState(GO_STATE_ACTIVE);
                         break;
-                    case GO_ZIGGURAT2:
-                        ziggurat2GUID = go->GetGUID();
-                        if (GetData(TYPE_NERUB) == IN_PROGRESS)
-                            HandleGameObject(ObjectGuid::Empty, true, go);
+                    case GO_GAUNTLET_GATE:
+                        _gauntletGateGUID = go->GetGUID();
+                        if (_zigguratState1 == 2 && _zigguratState2 == 2 && _zigguratState3 == 2)
+                            go->SetGoState(GO_STATE_ACTIVE);
                         break;
-                    case GO_ZIGGURAT3:
-                        ziggurat3GUID = go->GetGUID();
-                        if (GetData(TYPE_PALLID) == IN_PROGRESS)
-                            HandleGameObject(ObjectGuid::Empty, true, go);
+                    case GO_SLAUGTHER_GATE:
+                        _slaughterGateGUID = go->GetGUID();
+                        if (_zigguratState1 == 2 && _zigguratState2 == 2 && _zigguratState3 == 2)
+                            go->SetGoState(GO_STATE_ACTIVE);
                         break;
-                    case GO_ZIGGURAT4:
-                        ziggurat4GUID = go->GetGUID();
-                        if (GetData(TYPE_BARON) == DONE || GetData(TYPE_RAMSTEIN) == DONE)
-                            HandleGameObject(ObjectGuid::Empty, true, go);
+                    case GO_ZIGGURAT_DOORS4:
+                        _zigguratDoorsGUID4 = go->GetGUID();
+                        if (_slaughterProgress == 4)
+                            go->SetGoState(GO_STATE_ACTIVE);
                         break;
-                    case GO_ZIGGURAT5:
-                        ziggurat5GUID = go->GetGUID();
-                        if (GetData(TYPE_BARON) == DONE || GetData(TYPE_RAMSTEIN) == DONE)
-                            HandleGameObject(ObjectGuid::Empty, true, go);
+                    case GO_ZIGGURAT_DOORS5:
+                        _zigguratDoorsGUID5 = go->GetGUID();
+                        if (_slaughterProgress == 4)
+                            go->SetGoState(GO_STATE_ACTIVE);
                         break;
-                    case GO_PORT_GAUNTLET:
-                        portGauntletGUID = go->GetGUID();
-                        if (GetData(TYPE_BARONESS) == IN_PROGRESS && GetData(TYPE_NERUB) == IN_PROGRESS && GetData(TYPE_PALLID) == IN_PROGRESS)
-                            HandleGameObject(ObjectGuid::Empty, true, go);
-                        break;
-                    case GO_PORT_SLAUGTHER:
-                        portSlaugtherGUID = go->GetGUID();
-                        if (GetData(TYPE_BARONESS) == IN_PROGRESS && GetData(TYPE_NERUB) == IN_PROGRESS && GetData(TYPE_PALLID) == IN_PROGRESS)
-                            HandleGameObject(ObjectGuid::Empty, true, go);
-                        break;
-                    case GO_PORT_ELDERS:
-                        portElderGUID = go->GetGUID();
-                        break;
+					case GO_SLAUGHTER_GATE_SIDE:
+						if (_slaughterProgress >= 2)
+                            go->SetGoState(GO_STATE_ACTIVE);
+						break;
                 }
             }
 
-            void SetData(uint32 type, uint32 data) override
+			void CheckZiggurats()
+			{
+				if (_zigguratState1 == 2 && _zigguratState2 == 2 && _zigguratState3 == 2)
+				{
+					instance->LoadGrid(4035.83f, -3336.31f);
+					if (Creature* baron = instance->GetCreature(_baronRivendareGUID))
+						baron->AI()->Talk(SAY_BRAON_ZIGGURAT_FALL_YELL);
+
+					if (GameObject* gate = instance->GetGameObject(_gauntletGateGUID))
+						gate->SetGoState(GO_STATE_ACTIVE);
+					if (GameObject* gate = instance->GetGameObject(_slaughterGateGUID))
+						gate->SetGoState(GO_STATE_ACTIVE);
+				}
+			}
+
+            void SetData(uint32 type, uint32 data)
             {
-                switch (type)
-                {
-                    case TYPE_BARON_RUN:
-                        switch (data)
-                        {
-                            case IN_PROGRESS:
-                                if (EncounterState[0] == IN_PROGRESS || EncounterState[0] == FAIL)
-                                    break;
-                                EncounterState[0] = data;
-                                events.ScheduleEvent(EVENT_BARON_RUN, 2700000);
-                                TC_LOG_DEBUG("scripts", "Instance Stratholme: Baron run in progress.");
-                                break;
-                            case FAIL:
-                                DoRemoveAurasDueToSpellOnPlayers(SPELL_BARON_ULTIMATUM);
-                                EncounterState[0] = data;
-                                break;
-                            case DONE:
-                                EncounterState[0] = data;
-                                if (Creature* ysidaTrigger = instance->GetCreature(ysidaTriggerGUID))
-                                {
-                                    Position ysidaPos = ysidaTrigger->GetPosition();
-                                    ysidaTrigger->SummonCreature(NPC_YSIDA, ysidaPos, TEMPSUMMON_TIMED_DESPAWN, 1800000);
-                                }
-                                events.CancelEvent(EVENT_BARON_RUN);
-                                break;
-                        }
-                        break;
-                    case TYPE_BARONESS:
-                        EncounterState[1] = data;
-                        if (data == IN_PROGRESS)
-                        {
-                            HandleGameObject(ziggurat1GUID, true);
-                            //change to DONE when crystals implemented
-                            StartSlaugtherSquare();
-                        }
-                        break;
-                    case TYPE_NERUB:
-                        EncounterState[2] = data;
-                        if (data == IN_PROGRESS)
-                        {
-                            HandleGameObject(ziggurat2GUID, true);
-                            //change to DONE when crystals implemented
-                            StartSlaugtherSquare();
-                        }
-                        break;
-                    case TYPE_PALLID:
-                        EncounterState[3] = data;
-                        if (data == IN_PROGRESS)
-                        {
-                            HandleGameObject(ziggurat3GUID, true);
-                            //change to DONE when crystals implemented
-                            StartSlaugtherSquare();
-                        }
-                        break;
-                    case TYPE_RAMSTEIN:
-                        if (data == IN_PROGRESS)
-                        {
-                            HandleGameObject(portGauntletGUID, false);
+				switch (type)
+				{
+					case TYPE_BARON_RUN:
+					{
+						if (_baronRunProgress == DATA_BARON_RUN_NONE)
+						{
+							_baronRunProgress = DATA_BARON_RUN_GATE;
+							_baronRunTime = 45;
+							DoCastSpellOnPlayers(SPELL_BARON_ULTIMATUM);
+							events.ScheduleEvent(EVENT_BARON_TIME, 60000);
 
-                            uint32 count = abomnationGUID.size();
-                            for (GuidSet::const_iterator i = abomnationGUID.begin(); i != abomnationGUID.end(); ++i)
-                            {
-                                if (Creature* pAbom = instance->GetCreature(*i))
-                                    if (!pAbom->IsAlive())
-                                        --count;
-                            }
+							instance->LoadGrid(4035.83f, -3336.31f);
+							if (Creature* baron = instance->GetCreature(_baronRivendareGUID))
+								baron->AI()->Talk(SAY_BARON_INIT_YELL);
+						}
+						break;
+					}
+					case TYPE_ZIGGURAT1:
+					{
+						if (data == _zigguratState1+1)
+							++_zigguratState1;
 
-                            if (!count)
-                            {
-                                //a bit itchy, it should close the door after 10 secs, but it doesn't. skipping it for now.
-                                //UpdateGoState(ziggurat4GUID, 0, true);
-                                if (Creature* pBaron = instance->GetCreature(baronGUID))
-                                    pBaron->SummonCreature(NPC_RAMSTEIN, 4032.84f, -3390.24f, 119.73f, 4.71f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 1800000);
-                                TC_LOG_DEBUG("scripts", "Instance Stratholme: Ramstein spawned.");
-                            }
-                            else
-                                TC_LOG_DEBUG("scripts", "Instance Stratholme: %u Abomnation left to kill.", count);
-                        }
+						if (_zigguratState1 == 1)
+							if (GameObject* ziggurat = instance->GetGameObject(_zigguratDoorsGUID1))
+								ziggurat->SetGoState(GO_STATE_ACTIVE);
 
-                        if (data == NOT_STARTED)
-                            HandleGameObject(portGauntletGUID, true);
+						CheckZiggurats();
+						break;
+					}
+					case TYPE_ZIGGURAT2:
+					{
+						if (data == _zigguratState2+1)
+							++_zigguratState2;
 
-                        if (data == DONE)
-                        {
-                            events.ScheduleEvent(EVENT_SLAUGHTER_SQUARE, 60000);
-                            TC_LOG_DEBUG("scripts", "Instance Stratholme: Slaugther event will continue in 1 minute.");
-                        }
-                        EncounterState[4] = data;
-                        break;
-                    case TYPE_BARON:
-                        if (data == IN_PROGRESS)
-                        {
-                            HandleGameObject(ziggurat4GUID, false);
-                            HandleGameObject(ziggurat5GUID, false);
-                        }
-                        if (data == DONE || data == NOT_STARTED)
-                        {
-                            HandleGameObject(ziggurat4GUID, true);
-                            HandleGameObject(ziggurat5GUID, true);
-                        }
-                        if (data == DONE)
-                        {
-                            HandleGameObject(portGauntletGUID, true);
-                            if (GetData(TYPE_BARON_RUN) == IN_PROGRESS)
-                            {
-                                DoRemoveAurasDueToSpellOnPlayers(SPELL_BARON_ULTIMATUM);
-                                Map::PlayerList const& players = instance->GetPlayers();
-                                if (!players.isEmpty())
-                                    for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
-                                        if (Player* player = itr->GetSource())
-                                            if (player->GetQuestStatus(QUEST_DEAD_MAN_PLEA) == QUEST_STATUS_INCOMPLETE)
-                                            {
-                                                player->AreaExploredOrEventHappens(QUEST_DEAD_MAN_PLEA);
-                                                player->KilledMonsterCredit(NPC_YSIDA);
-                                            }
-                                SetData(TYPE_BARON_RUN, DONE);
-                            }
-                        }
-                        EncounterState[5] = data;
-                        break;
-                    case TYPE_SH_AELMAR:
-                        IsSilverHandDead[0] = (data) ? true : false;
-                        break;
-                    case TYPE_SH_CATHELA:
-                        IsSilverHandDead[1] = (data) ? true : false;
-                        break;
-                    case TYPE_SH_GREGOR:
-                        IsSilverHandDead[2] = (data) ? true : false;
-                        break;
-                    case TYPE_SH_NEMAS:
-                        IsSilverHandDead[3] = (data) ? true : false;
-                        break;
-                    case TYPE_SH_VICAR:
-                        IsSilverHandDead[4] = (data) ? true : false;
-                        break;
-                }
+						if (_zigguratState2 == 1)
+							if (GameObject* ziggurat = instance->GetGameObject(_zigguratDoorsGUID2))
+								ziggurat->SetGoState(GO_STATE_ACTIVE);
 
-                if (data == DONE)
-                    SaveToDB();
+						CheckZiggurats();
+						break;						
+					}
+					case TYPE_ZIGGURAT3:
+					{
+						if (data == _zigguratState3+1)
+							++_zigguratState3;
+
+						if (_zigguratState3 == 1)
+							if (GameObject* ziggurat = instance->GetGameObject(_zigguratDoorsGUID3))
+								ziggurat->SetGoState(GO_STATE_ACTIVE);
+
+						CheckZiggurats();
+						break;
+					}
+					case TYPE_BARON_FIGHT:
+					{
+						if (GameObject* gate = instance->GetGameObject(_zigguratDoorsGUID5))
+							gate->SetGoState(data == IN_PROGRESS ? GO_STATE_READY : GO_STATE_ACTIVE);
+						return;
+					}
+					case TYPE_MALLOW:
+						++_postboxesOpened;
+						break;
+				}
+
+                SaveToDB();
             }
 
-            std::string GetSaveData() override
+            std::string GetSaveData()
             {
-                OUT_SAVE_INST_DATA;
-
                 std::ostringstream saveStream;
-                saveStream << EncounterState[0] << ' ' << EncounterState[1] << ' ' << EncounterState[2] << ' '
-                    << EncounterState[3] << ' ' << EncounterState[4] << ' ' << EncounterState[5];
-
-                OUT_SAVE_INST_DATA_COMPLETE;
+				saveStream << "S T " << _baronRunProgress << ' ' << _baronRunTime << ' ' << _zigguratState1 << ' ' << _zigguratState2 << ' ' << _zigguratState3 << ' ' << _slaughterProgress << ' ' << _postboxesOpened;
                 return saveStream.str();
             }
 
-            void Load(const char* in) override
+            void Load(const char* in)
             {
-                if (!in)
+				if (!in)
+					return;
+
+				char dataHead1, dataHead2;
+				std::istringstream loadStream(in);
+				loadStream >> dataHead1 >> dataHead2;
+				if (dataHead1 == 'S' && dataHead2 == 'T')
+				{
+					loadStream >> _baronRunProgress;
+					loadStream >> _baronRunTime;
+					loadStream >> _zigguratState1;
+					loadStream >> _zigguratState2;
+					loadStream >> _zigguratState3;
+					loadStream >> _slaughterProgress;
+					loadStream >> _postboxesOpened;
+				}
+
+				if (_baronRunTime > 0)
+					events.ScheduleEvent(EVENT_BARON_TIME, 60000);
+
+				if (_slaughterProgress > 0 && _slaughterProgress < 4)
+					events.ScheduleEvent(EVENT_FORCE_SLAUGHTER_EVENT, 5000);
+            }
+
+            uint32 GetData(uint32 type) const
+            {
+				switch (type)
                 {
-                    OUT_LOAD_INST_DATA_FAIL;
-                    return;
+					case TYPE_ZIGGURAT1:
+						return _zigguratState1;
+					case TYPE_ZIGGURAT2:
+						return _zigguratState2;
+					case TYPE_ZIGGURAT3:
+						return _zigguratState3;
+					case TYPE_MALLOW:
+						return _postboxesOpened;
                 }
-
-                OUT_LOAD_INST_DATA(in);
-
-                std::istringstream loadStream(in);
-                loadStream >> EncounterState[0] >> EncounterState[1] >> EncounterState[2] >> EncounterState[3]
-                >> EncounterState[4] >> EncounterState[5];
-
-                // Do not reset 1, 2 and 3. they are not set to done, yet .
-                if (EncounterState[0] == IN_PROGRESS)
-                    EncounterState[0] = NOT_STARTED;
-                if (EncounterState[4] == IN_PROGRESS)
-                    EncounterState[4] = NOT_STARTED;
-                if (EncounterState[5] == IN_PROGRESS)
-                    EncounterState[5] = NOT_STARTED;
-
-                OUT_LOAD_INST_DATA_COMPLETE;
+                return 0;
             }
 
-            uint32 GetData(uint32 type) const override
-            {
-                  switch (type)
-                  {
-                      case TYPE_SH_QUEST:
-                          if (IsSilverHandDead[0] && IsSilverHandDead[1] && IsSilverHandDead[2] && IsSilverHandDead[3] && IsSilverHandDead[4])
-                              return 1;
-                          return 0;
-                      case TYPE_BARON_RUN:
-                          return EncounterState[0];
-                      case TYPE_BARONESS:
-                          return EncounterState[1];
-                      case TYPE_NERUB:
-                          return EncounterState[2];
-                      case TYPE_PALLID:
-                          return EncounterState[3];
-                      case TYPE_RAMSTEIN:
-                          return EncounterState[4];
-                      case TYPE_BARON:
-                          return EncounterState[5];
-                  }
-                  return 0;
-            }
-
-            ObjectGuid GetGuidData(uint32 data) const override
-            {
-                switch (data)
-                {
-                    case DATA_BARON:
-                        return baronGUID;
-                    case DATA_YSIDA_TRIGGER:
-                        return ysidaTriggerGUID;
-                }
-                return ObjectGuid::Empty;
-            }
-
-            void Update(uint32 diff) override
+            void Update(uint32 diff)
             {
                 events.Update(diff);
-
-                while (uint32 eventId = events.ExecuteEvent())
+				switch (events.ExecuteEvent())
                 {
-                    switch (eventId)
-                    {
-                        case EVENT_BARON_RUN:
-                            if (GetData(TYPE_BARON_RUN) != DONE)
-                                SetData(TYPE_BARON_RUN, FAIL);
-                            TC_LOG_DEBUG("scripts", "Instance Stratholme: Baron run event reached end. Event has state %u.", GetData(TYPE_BARON_RUN));
-                            break;
-                        case EVENT_SLAUGHTER_SQUARE:
-                            if (Creature* baron = instance->GetCreature(baronGUID))
-                            {
-                                for (uint8 i = 0; i < 4; ++i)
-                                    baron->SummonCreature(NPC_BLACK_GUARD, 4032.84f, -3390.24f, 119.73f, 4.71f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 1800000);
+                    case EVENT_BARON_TIME:
+					{
+						--_baronRunTime;
+						instance->LoadGrid(4035.83f, -3336.31f);
+						Creature* baron = instance->GetCreature(_baronRivendareGUID);
+						if (baron && !baron->IsInCombat())
+						{
+							switch (_baronRunTime)
+							{
+								case 10:
+									baron->AI()->Talk(SAY_BARON_10M);
+									break;
+								case 5:
+									baron->AI()->Talk(SAY_BARON_5M);
+									if (Creature* ysida = baron->FindNearestCreature(NPC_YSIDA, 50.0f))
+										ysida->AI()->SetData(1, 1);
+									break;
+								case 0:
+									baron->AI()->Talk(SAY_BARON_0M);
+									DoRemoveAurasDueToSpellOnPlayers(SPELL_BARON_ULTIMATUM);
+									break;
+							}
+						}
 
-                                HandleGameObject(ziggurat4GUID, true);
-                                HandleGameObject(ziggurat5GUID, true);
-                                TC_LOG_DEBUG("scripts", "Instance Stratholme: Black guard sentries spawned. Opening gates to baron.");
-                            }
-                            break;
-                        default:
-                            break;
-                    }
+						if (_baronRunTime > 0)
+							events.ScheduleEvent(EVENT_BARON_TIME, 60000);
+						else
+							events.ScheduleEvent(EVENT_EXECUTE_PRISONER, 0);
+
+						SaveToDB();
+						break;
+					}
+					case EVENT_EXECUTE_PRISONER:
+					{
+						instance->LoadGrid(4035.83f, -3336.31f);
+						Creature* baron = instance->GetCreature(_baronRivendareGUID);
+						if (baron && baron->IsAlive())
+						{
+							if (!baron->IsInCombat())
+							{
+								baron->HandleEmoteCommand(EMOTE_ONESHOT_ATTACK1H);
+								if (Creature* ysida = baron->FindNearestCreature(NPC_YSIDA, 50.0f))
+									Unit::Kill(baron, ysida);
+							}
+							else
+								events.ScheduleEvent(EVENT_EXECUTE_PRISONER, 1000);
+						}
+						break;
+					}
+                    case EVENT_SPAWN_MINDLESS:
+					{
+						Position pos = {3941.75f, -3393.06f, 119.70f, 0.0f};
+						instance->SummonCreature(NPC_MINDLESS_UNDEAD, pos);
+						break;
+					}
+					case EVENT_FORCE_SLAUGHTER_EVENT:
+					{
+						Map::PlayerList const& PlayerList = instance->GetPlayers();
+						if (!PlayerList.isEmpty())
+							for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
+								if (Player* player = i->GetSource())
+									if (player->GetDistance2d(4034.97f, -3402.13f) < 50.0f)
+									{
+										ProcessSlaughterEvent();
+										return;
+									}
+							
+						events.ScheduleEvent(EVENT_FORCE_SLAUGHTER_EVENT, 3000);
+						break;
+					}
+					case EVENT_SPAWN_BLACK_GUARD:
+					{
+						for (uint8 i = 0; i < 5; ++i)
+							if (Creature* guard = instance->SummonCreature(NPC_BLACK_GUARD, BlackGuardPos[i]))
+							{
+								guard->SetWalk(true);
+								guard->GetMotionMaster()->MovePoint(0, BlackGuardPos[i+5]);
+								guard->SetHomePosition(BlackGuardPos[i+5]);
+								if (i == 0 && guard->AI())
+									guard->AI()->Talk(SAY_BLACK_GUARD_INIT);
+							}
+
+						if (GameObject* gate = instance->GetGameObject(_zigguratDoorsGUID4))
+							gate->SetGoState(GO_STATE_ACTIVE);
+						break;
+					}
                 }
             }
+
+		private:
+			uint32 _baronRunProgress;
+			uint32 _baronRunTime;
+			uint32 _zigguratState1;
+			uint32 _zigguratState2;
+			uint32 _zigguratState3;
+			uint32 _slaughterProgress;
+			uint32 _slaughterNPCs;
+			uint32 _postboxesOpened;
+			EventMap events;
+
+			uint64 _zigguratDoorsGUID1;
+			uint64 _zigguratDoorsGUID2;
+			uint64 _zigguratDoorsGUID3;
+			uint64 _zigguratDoorsGUID4;
+			uint64 _zigguratDoorsGUID5;
+			uint64 _slaughterGateGUID;
+			uint64 _gauntletGateGUID;
+			uint64 _baronRivendareGUID;
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* map) const override
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
             return new instance_stratholme_InstanceMapScript(map);
         }

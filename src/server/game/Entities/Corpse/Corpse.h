@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,8 +16,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TRINITYCORE_CORPSE_H
-#define TRINITYCORE_CORPSE_H
+#ifndef SUNWELLCORE_CORPSE_H
+#define SUNWELLCORE_CORPSE_H
 
 #include "Object.h"
 #include "DatabaseEnv.h"
@@ -52,36 +52,34 @@ class Corpse : public WorldObject, public GridObject<Corpse>
         explicit Corpse(CorpseType type = CORPSE_BONES);
         ~Corpse();
 
-        void AddToWorld() override;
-        void RemoveFromWorld() override;
+        void AddToWorld();
+        void RemoveFromWorld();
 
-        bool Create(ObjectGuid::LowType guidlow);
-        bool Create(ObjectGuid::LowType guidlow, Player* owner);
+        bool Create(uint32 guidlow, Map* map);
+        bool Create(uint32 guidlow, Player* owner);
 
         void SaveToDB();
-        bool LoadCorpseFromDB(ObjectGuid::LowType guid, Field* fields);
+        bool LoadCorpseFromDB(uint32 guid, Field* fields);
 
         void DeleteFromDB(SQLTransaction& trans);
-        static void DeleteFromDB(ObjectGuid const& ownerGuid, SQLTransaction& trans);
 
-        ObjectGuid GetOwnerGUID() const { return GetGuidValue(CORPSE_FIELD_OWNER); }
+        uint64 GetOwnerGUID() const { return GetUInt64Value(CORPSE_FIELD_OWNER); }
 
         time_t const& GetGhostTime() const { return m_time; }
         void ResetGhostTime() { m_time = time(NULL); }
         CorpseType GetType() const { return m_type; }
 
-        CellCoord const& GetCellCoord() const { return _cellCoord; }
-        void SetCellCoord(CellCoord const& cellCoord) { _cellCoord = cellCoord; }
+        GridCoord const& GetGridCoord() const { return _gridCoord; }
+        void SetGridCoord(GridCoord const& gridCoord) { _gridCoord = gridCoord; }
 
         Loot loot;                                          // remove insignia ONLY at BG
         Player* lootRecipient;
-        bool lootForBody;
 
         bool IsExpired(time_t t) const;
 
     private:
         CorpseType m_type;
         time_t m_time;
-        CellCoord _cellCoord;
+        GridCoord _gridCoord;                                    // gride for corpse position for fast search
 };
 #endif

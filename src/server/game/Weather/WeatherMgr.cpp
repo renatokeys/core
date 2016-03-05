@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,16 +24,18 @@
 #include "Weather.h"
 #include "Log.h"
 #include "ObjectMgr.h"
+#include "AutoPtr.h"
 #include "Player.h"
-#include "WorldSession.h"
+#include "WorldPacket.h"
+#include "Opcodes.h"
 
 namespace WeatherMgr
 {
 
 namespace
 {
-    typedef std::unordered_map<uint32, std::shared_ptr<Weather> > WeatherMap;
-    typedef std::unordered_map<uint32, WeatherData> WeatherZoneMap;
+    typedef UNORDERED_MAP<uint32, Trinity::AutoPtr<Weather, ACE_Null_Mutex> > WeatherMap;
+    typedef UNORDERED_MAP<uint32, WeatherData> WeatherZoneMap;
 
     WeatherMap m_weathers;
     WeatherZoneMap mWeatherZoneMap;
@@ -49,7 +51,7 @@ namespace
 Weather* FindWeather(uint32 id)
 {
     WeatherMap::const_iterator itr = m_weathers.find(id);
-    return (itr != m_weathers.end()) ? itr->second.get() : nullptr;
+    return (itr != m_weathers.end()) ? itr->second.get() : 0;
 }
 
 /// Remove a Weather object for the given zoneid
@@ -94,7 +96,8 @@ void LoadWeatherData()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 weather definitions. DB table `game_weather` is empty.");
+        sLog->outErrorDb(">> Loaded 0 weather definitions. DB table `game_weather` is empty.");
+        sLog->outString();
         return;
     }
 
@@ -115,29 +118,30 @@ void LoadWeatherData()
             if (wzc.data[season].rainChance > 100)
             {
                 wzc.data[season].rainChance = 25;
-                TC_LOG_ERROR("sql.sql", "Weather for zone %u season %u has wrong rain chance > 100%%", zone_id, season);
+                sLog->outErrorDb("Weather for zone %u season %u has wrong rain chance > 100%%", zone_id, season);
             }
 
             if (wzc.data[season].snowChance > 100)
             {
                 wzc.data[season].snowChance = 25;
-                TC_LOG_ERROR("sql.sql", "Weather for zone %u season %u has wrong snow chance > 100%%", zone_id, season);
+                sLog->outErrorDb("Weather for zone %u season %u has wrong snow chance > 100%%", zone_id, season);
             }
 
             if (wzc.data[season].stormChance > 100)
             {
                 wzc.data[season].stormChance = 25;
-                TC_LOG_ERROR("sql.sql", "Weather for zone %u season %u has wrong storm chance > 100%%", zone_id, season);
+                sLog->outErrorDb("Weather for zone %u season %u has wrong storm chance > 100%%", zone_id, season);
             }
         }
 
-        wzc.ScriptId = sObjectMgr->GetScriptId(fields[13].GetString());
+        wzc.ScriptId = sObjectMgr->GetScriptId(fields[13].GetCString());
 
         ++count;
     }
     while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u weather definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    sLog->outString(">> Loaded %u weather definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    sLog->outString();
 }
 
 void SendFineWeatherUpdateToPlayer(Player* player)

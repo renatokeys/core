@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,6 +37,21 @@ template<class VISITOR, class TYPE_CONTAINER> void VisitorHelper(VISITOR &v, TYP
     v.Visit(c);
 }
 
+// terminate condition for container list
+template<class VISITOR> void VisitorHelper(VISITOR &/*v*/, ContainerList<TypeNull> &/*c*/) { }
+
+template<class VISITOR, class T> void VisitorHelper(VISITOR &v, ContainerList<T> &c)
+{
+    v.Visit(c._element);
+}
+
+// recursion for container list
+template<class VISITOR, class H, class T> void VisitorHelper(VISITOR &v, ContainerList<TypeList<H, T> > &c)
+{
+    VisitorHelper(v, c._elements);
+    VisitorHelper(v, c._TailElements);
+}
+
 // terminate condition container map list
 template<class VISITOR> void VisitorHelper(VISITOR &/*v*/, ContainerMapList<TypeNull> &/*c*/) { }
 
@@ -52,31 +67,23 @@ template<class VISITOR, class H, class T> void VisitorHelper(VISITOR &v, Contain
     VisitorHelper(v, c._TailElements);
 }
 
-// for TypeMapContainer
-template<class VISITOR, class OBJECT_TYPES> void VisitorHelper(VISITOR &v, TypeMapContainer<OBJECT_TYPES> &c)
-{
-    VisitorHelper(v, c.GetElements());
-}
-
-// TypeUnorderedMapContainer
-template<class VISITOR, class KEY_TYPE>
-void VisitorHelper(VISITOR& /*v*/, ContainerUnorderedMap<TypeNull, KEY_TYPE>& /*c*/) { }
-
-template<class VISITOR, class KEY_TYPE, class T>
-void VisitorHelper(VISITOR& v, ContainerUnorderedMap<T, KEY_TYPE>& c)
+// array list
+template<class VISITOR, class T> void VisitorHelper(VISITOR &v, ContainerArrayList<T> &c)
 {
     v.Visit(c._element);
 }
 
-template<class VISITOR, class KEY_TYPE, class H, class T>
-void VisitorHelper(VISITOR& v, ContainerUnorderedMap<TypeList<H, T>, KEY_TYPE>& c)
+template<class VISITOR> void VisitorHelper(VISITOR &/*v*/, ContainerArrayList<TypeNull> &/*c*/) { }
+
+// recursion
+template<class VISITOR, class H, class T> void VisitorHelper(VISITOR &v, ContainerArrayList<TypeList<H, T> > &c)
 {
     VisitorHelper(v, c._elements);
     VisitorHelper(v, c._TailElements);
 }
 
-template<class VISITOR, class OBJECT_TYPES, class KEY_TYPE>
-void VisitorHelper(VISITOR& v, TypeUnorderedMapContainer<OBJECT_TYPES, KEY_TYPE>& c)
+// for TypeMapContainer
+template<class VISITOR, class OBJECT_TYPES> void VisitorHelper(VISITOR &v, TypeMapContainer<OBJECT_TYPES> &c)
 {
     VisitorHelper(v, c.GetElements());
 }

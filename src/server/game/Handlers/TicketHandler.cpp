@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,7 +24,9 @@
 #include "Player.h"
 #include "TicketMgr.h"
 #include "Util.h"
+#include "World.h"
 #include "WorldPacket.h"
+#include "Chat.h"
 #include "WorldSession.h"
 
 void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
@@ -43,7 +45,7 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
     GmTicket* ticket = sTicketMgr->GetTicketByPlayer(GetPlayer()->GetGUID());
 
     if (ticket && ticket->IsCompleted())
-        sTicketMgr->CloseTicket(ticket->GetId(), GetPlayer()->GetGUID());
+        sTicketMgr->CloseTicket(ticket->GetId(), GetPlayer()->GetGUID());;
 
     // Player must not have ticket
     if (!ticket || ticket->IsClosed())
@@ -89,7 +91,7 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
             }
             else
             {
-                TC_LOG_ERROR("network", "CMSG_GMTICKET_CREATE possibly corrupt. Uncompression failed.");
+                sLog->outError("CMSG_GMTICKET_CREATE possibly corrupt. Uncompression failed.");
                 recvData.rfinish();
                 return;
             }
@@ -118,10 +120,10 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
     SendPacket(&data);
 }
 
-void WorldSession::HandleGMTicketUpdateOpcode(WorldPacket& recvData)
+void WorldSession::HandleGMTicketUpdateOpcode(WorldPacket & recv_data)
 {
     std::string message;
-    recvData >> message;
+    recv_data >> message;
 
     GMTicketResponse response = GMTICKET_RESPONSE_UPDATE_ERROR;
     if (GmTicket* ticket = sTicketMgr->GetTicketByPlayer(GetPlayer()->GetGUID()))
@@ -140,7 +142,7 @@ void WorldSession::HandleGMTicketUpdateOpcode(WorldPacket& recvData)
     SendPacket(&data);
 }
 
-void WorldSession::HandleGMTicketDeleteOpcode(WorldPacket & /*recvData*/)
+void WorldSession::HandleGMTicketDeleteOpcode(WorldPacket & /*recv_data*/)
 {
     if (GmTicket* ticket = sTicketMgr->GetTicketByPlayer(GetPlayer()->GetGUID()))
     {
@@ -155,7 +157,7 @@ void WorldSession::HandleGMTicketDeleteOpcode(WorldPacket & /*recvData*/)
     }
 }
 
-void WorldSession::HandleGMTicketGetTicketOpcode(WorldPacket & /*recvData*/)
+void WorldSession::HandleGMTicketGetTicketOpcode(WorldPacket & /*recv_data*/)
 {
     SendQueryTimeResponse();
 
@@ -170,7 +172,7 @@ void WorldSession::HandleGMTicketGetTicketOpcode(WorldPacket & /*recvData*/)
         sTicketMgr->SendTicket(this, NULL);
 }
 
-void WorldSession::HandleGMTicketSystemStatusOpcode(WorldPacket & /*recvData*/)
+void WorldSession::HandleGMTicketSystemStatusOpcode(WorldPacket & /*recv_data*/)
 {
     // Note: This only disables the ticket UI at client side and is not fully reliable
     // are we sure this is a uint32? Should ask Zor
@@ -179,27 +181,27 @@ void WorldSession::HandleGMTicketSystemStatusOpcode(WorldPacket & /*recvData*/)
     SendPacket(&data);
 }
 
-void WorldSession::HandleGMSurveySubmit(WorldPacket& recvData)
+void WorldSession::HandleGMSurveySubmit(WorldPacket& recv_data)
 {
     uint32 nextSurveyID = sTicketMgr->GetNextSurveyID();
     // just put the survey into the database
     uint32 mainSurvey; // GMSurveyCurrentSurvey.dbc, column 1 (all 9) ref to GMSurveySurveys.dbc
-    recvData >> mainSurvey;
+    recv_data >> mainSurvey;
 
-    std::unordered_set<uint32> surveyIds;
+    UNORDERED_SET<uint32> surveyIds;
     SQLTransaction trans = CharacterDatabase.BeginTransaction();
     // sub_survey1, r1, comment1, sub_survey2, r2, comment2, sub_survey3, r3, comment3, sub_survey4, r4, comment4, sub_survey5, r5, comment5, sub_survey6, r6, comment6, sub_survey7, r7, comment7, sub_survey8, r8, comment8, sub_survey9, r9, comment9, sub_survey10, r10, comment10,
     for (uint8 i = 0; i < 10; i++)
     {
         uint32 subSurveyId; // ref to i'th GMSurveySurveys.dbc field (all fields in that dbc point to fields in GMSurveyQuestions.dbc)
-        recvData >> subSurveyId;
+        recv_data >> subSurveyId;
         if (!subSurveyId)
             break;
 
         uint8 rank; // probably some sort of ref to GMSurveyAnswers.dbc
-        recvData >> rank;
+        recv_data >> rank;
         std::string comment; // comment ("Usage: GMSurveyAnswerSubmit(question, rank, comment)")
-        recvData >> comment;
+        recv_data >> comment;
 
         // make sure the same sub survey is not added to DB twice
         if (!surveyIds.insert(subSurveyId).second)
@@ -214,10 +216,10 @@ void WorldSession::HandleGMSurveySubmit(WorldPacket& recvData)
     }
 
     std::string comment; // just a guess
-    recvData >> comment;
+    recv_data >> comment;
 
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_GM_SURVEY);
-    stmt->setUInt32(0, GetPlayer()->GetGUID().GetCounter());
+    stmt->setUInt32(0, GUID_LOPART(GetPlayer()->GetGUID()));
     stmt->setUInt32(1, nextSurveyID);
     stmt->setUInt32(2, mainSurvey);
     stmt->setString(3, comment);
@@ -227,20 +229,20 @@ void WorldSession::HandleGMSurveySubmit(WorldPacket& recvData)
     CharacterDatabase.CommitTransaction(trans);
 }
 
-void WorldSession::HandleReportLag(WorldPacket& recvData)
+void WorldSession::HandleReportLag(WorldPacket& recv_data)
 {
     // just put the lag report into the database...
     // can't think of anything else to do with it
     uint32 lagType, mapId;
-    recvData >> lagType;
-    recvData >> mapId;
+    recv_data >> lagType;
+    recv_data >> mapId;
     float x, y, z;
-    recvData >> x;
-    recvData >> y;
-    recvData >> z;
+    recv_data >> x;
+    recv_data >> y;
+    recv_data >> z;
 
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_LAG_REPORT);
-    stmt->setUInt32(0, GetPlayer()->GetGUID().GetCounter());
+    stmt->setUInt32(0, GUID_LOPART(GetPlayer()->GetGUID()));
     stmt->setUInt8 (1, lagType);
     stmt->setUInt16(2, mapId);
     stmt->setFloat (3, x);

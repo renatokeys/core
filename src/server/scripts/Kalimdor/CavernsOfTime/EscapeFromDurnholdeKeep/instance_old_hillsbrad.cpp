@@ -1,27 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Instance_Old_Hillsbrad
-SD%Complete: 75
-SDComment: If thrall escort fail, all parts will reset. In future, save sub-parts and continue from last known.
-SDCategory: Caverns of Time, Old Hillsbrad Foothills
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -29,209 +8,333 @@ EndScriptData */
 #include "old_hillsbrad.h"
 #include "Player.h"
 
-#define MAX_ENCOUNTER      6
+const Position instancePositions[INSTANCE_POSITIONS_COUNT] = 
+{
+	{2188.18f, 228.90f, 53.025f, 1.77f},	// Orcs Gather Point 1
+	{2103.23f, 93.55f, 53.096f, 3.78f},		// Orcs Gather Point 2
+	{2128.43f, 71.01f, 64.42f, 1.74f}		// Lieutenant Drake Summon Position
+};
 
-#define THRALL_ENTRY    17876
-#define TARETHA_ENTRY   18887
-#define EPOCH_ENTRY    18096
+const Position thrallPositions[THRALL_POSITIONS_COUNT] =
+{
+	{2181.37f, 119.15f, 89.45f, 5.75f},		// After wearing armor
+	{2096.09f, 195.91f, 65.22f, 2.45f},		// After Fourth Ambush
+	{2062.9f, 229.93f, 64.454f, 2.45f},		// After Captain Skarloc death
+	{2486.91f, 626.356f, 58.0761f, 0.0f},	// Arrived at Tarren Mill
+	{2660.47f, 659.223f, 62.0f, 5.78f}		// Taretha Met
 
-#define DRAKE_ENTRY             17848
-
-#define QUEST_ENTRY_DIVERSION   10283
-#define LODGE_QUEST_TRIGGER     20155
+};
 
 class instance_old_hillsbrad : public InstanceMapScript
 {
 public:
     instance_old_hillsbrad() : InstanceMapScript("instance_old_hillsbrad", 560) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* map) const override
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
         return new instance_old_hillsbrad_InstanceMapScript(map);
     }
 
     struct instance_old_hillsbrad_InstanceMapScript : public InstanceScript
     {
-        instance_old_hillsbrad_InstanceMapScript(Map* map) : InstanceScript(map)
-        {
-            SetHeaders(DataHeader);
-            memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
+        instance_old_hillsbrad_InstanceMapScript(Map* map) : InstanceScript(map) { }
 
-            mBarrelCount = 0;
-            mThrallEventCount = 0;
+        void Initialize()
+        {
+            _encounterProgress = 0;
+			_barrelCount = 0;
+	        _attemptsCount = 0;
+
+			_thrallGUID = 0;
+			_tarethaGUID = 0;
+
+			_initalFlamesSet.clear();
+			_finalFlamesSet.clear();
+			_prisonersSet.clear();
+			_events.Reset();
         }
 
-        uint32 m_auiEncounter[MAX_ENCOUNTER];
-        uint32 mBarrelCount;
-        uint32 mThrallEventCount;
+		void OnPlayerEnter(Player* player)
+		{
+			if (instance->GetPlayersCountExceptGMs() == 1)
+				CleanupInstance();
 
-        ObjectGuid ThrallGUID;
-        ObjectGuid TarethaGUID;
-        ObjectGuid EpochGUID;
+			EnsureGridLoaded();
 
-        Player* GetPlayerInMap()
-        {
-            Map::PlayerList const& players = instance->GetPlayers();
+			if (_encounterProgress < ENCOUNTER_PROGRESS_BARRELS)
+				player->SendUpdateWorldState(WORLD_STATE_BARRELS_PLANTED, _barrelCount);
+		}
 
-            if (!players.isEmpty())
-            {
-                for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
-                {
-                    if (Player* player = itr->GetSource())
-                        return player;
-                }
-            }
+		void CleanupInstance()
+		{
+			if (_encounterProgress == ENCOUNTER_PROGRESS_NONE)
+				return;
 
-            TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: GetPlayerInMap, but PlayerList is empty!");
-            return NULL;
-        }
+			_events.ScheduleEvent(EVENT_INITIAL_BARRELS_FLAME, 0);
+			_events.ScheduleEvent(EVENT_FINAL_BARRELS_FLAME, 0);
 
-        void UpdateQuestCredit()
-        {
-            Map::PlayerList const& players = instance->GetPlayers();
+			if (_encounterProgress == ENCOUNTER_PROGRESS_BARRELS)
+				_events.ScheduleEvent(EVENT_SUMMON_LIEUTENANT, 0);
+			else
+				SetData(DATA_THRALL_REPOSITION, 2);
+		}
 
-            if (!players.isEmpty())
-            {
-                for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
-                {
-                    if (Player* player = itr->GetSource())
-                        player->KilledMonsterCredit(LODGE_QUEST_TRIGGER);
-                }
-            }
-        }
-
-        void OnCreatureCreate(Creature* creature) override
+        void OnCreatureCreate(Creature* creature)
         {
             switch (creature->GetEntry())
             {
-                case THRALL_ENTRY:
-                    ThrallGUID = creature->GetGUID();
+                case NPC_THRALL:
+                    _thrallGUID = creature->GetGUID();
+					if (_encounterProgress == ENCOUNTER_PROGRESS_FINISHED)
+						creature->SetVisible(false);
+					else
+						Reposition(creature);
                     break;
-                case TARETHA_ENTRY:
-                    TarethaGUID = creature->GetGUID();
-                    break;
-                case EPOCH_ENTRY:
-                    EpochGUID = creature->GetGUID();
-                    break;
+				case NPC_ORC_PRISONER:
+					_prisonersSet.insert(creature->GetGUID());
+					break;
+				case NPC_TARETHA:
+					if (_encounterProgress == ENCOUNTER_PROGRESS_FINISHED)
+						creature->SetVisible(false);
+					_tarethaGUID = creature->GetGUID();
+					break;
             }
         }
 
-        void SetData(uint32 type, uint32 data) override
+		void OnGameObjectCreate(GameObject* gameobject)
+		{
+			switch (gameobject->GetEntry())
+			{
+				case GO_BARREL:
+					if (_encounterProgress >= ENCOUNTER_PROGRESS_BARRELS)
+						gameobject->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+					break;
+				case GO_PRISON_DOOR:
+					if (_encounterProgress >= ENCOUNTER_PROGRESS_THRALL_ARMORED)
+						gameobject->SetGoState(GO_STATE_ACTIVE);
+					break;
+				case GO_ROARING_FLAME:
+					// Xinef: hack in DB to distinguish final / initial flames
+					if (gameobject->GetPhaseMask() & 0x2)
+						_finalFlamesSet.insert(gameobject->GetGUID());
+					else
+						_initalFlamesSet.insert(gameobject->GetGUID());
+					break;
+			}
+		}
+
+        void SetData(uint32 type, uint32 data)
         {
-            Player* player = GetPlayerInMap();
-
-            if (!player)
-            {
-                TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: SetData (Type: %u Data %u) cannot find any player.", type, data);
-                return;
-            }
-
             switch (type)
             {
-                case TYPE_BARREL_DIVERSION:
+				case DATA_THRALL_REPOSITION:
+					if (data > 1)
+						_events.ScheduleEvent(EVENT_THRALL_REPOSITION, data == 2 ? 0 : 10000);
+					else if (Creature* thrall = instance->GetCreature(_thrallGUID))
+						Reposition(thrall);
+					return;
+				case DATA_ESCORT_PROGRESS:
+					_encounterProgress = data;
+					SaveToDB();
+					break;
+                case DATA_BOMBS_PLACED:
                 {
-                    if (data == IN_PROGRESS)
+					if (_barrelCount >= 5 || _encounterProgress > ENCOUNTER_PROGRESS_NONE)
+						return;
+
+                    DoUpdateWorldState(WORLD_STATE_BARRELS_PLANTED, ++_barrelCount);
+                    if (_barrelCount == 5)
                     {
-                        if (mBarrelCount >= 5)
-                            return;
-
-                        ++mBarrelCount;
-                        DoUpdateWorldState(WORLD_STATE_OH, mBarrelCount);
-
-                        TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: go_barrel_old_hillsbrad count %u", mBarrelCount);
-
-                        m_auiEncounter[0] = IN_PROGRESS;
-
-                        if (mBarrelCount == 5)
-                        {
-                            UpdateQuestCredit();
-                            player->SummonCreature(DRAKE_ENTRY, 2128.43f, 71.01f, 64.42f, 1.74f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 1800000);
-                            m_auiEncounter[0] = DONE;
-                        }
+						_events.ScheduleEvent(EVENT_INITIAL_BARRELS_FLAME, 4000);
+						_events.ScheduleEvent(EVENT_FINAL_BARRELS_FLAME, 12000);
+						_events.ScheduleEvent(EVENT_SUMMON_LIEUTENANT, 18000);
                     }
                     break;
                 }
-                case TYPE_THRALL_EVENT:
-                {
-                    if (data == FAIL)
-                    {
-                        if (mThrallEventCount <= 20)
-                        {
-                            ++mThrallEventCount;
-                            m_auiEncounter[1] = NOT_STARTED;
-                            TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: Thrall event failed %u times. Resetting all sub-events.", mThrallEventCount);
-                            m_auiEncounter[2] = NOT_STARTED;
-                            m_auiEncounter[3] = NOT_STARTED;
-                            m_auiEncounter[4] = NOT_STARTED;
-                            m_auiEncounter[5] = NOT_STARTED;
-                        }
-                        else if (mThrallEventCount > 20)
-                        {
-                            m_auiEncounter[1] = data;
-                            m_auiEncounter[2] = data;
-                            m_auiEncounter[3] = data;
-                            m_auiEncounter[4] = data;
-                            m_auiEncounter[5] = data;
-                            TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: Thrall event failed %u times. Resetting all sub-events.", mThrallEventCount);
-                        }
-                    }
-                    else
-                        m_auiEncounter[1] = data;
-                    TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: Thrall escort event adjusted to data %u.", data);
-                    break;
-                }
-                case TYPE_THRALL_PART1:
-                    m_auiEncounter[2] = data;
-                    TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: Thrall event part I adjusted to data %u.", data);
-                    break;
-                case TYPE_THRALL_PART2:
-                    m_auiEncounter[3] = data;
-                    TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: Thrall event part II adjusted to data %u.", data);
-                    break;
-                case TYPE_THRALL_PART3:
-                    m_auiEncounter[4] = data;
-                    TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: Thrall event part III adjusted to data %u.", data);
-                    break;
-                case TYPE_THRALL_PART4:
-                    m_auiEncounter[5] = data;
-                     TC_LOG_DEBUG("scripts", "Instance Old Hillsbrad: Thrall event part IV adjusted to data %u.", data);
-                    break;
+				case DATA_THRALL_ADD_FLAG:
+					if (Creature* thrall = instance->GetCreature(_thrallGUID))
+						thrall->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+					break;
             }
         }
 
-        uint32 GetData(uint32 data) const override
+        uint32 GetData(uint32 data) const
         {
-            switch (data)
-            {
-                case TYPE_BARREL_DIVERSION:
-                    return m_auiEncounter[0];
-                case TYPE_THRALL_EVENT:
-                    return m_auiEncounter[1];
-                case TYPE_THRALL_PART1:
-                    return m_auiEncounter[2];
-                case TYPE_THRALL_PART2:
-                    return m_auiEncounter[3];
-                case TYPE_THRALL_PART3:
-                    return m_auiEncounter[4];
-                case TYPE_THRALL_PART4:
-                    return m_auiEncounter[5];
-            }
+			if (data == DATA_ESCORT_PROGRESS)
+				return _encounterProgress;
+			else if (data == DATA_ATTEMPTS_COUNT)
+				return _attemptsCount;
             return 0;
         }
 
-        ObjectGuid GetGuidData(uint32 data) const override
+        uint64 GetData64(uint32 data) const
         {
-            switch (data)
-            {
-                case DATA_THRALL:
-                    return ThrallGUID;
-                case DATA_TARETHA:
-                    return TarethaGUID;
-                case DATA_EPOCH:
-                    return EpochGUID;
-            }
-            return ObjectGuid::Empty;
+			if (data == DATA_THRALL_GUID)
+				return _thrallGUID;
+			else if (data == DATA_TARETHA_GUID)
+				return _tarethaGUID;
+            return 0;
         }
+
+		void Update(uint32 diff)
+		{
+			_events.Update(diff);
+			switch (_events.ExecuteEvent())
+			{
+				case EVENT_INITIAL_BARRELS_FLAME:
+				{
+					instance->LoadGrid(instancePositions[0].GetPositionX(), instancePositions[0].GetPositionY());
+					instance->LoadGrid(instancePositions[1].GetPositionX(), instancePositions[1].GetPositionY());
+
+					for (std::set<uint64>::const_iterator itr = _prisonersSet.begin(); itr != _prisonersSet.end(); ++itr)
+						if (Creature* orc = instance->GetCreature(*itr))
+						{
+							uint8 index = orc->GetDistance(instancePositions[0]) < 80.0f ? 0 : 1;
+							Position pos(instancePositions[index]);
+							orc->MovePosition(pos, frand(1.0f, 3.0f) + 15.0f * (float)rand_norm(), (float)rand_norm() * static_cast<float>(2 * M_PI));
+							orc->GetMotionMaster()->MovePoint(1, pos);
+							orc->SetStandState(UNIT_STAND_STATE_STAND);
+						}
+
+					for (std::set<uint64>::const_iterator itr = _initalFlamesSet.begin(); itr != _initalFlamesSet.end(); ++itr)
+						if (GameObject* gobject = instance->GetGameObject(*itr))
+						{
+							gobject->SetRespawnTime(0);
+							gobject->UpdateObjectVisibility(true);
+						}
+					break;
+				}
+				case EVENT_FINAL_BARRELS_FLAME:
+				{
+					instance->LoadGrid(instancePositions[0].GetPositionX(), instancePositions[0].GetPositionY());
+					instance->LoadGrid(instancePositions[1].GetPositionX(), instancePositions[1].GetPositionY());
+
+					if (_encounterProgress == ENCOUNTER_PROGRESS_NONE)
+					{
+						Map::PlayerList const& players = instance->GetPlayers();
+						if (!players.isEmpty())
+							for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
+								if (Player* player = itr->GetSource())
+									player->KilledMonsterCredit(NPC_LODGE_QUEST_TRIGGER, 0);
+					}
+
+					for (std::set<uint64>::const_iterator itr = _finalFlamesSet.begin(); itr != _finalFlamesSet.end(); ++itr)
+						if (GameObject* gobject = instance->GetGameObject(*itr))
+						{
+							gobject->SetRespawnTime(0);
+							gobject->UpdateObjectVisibility(true);
+						}
+
+					for (std::set<uint64>::const_iterator itr = _prisonersSet.begin(); itr != _prisonersSet.end(); ++itr)
+						if (Creature* orc = instance->GetCreature(*itr))
+							if (roll_chance_i(25))
+								orc->HandleEmoteCommand(EMOTE_ONESHOT_CHEER);
+					
+					SetData(DATA_ESCORT_PROGRESS, ENCOUNTER_PROGRESS_BARRELS);
+                    DoUpdateWorldState(WORLD_STATE_BARRELS_PLANTED, 0);
+					break;
+				}
+				case EVENT_SUMMON_LIEUTENANT:
+				{
+					instance->LoadGrid(instancePositions[2].GetPositionX(), instancePositions[2].GetPositionY());
+					if (Creature* drake = instance->SummonCreature(NPC_LIEUTENANT_DRAKE, instancePositions[2]))
+						drake->AI()->Talk(0);
+				}
+				case EVENT_THRALL_REPOSITION:
+				{
+					if (Creature* thrall = instance->GetCreature(_thrallGUID))
+					{
+						if (!thrall->IsAlive())
+						{
+							++_attemptsCount;
+							EnsureGridLoaded();
+							thrall->SetVisible(false);
+							Reposition(thrall);
+							thrall->setDeathState(DEAD);
+							thrall->Respawn();
+							thrall->SetVisible(true);
+							SaveToDB();
+						}
+						else
+							thrall->AI()->Reset();
+					}
+					break;
+				}
+			}
+		}
+
+		void Reposition(Creature* thrall)
+		{
+			switch (uint32 data = GetData(DATA_ESCORT_PROGRESS))
+			{
+				case ENCOUNTER_PROGRESS_THRALL_ARMORED:
+				case ENCOUNTER_PROGRESS_AMBUSHES_1:
+				case ENCOUNTER_PROGRESS_SKARLOC_KILLED:
+				case ENCOUNTER_PROGRESS_TARREN_MILL:
+				case ENCOUNTER_PROGRESS_TARETHA_MEET:
+					thrall->UpdatePosition(thrallPositions[data - ENCOUNTER_PROGRESS_THRALL_ARMORED], true);
+					thrall->SetHomePosition(thrallPositions[data - ENCOUNTER_PROGRESS_THRALL_ARMORED]);
+					thrall->SetFacingTo(thrallPositions[data - ENCOUNTER_PROGRESS_THRALL_ARMORED].GetOrientation());
+					break;
+			}
+		}
+
+		void EnsureGridLoaded()
+		{
+			for (uint8 i = 0; i < THRALL_POSITIONS_COUNT; ++i)
+				instance->LoadGrid(thrallPositions[i].GetPositionX(), thrallPositions[i].GetPositionY());
+		}
+
+		std::string GetSaveData()
+        {
+            OUT_SAVE_INST_DATA;
+
+            std::ostringstream saveStream;
+                saveStream << "O H " << _encounterProgress << ' ' << _attemptsCount;
+
+            OUT_SAVE_INST_DATA_COMPLETE;
+            return saveStream.str();
+        }
+
+        void Load(const char* in)
+        {
+            if (!in)
+            {
+                OUT_LOAD_INST_DATA_FAIL;
+                return;
+            }
+
+            OUT_LOAD_INST_DATA(in);
+
+            char dataHead1, dataHead2;
+            uint32 data0, data1;
+
+            std::istringstream loadStream(in);
+            loadStream >> dataHead1 >> dataHead2 >> data0 >> data1;
+
+            if (dataHead1 == 'O' && dataHead2 == 'H')
+            {
+                _encounterProgress = data0;
+                _attemptsCount = data1;
+            }
+            else
+                OUT_LOAD_INST_DATA_FAIL;
+
+            OUT_LOAD_INST_DATA_COMPLETE;
+        }
+
+		private:
+			uint32 _encounterProgress;
+			uint32 _barrelCount;
+	        uint32 _attemptsCount;
+
+			uint64 _thrallGUID;
+			uint64 _tarethaGUID;
+			std::set<uint64> _initalFlamesSet;
+			std::set<uint64> _finalFlamesSet;
+			std::set<uint64> _prisonersSet;
+
+			EventMap _events;
     };
 
 };

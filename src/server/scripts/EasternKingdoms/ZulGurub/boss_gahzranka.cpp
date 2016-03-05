@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -43,24 +43,23 @@ enum Events
 
 class boss_gahzranka : public CreatureScript // gahzranka
 {
-    public:
-        boss_gahzranka() : CreatureScript("boss_gahzranka") { }
+    public: boss_gahzranka() : CreatureScript("boss_gahzranka") { }
 
         struct boss_gahzrankaAI : public BossAI
         {
             boss_gahzrankaAI(Creature* creature) : BossAI(creature, DATA_GAHZRANKA) { }
 
-            void Reset() override
+            void Reset()
             {
                 _Reset();
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 _JustDied();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 events.ScheduleEvent(EVENT_FROSTBREATH, 8000);
@@ -68,7 +67,7 @@ class boss_gahzranka : public CreatureScript // gahzranka
                 events.ScheduleEvent(EVENT_SLAM, 17000);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -103,7 +102,7 @@ class boss_gahzranka : public CreatureScript // gahzranka
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new boss_gahzrankaAI(creature);
         }

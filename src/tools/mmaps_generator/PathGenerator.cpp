@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,7 +18,8 @@
 
 #include "PathCommon.h"
 #include "MapBuilder.h"
-#include "Timer.h"
+
+LoginDatabaseWorkerPool LoginDatabase;
 
 using namespace MMAP;
 
@@ -243,7 +244,7 @@ int finish(const char* message, int returnValue)
 int main(int argc, char** argv)
 {
     int threads = 3, mapnum = -1;
-    float maxAngle = 70.0f;
+    float maxAngle = 55.0f;
     int tileX = -1, tileY = -1;
     bool skipLiquid = false,
          skipContinents = false,
@@ -276,7 +277,7 @@ int main(int argc, char** argv)
     }
 
     if (!checkDirectories(debugOutput))
-        return silent ? -3 : finish("Press ENTER to close...", -3);
+        return silent ? -3 : finish("Press any key to close...", -3);
 
     MapBuilder builder(maxAngle, skipLiquid, skipContinents, skipJunkMaps,
                        skipBattlegrounds, debugOutput, bigBaseUnit, offMeshInputPath);

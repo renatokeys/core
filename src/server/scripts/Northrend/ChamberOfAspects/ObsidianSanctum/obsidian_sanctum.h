@@ -1,55 +1,47 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY XINEF, IT OWNS NOW!
+*/
 
-#ifndef OBSIDIAN_SANCTUM_H_
-#define OBSIDIAN_SANCTUM_H_
+#ifndef DEF_OBSIDIAN_SANCTUM_H
+#define DEF_OBSIDIAN_SANCTUM_H
 
-#define OSScriptName "instance_obsidian_sanctum"
-#define DataHeader "OS"
-
-uint32 const EncounterCount = 5;
-
-enum DataTypes
+enum Data
 {
-    DATA_SARTHARION             = 0,
-    DATA_TENEBRON               = 1,
-    DATA_SHADRON                = 2,
-    DATA_VESPERON               = 3,
-    DATA_PORTAL_OPEN            = 4,
-    TWILIGHT_ACHIEVEMENTS       = 5
+	// Encounter
+	BOSS_SARTHARION_EVENT			= 0,
+	BOSS_TENEBRON_EVENT				= 1,
+	BOSS_VESPERON_EVENT				= 2,
+	BOSS_SHADRON_EVENT				= 3,
+	MAX_ENCOUNTERS					= 4,
+
+	// GUIDs
+    DATA_SARTHARION					= 10,
+    DATA_TENEBRON					= 11,
+    DATA_SHADRON					= 12,
+    DATA_VESPERON					= 13,
+
+	// Portal
+	DATA_CLEAR_PORTAL				= 20,
+	DATA_ADD_PORTAL					= 21,
+
+	// Achievements
+	DATA_ACHIEVEMENT_DRAGONS_COUNT	= 30,
+	DATA_VOLCANO_BLOWS				= 31,
+
+	// NPCs
+    NPC_SARTHARION					= 28860,
+    NPC_TENEBRON					= 30452,
+    NPC_SHADRON						= 30451,
+    NPC_VESPERON					= 30449,
+	NPC_FIRE_CYCLONE				= 30648,
+
+	// GOs
+    GO_TWILIGHT_PORTAL				= 193988,
+	GO_NORMAL_PORTAL				= 193989,
+
+	// Spells
+	SPELL_TWILIGHT_SHIFT			= 57620,
+	SPELL_TWILIGHT_TORMENT_SARTHARION = 58853,
 };
 
-enum CreaturesIds
-{
-    NPC_SARTHARION              = 28860,
-    NPC_TENEBRON                = 30452,
-    NPC_SHADRON                 = 30451,
-    NPC_VESPERON                = 30449
-};
-
-enum GameObjectIds
-{
-    GO_TWILIGHT_PORTAL          = 193988
-};
-
-template<class AI>
-AI* GetObsidianSanctumAI(Creature* creature)
-{
-    return GetInstanceAI<AI>(creature, OSScriptName);
-}
-
-#endif // OBSIDIAN_SANCTUM_H_
+#endif

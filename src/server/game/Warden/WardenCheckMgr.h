@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,8 +20,6 @@
 #define _WARDENCHECKMGR_H
 
 #include <map>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/shared_mutex.hpp>
 #include "Cryptography/BigNumber.h"
 
 enum WardenActions
@@ -50,17 +48,11 @@ struct WardenCheckResult
 
 class WardenCheckMgr
 {
-    private:
-        WardenCheckMgr();
-        ~WardenCheckMgr();
+    friend class ACE_Singleton<WardenCheckMgr, ACE_Null_Mutex>;
+    WardenCheckMgr();
+    ~WardenCheckMgr();
 
     public:
-        static WardenCheckMgr* instance()
-        {
-            static WardenCheckMgr instance;
-            return &instance;
-        }
-
         // We have a linear key without any gaps, so we use vector for fast access
         typedef std::vector<WardenCheck*> CheckContainer;
         typedef std::map<uint32, WardenCheckResult*> CheckResultContainer;
@@ -74,13 +66,13 @@ class WardenCheckMgr
         void LoadWardenChecks();
         void LoadWardenOverrides();
 
-        boost::shared_mutex _checkStoreLock;
+        ACE_RW_Mutex _checkStoreLock;
 
     private:
         CheckContainer CheckStore;
         CheckResultContainer CheckResultStore;
 };
 
-#define sWardenCheckMgr WardenCheckMgr::instance()
+#define sWardenCheckMgr ACE_Singleton<WardenCheckMgr, ACE_Null_Mutex>::instance()
 
 #endif

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -47,8 +47,6 @@ typedef uint8_t            uint8;
 
 #define FILE_FORMAT_VERSION    18
 
-#pragma pack(push, 1)
-
 //
 // File version chunk
 //
@@ -76,7 +74,4 @@ public:
     bool loadFile(char *filename, bool log = true);
     virtual void free();
 };
-
-#pragma pack(pop)
-
 #endif

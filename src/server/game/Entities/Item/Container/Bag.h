@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -32,10 +32,10 @@ class Bag : public Item
         Bag();
         ~Bag();
 
-        void AddToWorld() override;
-        void RemoveFromWorld() override;
+        void AddToWorld();
+        void RemoveFromWorld();
 
-        bool Create(ObjectGuid::LowType guidlow, ObjectGuid::LowType itemid, Player const* owner) override;
+        bool Create(uint32 guidlow, uint32 itemid, Player const* owner);
 
         void Clear();
         void StoreItem(uint8 slot, Item* pItem, bool update);
@@ -45,20 +45,20 @@ class Bag : public Item
         uint32 GetItemCount(uint32 item, Item* eItem = NULL) const;
         uint32 GetItemCountWithLimitCategory(uint32 limitCategory, Item* skipItem = NULL) const;
 
-        uint8 GetSlotByItemGUID(ObjectGuid guid) const;
+        uint8 GetSlotByItemGUID(uint64 guid) const;
         bool IsEmpty() const;
         uint32 GetFreeSlots() const;
         uint32 GetBagSize() const { return GetUInt32Value(CONTAINER_FIELD_NUM_SLOTS); }
 
         // DB operations
         // overwrite virtual Item::SaveToDB
-        void SaveToDB(SQLTransaction& trans) override;
+        void SaveToDB(SQLTransaction& trans);
         // overwrite virtual Item::LoadFromDB
-        bool LoadFromDB(ObjectGuid::LowType guid, ObjectGuid owner_guid, Field* fields, uint32 entry) override;
+        bool LoadFromDB(uint32 guid, uint64 owner_guid, Field* fields, uint32 entry);
         // overwrite virtual Item::DeleteFromDB
-        void DeleteFromDB(SQLTransaction& trans) override;
+        void DeleteFromDB(SQLTransaction& trans);
 
-        void BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) const override;
+        void BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) const;
 
     protected:
 

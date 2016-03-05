@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -50,7 +50,7 @@ enum Sylvanas
     SAY_SUNSORROW_WHISPER           = 0,
 
     SOUND_CREDIT                    = 10896,
-
+    
     NPC_HIGHBORNE_LAMENTER          = 21628,
     NPC_HIGHBORNE_BUNNY             = 21641,
     NPC_AMBASSADOR_SUNSORROW        = 16287,
@@ -96,7 +96,7 @@ class npc_lady_sylvanas_windrunner : public CreatureScript
 public:
     npc_lady_sylvanas_windrunner() : CreatureScript("npc_lady_sylvanas_windrunner") { }
 
-    bool OnQuestReward(Player* player, Creature* creature, const Quest *_Quest, uint32 /*slot*/) override
+    bool OnQuestReward(Player* player, Creature* creature, const Quest *_Quest, uint32 /*slot*/)
     {
         if (_Quest->GetQuestId() == QUEST_JOURNEY_TO_UNDERCITY)
             creature->AI()->SetGUID(player->GetGUID(), GUID_EVENT_INVOKER);
@@ -108,23 +108,17 @@ public:
     {
         npc_lady_sylvanas_windrunnerAI(Creature* creature) : ScriptedAI(creature)
         {
-            Initialize();
         }
 
-        void Initialize()
+        void Reset()
         {
             LamentEvent = false;
-            targetGUID.Clear();
-            playerGUID.Clear();
-        }
-
-        void Reset() override
-        {
-            Initialize();
+            targetGUID = 0;
+            playerGUID = 0;
             _events.Reset();
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             _events.ScheduleEvent(EVENT_FADE, 30000);
             _events.ScheduleEvent(EVENT_SUMMON_SKELETON, 20000);
@@ -133,7 +127,7 @@ public:
             _events.ScheduleEvent(EVENT_MULTI_SHOT, 10000);
         }
 
-        void SetGUID(ObjectGuid guid, int32 type) override
+        void SetGUID(uint64 guid, int32 type)
         {
             if (type == GUID_EVENT_INVOKER)
             {
@@ -151,23 +145,18 @@ public:
             }
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             if (summoned->GetEntry() == NPC_HIGHBORNE_BUNNY)
             {
-                if (Creature* target = ObjectAccessor::GetCreature(*summoned, targetGUID))
-                {
-                    target->GetMotionMaster()->MoveJump(target->GetPositionX(), target->GetPositionY(), me->GetPositionZ() + 15.0f, me->GetOrientation(), 0);
-                    target->SetPosition(target->GetPositionX(), target->GetPositionY(), me->GetPositionZ()+15.0f, 0.0f);
-                    summoned->CastSpell(target, SPELL_RIBBON_OF_SOULS, false);
-                }
-
-                summoned->SetDisableGravity(true);
-                targetGUID = summoned->GetGUID();
+				summoned->SetDisableGravity(true);
+				float speed = summoned->GetDistance(summoned->GetPositionX(), summoned->GetPositionY(), me->GetPositionZ()+15.0f) / (1000.0f * 0.001f);
+				summoned->MonsterMoveWithSpeed(summoned->GetPositionX(), summoned->GetPositionY(), me->GetPositionZ()+15.0f, speed);
+                summoned->CastSpell(summoned, SPELL_RIBBON_OF_SOULS, false);
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim() && !LamentEvent)
                 return;
@@ -241,11 +230,11 @@ public:
     private:
         EventMap _events;
         bool LamentEvent;
-        ObjectGuid targetGUID;
-        ObjectGuid playerGUID;
+        uint64 targetGUID;
+        uint64 playerGUID;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_lady_sylvanas_windrunnerAI(creature);
     }
@@ -260,19 +249,21 @@ class npc_highborne_lamenter : public CreatureScript
 public:
     npc_highborne_lamenter() : CreatureScript("npc_highborne_lamenter") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_highborne_lamenterAI(creature);
     }
 
     struct npc_highborne_lamenterAI : public ScriptedAI
     {
-        npc_highborne_lamenterAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
+        npc_highborne_lamenterAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Initialize()
+        uint32 EventMoveTimer;
+        uint32 EventCastTimer;
+        bool EventMove;
+        bool EventCast;
+
+        void Reset()
         {
             EventMoveTimer = 10000;
             EventCastTimer = 17500;
@@ -280,19 +271,9 @@ public:
             EventCast = true;
         }
 
-        uint32 EventMoveTimer;
-        uint32 EventCastTimer;
-        bool EventMove;
-        bool EventCast;
+        void EnterCombat(Unit* /*who*/) { }
 
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void EnterCombat(Unit* /*who*/) override { }
-
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (EventMove)
             {
@@ -317,6 +298,59 @@ public:
 };
 
 /*######
+## npc_parqual_fintallas
+######*/
+
+enum ParqualFintallas
+{
+    SPELL_MARK_OF_SHAME         = 6767
+};
+
+#define GOSSIP_HPF1             "Gul'dan"
+#define GOSSIP_HPF2             "Kel'Thuzad"
+#define GOSSIP_HPF3             "Ner'zhul"
+
+class npc_parqual_fintallas : public CreatureScript
+{
+public:
+    npc_parqual_fintallas() : CreatureScript("npc_parqual_fintallas") { }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
+    {
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF+1)
+        {
+            player->CLOSE_GOSSIP_MENU();
+            creature->CastSpell(player, SPELL_MARK_OF_SHAME, false);
+        }
+        if (action == GOSSIP_ACTION_INFO_DEF+2)
+        {
+            player->CLOSE_GOSSIP_MENU();
+            player->AreaExploredOrEventHappens(6628);
+        }
+        return true;
+    }
+
+    bool OnGossipHello(Player* player, Creature* creature)
+    {
+        if (creature->IsQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
+
+        if (player->GetQuestStatus(6628) == QUEST_STATUS_INCOMPLETE && !player->HasAura(SPELL_MARK_OF_SHAME))
+        {
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+            player->SEND_GOSSIP_MENU(5822, creature->GetGUID());
+        }
+        else
+            player->SEND_GOSSIP_MENU(5821, creature->GetGUID());
+
+        return true;
+    }
+};
+
+/*######
 ## AddSC
 ######*/
 
@@ -324,4 +358,5 @@ void AddSC_undercity()
 {
     new npc_lady_sylvanas_windrunner();
     new npc_highborne_lamenter();
+    new npc_parqual_fintallas();
 }

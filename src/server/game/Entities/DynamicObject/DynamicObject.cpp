@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,15 +18,17 @@
 
 #include "Common.h"
 #include "UpdateMask.h"
+#include "Opcodes.h"
 #include "World.h"
 #include "ObjectAccessor.h"
 #include "DatabaseEnv.h"
 #include "GridNotifiers.h"
+#include "CellImpl.h"
 #include "GridNotifiersImpl.h"
 #include "ScriptMgr.h"
 #include "Transport.h"
 
-DynamicObject::DynamicObject(bool isWorldObject) : WorldObject(isWorldObject),
+DynamicObject::DynamicObject(bool isWorldObject) : WorldObject(isWorldObject), MovableMapObject(),
     _aura(NULL), _removedAura(NULL), _caster(NULL), _duration(0), _isViewpoint(false)
 {
     m_objectType |= TYPEMASK_DYNAMICOBJECT;
@@ -45,20 +47,33 @@ DynamicObject::~DynamicObject()
     ASSERT(!_isViewpoint);
     delete _removedAura;
 }
+  
+void DynamicObject::CleanupsBeforeDelete(bool finalCleanup /* = true */)
+{
+    if (Transport* transport = GetTransport())
+    {
+        transport->RemovePassenger(this);
+        SetTransport(NULL);
+        m_movementInfo.transport.Reset();
+        m_movementInfo.RemoveMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
+    }
+
+    WorldObject::CleanupsBeforeDelete(finalCleanup);
+}
 
 void DynamicObject::AddToWorld()
-{
+{ 
     ///- Register the dynamicObject for guid lookup and for caster
     if (!IsInWorld())
     {
-        GetMap()->GetObjectsStore().Insert<DynamicObject>(GetGUID(), this);
+        sObjectAccessor->AddObject(this);
         WorldObject::AddToWorld();
         BindToCaster();
     }
 }
 
 void DynamicObject::RemoveFromWorld()
-{
+{ 
     ///- Remove the dynamicObject from the accessor and from all lists of objects in world
     if (IsInWorld())
     {
@@ -73,27 +88,28 @@ void DynamicObject::RemoveFromWorld()
             return;
 
         UnbindFromCaster();
+		if (Transport* transport = GetTransport())
+			transport->RemovePassenger(this, true);
         WorldObject::RemoveFromWorld();
-        GetMap()->GetObjectsStore().Remove<DynamicObject>(GetGUID());
-
+        sObjectAccessor->RemoveObject(this);
     }
 }
 
-bool DynamicObject::CreateDynamicObject(ObjectGuid::LowType guidlow, Unit* caster, uint32 spellId, Position const& pos, float radius, DynamicObjectType type)
-{
+bool DynamicObject::CreateDynamicObject(uint32 guidlow, Unit* caster, uint32 spellId, Position const& pos, float radius, DynamicObjectType type)
+{ 
     SetMap(caster->GetMap());
     Relocate(pos);
     if (!IsPositionValid())
     {
-        TC_LOG_ERROR("misc", "DynamicObject (spell %u) not created. Suggested coordinates isn't valid (X: %f Y: %f)", spellId, GetPositionX(), GetPositionY());
+        sLog->outError("DynamicObject (spell %u) not created. Suggested coordinates isn't valid (X: %f Y: %f)", spellId, GetPositionX(), GetPositionY());
         return false;
     }
 
-    WorldObject::_Create(guidlow, HighGuid::DynamicObject, caster->GetPhaseMask());
+    WorldObject::_Create(guidlow, HIGHGUID_DYNAMICOBJECT, caster->GetPhaseMask());
 
     SetEntry(spellId);
     SetObjectScale(1);
-    SetGuidValue(DYNAMICOBJECT_CASTER, caster->GetGUID());
+    SetUInt64Value(DYNAMICOBJECT_CASTER, caster->GetGUID());
 
     // The lower word of DYNAMICOBJECT_BYTES must be 0x0001. This value means that the visual radius will be overriden
     // by client for most of the "ground patch" visual effect spells and a few "skyfall" ones like Hurricane.
@@ -103,28 +119,14 @@ bool DynamicObject::CreateDynamicObject(ObjectGuid::LowType guidlow, Unit* caste
     SetByteValue(DYNAMICOBJECT_BYTES, 0, type);
     SetUInt32Value(DYNAMICOBJECT_SPELLID, spellId);
     SetFloatValue(DYNAMICOBJECT_RADIUS, radius);
-    SetUInt32Value(DYNAMICOBJECT_CASTTIME, getMSTime());
+    SetUInt32Value(DYNAMICOBJECT_CASTTIME, World::GetGameTimeMS());
 
     if (IsWorldObject())
         setActive(true);    //must before add to map to be put in world container
 
-    Transport* transport = caster->GetTransport();
-    if (transport)
-    {
-        float x, y, z, o;
-        pos.GetPosition(x, y, z, o);
-        transport->CalculatePassengerOffset(x, y, z, &o);
-        m_movementInfo.transport.pos.Relocate(x, y, z, o);
-
-        // This object must be added to transport before adding to map for the client to properly display it
-        transport->AddPassenger(this);
-    }
-
-    if (!GetMap()->AddToMap(this))
+    if (!GetMap()->AddToMap(this, true))
     {
         // Returning false will cause the object to be deleted - remove from transport
-        if (transport)
-            transport->RemovePassenger(this);
         return false;
     }
 
@@ -132,7 +134,7 @@ bool DynamicObject::CreateDynamicObject(ObjectGuid::LowType guidlow, Unit* caste
 }
 
 void DynamicObject::Update(uint32 p_time)
-{
+{ 
     // caster has to be always available and in the same map
     ASSERT(_caster);
     ASSERT(_caster->GetMap() == GetMap());
@@ -163,7 +165,7 @@ void DynamicObject::Update(uint32 p_time)
 }
 
 void DynamicObject::Remove()
-{
+{ 
     if (IsInWorld())
     {
         SendObjectDeSpawnAnim(GetGUID());
@@ -173,7 +175,7 @@ void DynamicObject::Remove()
 }
 
 int32 DynamicObject::GetDuration() const
-{
+{ 
     if (!_aura)
         return _duration;
     else
@@ -181,7 +183,7 @@ int32 DynamicObject::GetDuration() const
 }
 
 void DynamicObject::SetDuration(int32 newDuration)
-{
+{ 
     if (!_aura)
         _duration = newDuration;
     else
@@ -189,18 +191,18 @@ void DynamicObject::SetDuration(int32 newDuration)
 }
 
 void DynamicObject::Delay(int32 delaytime)
-{
+{ 
     SetDuration(GetDuration() - delaytime);
 }
 
 void DynamicObject::SetAura(Aura* aura)
-{
+{ 
     ASSERT(!_aura && aura);
     _aura = aura;
 }
 
 void DynamicObject::RemoveAura()
-{
+{ 
     ASSERT(_aura && !_removedAura);
     _removedAura = _aura;
     _aura = NULL;
@@ -209,7 +211,7 @@ void DynamicObject::RemoveAura()
 }
 
 void DynamicObject::SetCasterViewpoint()
-{
+{ 
     if (Player* caster = _caster->ToPlayer())
     {
         caster->SetViewpoint(this, true);
@@ -218,7 +220,7 @@ void DynamicObject::SetCasterViewpoint()
 }
 
 void DynamicObject::RemoveCasterViewpoint()
-{
+{ 
     if (Player* caster = _caster->ToPlayer())
     {
         caster->SetViewpoint(this, false);
@@ -227,7 +229,7 @@ void DynamicObject::RemoveCasterViewpoint()
 }
 
 void DynamicObject::BindToCaster()
-{
+{ 
     ASSERT(!_caster);
     _caster = ObjectAccessor::GetUnit(*this, GetCasterGUID());
     ASSERT(_caster);
@@ -236,7 +238,7 @@ void DynamicObject::BindToCaster()
 }
 
 void DynamicObject::UnbindFromCaster()
-{
+{ 
     ASSERT(_caster);
     _caster->_UnregisterDynObject(this);
     _caster = NULL;

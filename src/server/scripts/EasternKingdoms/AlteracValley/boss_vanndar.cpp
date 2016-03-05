@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -42,19 +42,7 @@ public:
 
     struct boss_vanndarAI : public ScriptedAI
     {
-        boss_vanndarAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            AvatarTimer = 3 * IN_MILLISECONDS;
-            ThunderclapTimer = 4 * IN_MILLISECONDS;
-            StormboltTimer = 6 * IN_MILLISECONDS;
-            ResetTimer = 5 * IN_MILLISECONDS;
-            YellTimer = urand(20 * IN_MILLISECONDS, 30 * IN_MILLISECONDS);
-        }
+        boss_vanndarAI(Creature* creature) : ScriptedAI(creature) { }
 
         uint32 AvatarTimer;
         uint32 ThunderclapTimer;
@@ -62,17 +50,21 @@ public:
         uint32 ResetTimer;
         uint32 YellTimer;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            AvatarTimer        = 3 * IN_MILLISECONDS;
+            ThunderclapTimer   = 4 * IN_MILLISECONDS;
+            StormboltTimer     = 6 * IN_MILLISECONDS;
+            ResetTimer         = 5 * IN_MILLISECONDS;
+            YellTimer = urand(20 * IN_MILLISECONDS, 30 * IN_MILLISECONDS);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             Talk(YELL_AGGRO);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -116,7 +108,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new boss_vanndarAI(creature);
     }

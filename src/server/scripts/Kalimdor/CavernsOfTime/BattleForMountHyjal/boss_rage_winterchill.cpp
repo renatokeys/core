@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -42,7 +42,7 @@ class boss_rage_winterchill : public CreatureScript
 public:
     boss_rage_winterchill() : CreatureScript("boss_rage_winterchill") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_rage_winterchillAI>(creature);
     }
@@ -51,18 +51,8 @@ public:
     {
         boss_rage_winterchillAI(Creature* creature) : hyjal_trashAI(creature)
         {
-            Initialize();
             instance = creature->GetInstanceScript();
             go = false;
-        }
-
-        void Initialize()
-        {
-            damageTaken = 0;
-            FrostArmorTimer = 37000;
-            DecayTimer = 45000;
-            NovaTimer = 15000;
-            IceboltTimer = 10000;
         }
 
         uint32 FrostArmorTimer;
@@ -71,37 +61,41 @@ public:
         uint32 IceboltTimer;
         bool go;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            damageTaken = 0;
+            FrostArmorTimer = 37000;
+            DecayTimer = 45000;
+            NovaTimer = 15000;
+            IceboltTimer = 10000;
 
             if (IsEvent)
                 instance->SetData(DATA_RAGEWINTERCHILLEVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             if (IsEvent)
                 instance->SetData(DATA_RAGEWINTERCHILLEVENT, IN_PROGRESS);
             Talk(SAY_ONAGGRO);
         }
 
-        void KilledUnit(Unit* /*victim*/) override
+        void KilledUnit(Unit* /*victim*/)
         {
             Talk(SAY_ONSLAY);
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             if (waypointId == 7 && instance)
             {
-                Unit* target = ObjectAccessor::GetUnit(*me, instance->GetGuidData(DATA_JAINAPROUDMOORE));
+                Unit* target = ObjectAccessor::GetUnit(*me, instance->GetData64(DATA_JAINAPROUDMOORE));
                 if (target && target->IsAlive())
                     me->AddThreat(target, 0.0f);
             }
         }
 
-        void JustDied(Unit* killer) override
+        void JustDied(Unit* killer)
         {
             hyjal_trashAI::JustDied(killer);
             if (IsEvent)
@@ -109,7 +103,7 @@ public:
             Talk(SAY_ONDEATH);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (IsEvent)
             {
@@ -138,24 +132,24 @@ public:
             if (FrostArmorTimer <= diff)
             {
                 DoCast(me, SPELL_FROST_ARMOR);
-                FrostArmorTimer = 40000 + rand32() % 20000;
+                FrostArmorTimer = 40000+rand()%20000;
             } else FrostArmorTimer -= diff;
             if (DecayTimer <= diff)
             {
                 DoCastVictim(SPELL_DEATH_AND_DECAY);
-                DecayTimer = 60000 + rand32() % 20000;
+                DecayTimer = 60000+rand()%20000;
                 Talk(SAY_DECAY);
             } else DecayTimer -= diff;
             if (NovaTimer <= diff)
             {
                 DoCastVictim(SPELL_FROST_NOVA);
-                NovaTimer = 30000 + rand32() % 15000;
+                NovaTimer = 30000+rand()%15000;
                 Talk(SAY_NOVA);
             } else NovaTimer -= diff;
             if (IceboltTimer <= diff)
             {
                 DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0, 40, true), SPELL_ICEBOLT);
-                IceboltTimer = 11000 + rand32() % 20000;
+                IceboltTimer = 11000+rand()%20000;
             } else IceboltTimer -= diff;
 
             DoMeleeAttackIfReady();

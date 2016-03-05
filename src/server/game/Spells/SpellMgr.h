@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,15 +21,10 @@
 
 // For static or at-server-startup loaded spell data
 
-#include "Define.h"
-#include "DBCStructure.h"
+#include <ace/Singleton.h>
+#include "Common.h"
 #include "SharedDefines.h"
-#include "Util.h"
-
-#include <map>
-#include <set>
-#include <vector>
-#include <unordered_map>
+#include "Unit.h"
 
 class SpellInfo;
 class Player;
@@ -37,14 +32,16 @@ class Unit;
 class ProcEventInfo;
 struct SkillLineAbilityEntry;
 
+#define SPELL_RELIC_COOLDOWN      1
+
 // only used in code
 enum SpellCategories
 {
     SPELLCATEGORY_HEALTH_MANA_POTIONS = 4,
     SPELLCATEGORY_DEVOUR_MAGIC        = 12,
     SPELLCATEGORY_JUDGEMENT           = 1210,               // Judgement (seal trigger)
-    SPELLCATEGORY_FOOD                = 11,
-    SPELLCATEGORY_DRINK               = 59
+    SPELLCATEGORY_FOOD             = 11,
+    SPELLCATEGORY_DRINK            = 59,
 };
 
 //SpellFamilyFlags
@@ -89,8 +86,8 @@ enum SpellFamilyFlag
     SPELLFAMILYFLAG_DK_DEATH_STRIKE         = 0x00000010,
     SPELLFAMILYFLAG_DK_DEATH_COIL           = 0x00002000,
 
-    /// @todo Figure out a more accurate name for the following familyflag(s)
-    SPELLFAMILYFLAG_SHAMAN_TOTEM_EFFECTS    = 0x04000000  // Seems to be linked to most totems and some totem effects
+    // TODO: Figure out a more accurate name for the following familyflag(s)
+    SPELLFAMILYFLAG_SHAMAN_TOTEM_EFFECTS    = 0x04000000,  // Seems to be linked to most totems and some totem effects
 };
 
 
@@ -101,7 +98,7 @@ enum SpellLinkedType
     SPELL_LINK_CAST     = 0,            // +: cast; -: remove
     SPELL_LINK_HIT      = 1 * 200000,
     SPELL_LINK_AURA     = 2 * 200000,   // +: aura; -: immune
-    SPELL_LINK_REMOVE   = 0
+    SPELL_LINK_REMOVE   = 0,
 };
 
 
@@ -182,7 +179,7 @@ enum ProcFlags
                                                  | PROC_FLAG_TAKEN_SPELL_MAGIC_DMG_CLASS_POS | PROC_FLAG_TAKEN_SPELL_MAGIC_DMG_CLASS_NEG
                                                  | PROC_FLAG_TAKEN_PERIODIC | PROC_FLAG_TAKEN_DAMAGE,
 
-    REQ_SPELL_PHASE_PROC_FLAG_MASK             = SPELL_PROC_FLAG_MASK & DONE_HIT_PROC_FLAG_MASK
+    REQ_SPELL_PHASE_PROC_FLAG_MASK             = SPELL_PROC_FLAG_MASK & DONE_HIT_PROC_FLAG_MASK,
 };
 
 #define MELEE_BASED_TRIGGER_MASK (PROC_FLAG_DONE_MELEE_AUTO_ATTACK      | \
@@ -216,6 +213,8 @@ enum ProcFlagsExLegacy
     PROC_EX_EX_TRIGGER_ALWAYS   = 0x0010000,                 // If set trigger always no matter of hit result
     PROC_EX_EX_ONE_TIME_TRIGGER = 0x0020000,                 // If set trigger always but only one time (not implemented yet)
     PROC_EX_ONLY_ACTIVE_SPELL   = 0x0040000,                 // Spell has to do damage/heal to proc
+	PROC_EX_NO_OVERHEAL			= 0x0080000,				 // Proc if heal did some work
+	PROC_EX_NO_AURA_REFRESH		= 0x0100000,				 // Proc if aura was not refreshed
 
     // Flags for internal use - do not use these in db!
     PROC_EX_INTERNAL_CANT_PROC  = 0x0800000,
@@ -266,12 +265,12 @@ enum ProcFlagsHit
     PROC_HIT_REFLECT             = 0x0000800,
     PROC_HIT_INTERRUPT           = 0x0001000, // (not used atm)
     PROC_HIT_FULL_BLOCK          = 0x0002000,
-    PROC_HIT_MASK_ALL            = 0x2FFF
+    PROC_HIT_MASK_ALL = 0x2FFF,
 };
 
 enum ProcAttributes
 {
-    PROC_ATTR_REQ_EXP_OR_HONOR   = 0x0000010
+    PROC_ATTR_REQ_EXP_OR_HONOR   = 0x0000010,
 };
 
 struct SpellProcEventEntry
@@ -286,7 +285,7 @@ struct SpellProcEventEntry
     uint32      cooldown;                                   // hidden cooldown used for some spell proc events, applied to _triggered_spell_
 };
 
-typedef std::unordered_map<uint32, SpellProcEventEntry> SpellProcEventMap;
+typedef UNORDERED_MAP<uint32, SpellProcEventEntry> SpellProcEventMap;
 
 struct SpellProcEntry
 {
@@ -304,7 +303,7 @@ struct SpellProcEntry
     uint32      charges;                                    // if nonzero - owerwrite procCharges field for given Spell.dbc entry, defines how many times proc can occur before aura remove, 0 - infinite
 };
 
-typedef std::unordered_map<uint32, SpellProcEntry> SpellProcMap;
+typedef UNORDERED_MAP<uint32, SpellProcEntry> SpellProcMap;
 
 struct SpellEnchantProcEntry
 {
@@ -313,7 +312,7 @@ struct SpellEnchantProcEntry
     uint32      procEx;
 };
 
-typedef std::unordered_map<uint32, SpellEnchantProcEntry> SpellEnchantProcEventMap;
+typedef UNORDERED_MAP<uint32, SpellEnchantProcEntry> SpellEnchantProcEventMap;
 
 struct SpellBonusEntry
 {
@@ -323,39 +322,51 @@ struct SpellBonusEntry
     float  ap_dot_bonus;
 };
 
-typedef std::unordered_map<uint32, SpellBonusEntry>     SpellBonusMap;
+typedef UNORDERED_MAP<uint32, SpellBonusEntry>     SpellBonusMap;
 
-enum SpellGroup
+enum SpellGroupSpecialFlags
 {
-    SPELL_GROUP_NONE             = 0,
-    SPELL_GROUP_ELIXIR_BATTLE    = 1,
-    SPELL_GROUP_ELIXIR_GUARDIAN  = 2,
-    SPELL_GROUP_ELIXIR_UNSTABLE  = 3,
-    SPELL_GROUP_ELIXIR_SHATTRATH = 4,
-    SPELL_GROUP_CORE_RANGE_MAX   = 5
+    SPELL_GROUP_SPECIAL_FLAG_NONE				= 0x000,
+    SPELL_GROUP_SPECIAL_FLAG_ELIXIR_BATTLE		= 0x001,
+    SPELL_GROUP_SPECIAL_FLAG_ELIXIR_GUARDIAN	= 0x002,
+    SPELL_GROUP_SPECIAL_FLAG_ELIXIR_UNSTABLE	= 0x004,
+    SPELL_GROUP_SPECIAL_FLAG_ELIXIR_SHATTRATH	= 0x008,
+	SPELL_GROUP_SPECIAL_FLAG_STACK_EXCLUSIVE_MAX= 0x00F,
+	SPELL_GROUP_SPECIAL_FLAG_FORCED_STRONGEST	= 0x010, // xinef: specially helpful flag if some spells have different auras, but only one should be present
+	SPELL_GROUP_SPECIAL_FLAG_SKIP_STRONGER_CHECK= 0x020,
+	SPELL_GROUP_SPECIAL_FLAG_BASE_AMOUNT_CHECK	= 0x040,
+	SPELL_GROUP_SPECIAL_FLAG_PRIORITY1			= 0x100,
+	SPELL_GROUP_SPECIAL_FLAG_PRIORITY2			= 0x200,
+	SPELL_GROUP_SPECIAL_FLAG_PRIORITY3			= 0x400,
+	SPELL_GROUP_SPECIAL_FLAG_PRIORITY4			= 0x800,
+	SPELL_GROUP_SPECIAL_FLAG_MAX				= 0x1000,
 };
 
-#define SPELL_GROUP_DB_RANGE_MIN 1000
-
-//                  spell_id, group_id
-typedef std::multimap<uint32, SpellGroup > SpellSpellGroupMap;
-typedef std::pair<SpellSpellGroupMap::const_iterator, SpellSpellGroupMap::const_iterator> SpellSpellGroupMapBounds;
-
-//                      group_id, spell_id
-typedef std::multimap<SpellGroup, int32> SpellGroupSpellMap;
-typedef std::pair<SpellGroupSpellMap::const_iterator, SpellGroupSpellMap::const_iterator> SpellGroupSpellMapBounds;
-
-enum SpellGroupStackRule
+enum SpellGroupStackFlags
 {
-    SPELL_GROUP_STACK_RULE_DEFAULT,
-    SPELL_GROUP_STACK_RULE_EXCLUSIVE,
-    SPELL_GROUP_STACK_RULE_EXCLUSIVE_FROM_SAME_CASTER,
-    SPELL_GROUP_STACK_RULE_EXCLUSIVE_SAME_EFFECT,
-    SPELL_GROUP_STACK_RULE_EXCLUSIVE_HIGHEST,
-    SPELL_GROUP_STACK_RULE_MAX
+    SPELL_GROUP_STACK_FLAG_NONE					= 0x00,
+    SPELL_GROUP_STACK_FLAG_EXCLUSIVE			= 0x01,
+    SPELL_GROUP_STACK_FLAG_NOT_SAME_CASTER		= 0x02,
+	SPELL_GROUP_STACK_FLAG_FLAGGED				= 0x04, // xinef: just a marker
+	SPELL_GROUP_STACK_FLAG_NEVER_STACK			= 0x08,
+	SPELL_GROUP_STACK_FLAG_EFFECT_EXCLUSIVE		= 0x10,
+	SPELL_GROUP_STACK_FLAG_MAX					= 0x20,
+
+	// Internal use
+	SPELL_GROUP_STACK_FLAG_FORCED_STRONGEST		= 0x100,
+	SPELL_GROUP_STACK_FLAG_FORCED_WEAKEST		= 0x200,
 };
 
-typedef std::map<SpellGroup, SpellGroupStackRule> SpellGroupStackMap;
+struct SpellStackInfo
+{
+	uint32 groupId;
+	SpellGroupSpecialFlags specialFlags;
+};
+//             spell_id, group_id
+typedef std::map<uint32, SpellStackInfo> SpellGroupMap;
+typedef std::map<uint32, SpellGroupStackFlags> SpellGroupStackMap;
+
+
 
 struct SpellThreatEntry
 {
@@ -365,6 +376,7 @@ struct SpellThreatEntry
 };
 
 typedef std::map<uint32, SpellThreatEntry> SpellThreatMap;
+typedef std::map<uint32, float> SpellMixologyMap;
 
 // coordinates for spells (accessed using SpellMgr functions)
 struct SpellTargetPosition
@@ -444,10 +456,13 @@ enum EffectRadiusIndex
 class PetAura
 {
     private:
-        typedef std::unordered_map<uint32, uint32> PetAuraMap;
+        typedef UNORDERED_MAP<uint32, uint32> PetAuraMap;
 
     public:
-        PetAura() : removeOnChangePet(false), damage(0) { }
+        PetAura() : removeOnChangePet(false), damage(0)
+        {
+            auras.clear();
+        }
 
         PetAura(uint32 petEntry, uint32 aura, bool _removeOnChangePet, int _damage) :
         removeOnChangePet(_removeOnChangePet), damage(_damage)
@@ -524,7 +539,7 @@ struct SpellChainNode
     uint8  rank;
 };
 
-typedef std::unordered_map<uint32, SpellChainNode> SpellChainMap;
+typedef UNORDERED_MAP<uint32, SpellChainNode> SpellChainMap;
 
 //                   spell_id  req_spell
 typedef std::multimap<uint32, uint32> SpellRequiredMap;
@@ -544,16 +559,6 @@ struct SpellLearnSkillNode
 };
 
 typedef std::map<uint32, SpellLearnSkillNode> SpellLearnSkillMap;
-
-struct SpellLearnSpellNode
-{
-    uint32 spell;
-    bool active;                                            // show in spellbook or not
-    bool autoLearned;
-};
-
-typedef std::multimap<uint32, SpellLearnSpellNode> SpellLearnSpellMap;
-typedef std::pair<SpellLearnSpellMap::const_iterator, SpellLearnSpellMap::const_iterator> SpellLearnSpellMapBounds;
 
 typedef std::multimap<uint32, SkillLineAbilityEntry const*> SkillLineAbilityMap;
 typedef std::pair<SkillLineAbilityMap::const_iterator, SkillLineAbilityMap::const_iterator> SkillLineAbilityMapBounds;
@@ -599,8 +604,11 @@ DiminishingLevels GetDiminishingReturnsMaxLevel(DiminishingGroup group);
 int32 GetDiminishingReturnsLimitDuration(DiminishingGroup group, SpellInfo const* spellproto);
 bool IsDiminishingReturnsGroupDurationLimited(DiminishingGroup group);
 
+typedef std::set<uint32> TalentAdditionalSet;
+
 class SpellMgr
 {
+    friend class ACE_Singleton<SpellMgr, ACE_Null_Mutex>;
     // Constructors
     private:
         SpellMgr();
@@ -608,14 +616,10 @@ class SpellMgr
 
     // Accessors (const or static functions)
     public:
-        static SpellMgr* instance()
-        {
-            static SpellMgr instance;
-            return &instance;
-        }
-
         // Spell correctness for client using
-        static bool IsSpellValid(SpellInfo const* spellInfo, Player* player = NULL, bool msg = true);
+        static bool ComputeIsSpellValid(SpellInfo const* spellInfo, bool msg = true);
+        static bool IsSpellValid(SpellInfo const* spellInfo);
+		static bool CheckSpellValid(SpellInfo const* spellInfo, uint32 spellId, bool isTalent);
 
         // Spell difficulty
         uint32 GetSpellDifficultyId(uint32 spellId) const;
@@ -640,25 +644,16 @@ class SpellMgr
 
         // Spell learning
         SpellLearnSkillNode const* GetSpellLearnSkill(uint32 spell_id) const;
-        SpellLearnSpellMapBounds GetSpellLearnSpellMapBounds(uint32 spell_id) const;
-        bool IsSpellLearnSpell(uint32 spell_id) const;
-        bool IsSpellLearnToSpell(uint32 spell_id1, uint32 spell_id2) const;
 
         // Spell target coordinates
         SpellTargetPosition const* GetSpellTargetPosition(uint32 spell_id, SpellEffIndex effIndex) const;
 
-        // Spell Groups table
-        SpellSpellGroupMapBounds GetSpellSpellGroupMapBounds(uint32 spell_id) const;
-        bool IsSpellMemberOfSpellGroup(uint32 spellid, SpellGroup groupid) const;
-
-        SpellGroupSpellMapBounds GetSpellGroupSpellMapBounds(SpellGroup group_id) const;
-        void GetSetOfSpellsInSpellGroup(SpellGroup group_id, std::set<uint32>& foundSpells) const;
-        void GetSetOfSpellsInSpellGroup(SpellGroup group_id, std::set<uint32>& foundSpells, std::set<SpellGroup>& usedGroups) const;
-
-        // Spell Group Stack Rules table
-        bool AddSameEffectStackRuleSpellGroups(SpellInfo const* spellInfo, int32 amount, std::map<SpellGroup, int32>& groups) const;
-        SpellGroupStackRule CheckSpellGroupStackRules(SpellInfo const* spellInfo1, SpellInfo const* spellInfo2) const;
-        SpellGroupStackRule GetSpellGroupStackRule(SpellGroup groupid) const;
+        // Spell Groups
+        uint32 GetSpellGroup(uint32 spellid) const;
+		SpellGroupSpecialFlags GetSpellGroupSpecialFlags(uint32 spell_id) const;
+		SpellGroupStackFlags GetGroupStackFlags(uint32 groupid) const;
+        SpellGroupStackFlags CheckSpellGroupStackRules(SpellInfo const* spellInfo1, SpellInfo const* spellInfo2, bool remove, bool areaAura) const;
+		void GetSetOfSpellsInSpellGroupWithFlag(uint32 group_id, SpellGroupSpecialFlags flag, std::set<uint32>& availableElixirs) const;
 
         // Spell proc event table
         SpellProcEventEntry const* GetSpellProcEvent(uint32 spellId) const;
@@ -673,6 +668,9 @@ class SpellMgr
 
         // Spell threat table
         SpellThreatEntry const* GetSpellThreatEntry(uint32 spellID) const;
+
+		// Spell mixology table
+		float GetSpellMixologyBonus(uint32 spellId) const;
 
         SkillLineAbilityMapBounds GetSkillLineAbilityMapBounds(uint32 spell_id) const;
 
@@ -695,18 +693,10 @@ class SpellMgr
 
         // SpellInfo object management
         SpellInfo const* GetSpellInfo(uint32 spellId) const { return spellId < GetSpellInfoStoreSize() ?  mSpellInfoMap[spellId] : NULL; }
-        // Use this only with 100% valid spellIds
-        SpellInfo const* EnsureSpellInfo(uint32 spellId) const
-        {
-            ASSERT(spellId < GetSpellInfoStoreSize());
-            SpellInfo const* spellInfo = mSpellInfoMap[spellId];
-            ASSERT(spellInfo);
-            return spellInfo;
-        }
         uint32 GetSpellInfoStoreSize() const { return mSpellInfoMap.size(); }
 
-    private:
-        SpellInfo* _GetSpellInfo(uint32 spellId) { return spellId < GetSpellInfoStoreSize() ?  mSpellInfoMap[spellId] : NULL; }
+		// Talent Additional Set
+		bool IsAdditionalTalentSpell(uint32 spellId) const;
 
     // Modifiers
     public:
@@ -717,7 +707,6 @@ class SpellMgr
         void LoadSpellRanks();
         void LoadSpellRequired();
         void LoadSpellLearnSkills();
-        void LoadSpellLearnSpells();
         void LoadSpellTargetPositions();
         void LoadSpellGroups();
         void LoadSpellGroupStackRules();
@@ -725,6 +714,7 @@ class SpellMgr
         void LoadSpellProcs();
         void LoadSpellBonusess();
         void LoadSpellThreats();
+		void LoadSpellMixology();
         void LoadSkillLineAbilityMap();
         void LoadSpellPetAuras();
         void LoadEnchantCustomAttr();
@@ -736,8 +726,9 @@ class SpellMgr
         void LoadSpellInfoStore();
         void UnloadSpellInfoStore();
         void UnloadSpellInfoImplicitTargetConditionLists();
-        void LoadSpellInfoCustomAttributes();
-        void LoadSpellInfoCorrections();
+        void LoadSpellCustomAttr();
+        void LoadDbcDataCorrections();
+		void LoadSpellSpecificAndAuraState();
 
     private:
         SpellDifficultySearcherMap mSpellDifficultySearcherMap;
@@ -745,15 +736,14 @@ class SpellMgr
         SpellsRequiringSpellMap    mSpellsReqSpell;
         SpellRequiredMap           mSpellReq;
         SpellLearnSkillMap         mSpellLearnSkills;
-        SpellLearnSpellMap         mSpellLearnSpells;
         SpellTargetPositionMap     mSpellTargetPositions;
-        SpellSpellGroupMap         mSpellSpellGroup;
-        SpellGroupSpellMap         mSpellGroupSpell;
-        SpellGroupStackMap         mSpellGroupStack;
+        SpellGroupMap              mSpellGroupMap;
+        SpellGroupStackMap         mSpellGroupStackMap;
         SpellProcEventMap          mSpellProcEventMap;
         SpellProcMap               mSpellProcMap;
         SpellBonusMap              mSpellBonusMap;
         SpellThreatMap             mSpellThreatMap;
+		SpellMixologyMap           mSpellMixologyMap;
         SpellPetAuraMap            mSpellPetAuraMap;
         SpellLinkedMap             mSpellLinkedMap;
         SpellEnchantProcEventMap   mSpellEnchantProcEventMap;
@@ -767,8 +757,9 @@ class SpellMgr
         PetLevelupSpellMap         mPetLevelupSpellMap;
         PetDefaultSpellsMap        mPetDefaultSpellsMap;           // only spells not listed in related mPetLevelupSpellMap entry
         SpellInfoMap               mSpellInfoMap;
+		TalentAdditionalSet        mTalentSpellAdditionalSet;
 };
 
-#define sSpellMgr SpellMgr::instance()
+#define sSpellMgr ACE_Singleton<SpellMgr, ACE_Null_Mutex>::instance()
 
 #endif

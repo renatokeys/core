@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,24 +25,24 @@
 class MapReference : public Reference<Map, Player>
 {
     protected:
-        void targetObjectBuildLink() override
+        void targetObjectBuildLink()
         {
             // called from link()
             getTarget()->m_mapRefManager.insertFirst(this);
             getTarget()->m_mapRefManager.incSize();
         }
-        void targetObjectDestroyLink() override
+        void targetObjectDestroyLink()
         {
             // called from unlink()
             if (isValid()) getTarget()->m_mapRefManager.decSize();
         }
-        void sourceObjectDestroyLink() override
+        void sourceObjectDestroyLink()
         {
             // called from invalidate()
             getTarget()->m_mapRefManager.decSize();
         }
     public:
-        MapReference() : Reference<Map, Player>() { }
+        MapReference() : Reference<Map, Player>() {}
         ~MapReference() { unlink(); }
         MapReference* next() { return (MapReference*)Reference<Map, Player>::next(); }
         MapReference const* next() const { return (MapReference const*)Reference<Map, Player>::next(); }

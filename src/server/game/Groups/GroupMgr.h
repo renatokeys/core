@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,42 +22,32 @@
 
 class GroupMgr
 {
+    friend class ACE_Singleton<GroupMgr, ACE_Null_Mutex>;
 private:
     GroupMgr();
     ~GroupMgr();
 
 public:
-    static GroupMgr* instance()
-    {
-        static GroupMgr instance;
-        return &instance;
-    }
+    typedef std::map<uint32, Group*> GroupContainer;
 
-    typedef std::map<ObjectGuid::LowType, Group*> GroupContainer;
-    typedef std::vector<Group*>      GroupDbContainer;
+    Group* GetGroupByGUID(uint32 guid) const;
 
-    Group* GetGroupByGUID(ObjectGuid::LowType guid) const;
+	void InitGroupIds();
+    void RegisterGroupId(uint32 groupId);
+    uint32 GenerateGroupId();
 
-    uint32 GenerateNewGroupDbStoreId();
-    void   RegisterGroupDbStoreId(uint32 storageId, Group* group);
-    void   FreeGroupDbStoreId(Group* group);
-    void   SetNextGroupDbStoreId(uint32 storageId) { NextGroupDbStoreId = storageId; };
-    Group* GetGroupByDbStoreId(uint32 storageId) const;
-    void   SetGroupDbStoreSize(uint32 newSize) { GroupDbStore.resize(newSize); }
-
-    void   LoadGroups();
-    ObjectGuid::LowType GenerateGroupId();
-    void   AddGroup(Group* group);
-    void   RemoveGroup(Group* group);
+    void LoadGroups();
+    void AddGroup(Group* group);
+    void RemoveGroup(Group* group);
 
 
 protected:
-    ObjectGuid::LowType           NextGroupId;
-    uint32           NextGroupDbStoreId;
+	typedef std::vector<bool> GroupIds;
+	GroupIds         _groupIds;
+    uint32           _nextGroupId;
     GroupContainer   GroupStore;
-    GroupDbContainer GroupDbStore;
 };
 
-#define sGroupMgr GroupMgr::instance()
+#define sGroupMgr ACE_Singleton<GroupMgr, ACE_Null_Mutex>::instance()
 
 #endif

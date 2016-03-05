@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -71,13 +71,8 @@ public:
 
     struct boss_chromaggusAI : public BossAI
     {
-        boss_chromaggusAI(Creature* creature) : BossAI(creature, DATA_CHROMAGGUS)
+        boss_chromaggusAI(Creature* creature) : BossAI(creature, BOSS_CHROMAGGUS)
         {
-            Initialize();
-
-            Breath1_Spell = 0;
-            Breath2_Spell = 0;
-
             // Select the 2 breaths that we are going to use until despawned
             // 5 possiblities for the first breath, 4 for the second, 20 total possiblites
             // This way we don't end up casting 2 of the same breath
@@ -178,21 +173,21 @@ public:
             EnterEvadeMode();
         }
 
-        void Initialize()
+        void Reset()
         {
+            _Reset();
+
             CurrentVurln_Spell = 0;     // We use this to store our last vulnerabilty spell so we can remove it later
             Enraged = false;
         }
 
-        void Reset() override
+        void EnterCombat(Unit* /*who*/)
         {
-            _Reset();
-
-            Initialize();
-        }
-
-        void EnterCombat(Unit* /*who*/) override
-        {
+            if (instance->GetBossState(BOSS_FLAMEGOR) != DONE)
+            {
+                EnterEvadeMode();
+                return;
+            }
             _EnterCombat();
 
             events.ScheduleEvent(EVENT_SHIMMER, 0);
@@ -202,7 +197,7 @@ public:
             events.ScheduleEvent(EVENT_FRENZY, 15000);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -285,7 +280,7 @@ public:
         bool Enraged;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_chromaggusAI>(creature);
     }

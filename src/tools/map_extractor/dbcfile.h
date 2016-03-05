@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -82,8 +82,6 @@ public:
 
         friend class DBCFile;
         friend class DBCFile::Iterator;
-
-        Record& operator=(Record const& right);
     };
     /** Iterator that iterates over records
     */
@@ -113,8 +111,6 @@ public:
         }
     private:
         Record record;
-
-        Iterator& operator=(Iterator const& right);
     };
 
     // Get record by id

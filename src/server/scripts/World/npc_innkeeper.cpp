@@ -1,27 +1,3 @@
-/*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Npc_Innkeeper
-SDAuthor: WarHead
-SD%Complete: 99%
-SDComment: Complete
-SDCategory: NPCs
-EndScriptData */
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -30,39 +6,23 @@ EndScriptData */
 #include "Player.h"
 #include "WorldSession.h"
 
-enum Spells
+enum eTrickOrTreatSpells
 {
-    SPELL_TRICK_OR_TREATED      = 24755,
-    SPELL_TREAT                 = 24715
+    SPELL_TRICK                 = 24714,
+    SPELL_TREAT                 = 24715,
+    SPELL_TRICKED_OR_TREATED    = 24755,
+	HALLOWEEN_EVENTID			= 12,
 };
-
-#define LOCALE_TRICK_OR_TREAT_0 "Trick or Treat!"
-#define LOCALE_TRICK_OR_TREAT_2 "Des bonbons ou des blagues!"
-#define LOCALE_TRICK_OR_TREAT_3 "Süßes oder Saures!"
-#define LOCALE_TRICK_OR_TREAT_6 "¡Truco o trato!"
-
-#define LOCALE_INNKEEPER_0 "Make this inn my home."
-#define LOCALE_INNKEEPER_3 "Ich möchte dieses Gasthaus zu meinem Heimatort machen."
 
 class npc_innkeeper : public CreatureScript
 {
 public:
     npc_innkeeper() : CreatureScript("npc_innkeeper") { }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (IsHolidayActive(HOLIDAY_HALLOWS_END) && !player->HasAura(SPELL_TRICK_OR_TREATED))
-        {
-            const char* localizedEntry;
-            switch (player->GetSession()->GetSessionDbcLocale())
-            {
-                case LOCALE_frFR: localizedEntry = LOCALE_TRICK_OR_TREAT_2; break;
-                case LOCALE_deDE: localizedEntry = LOCALE_TRICK_OR_TREAT_3; break;
-                case LOCALE_esES: localizedEntry = LOCALE_TRICK_OR_TREAT_6; break;
-                case LOCALE_enUS: default: localizedEntry = LOCALE_TRICK_OR_TREAT_0;
-            }
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, localizedEntry, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-        }
+        if (IsEventActive(HALLOWEEN_EVENTID) && !player->HasAura(SPELL_TRICKED_OR_TREATED))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Trick or Treat!", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+HALLOWEEN_EVENTID);
 
         if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
@@ -71,52 +31,21 @@ public:
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
 
         if (creature->IsInnkeeper())
-        {
-            const char* localizedEntry;
-            switch (player->GetSession()->GetSessionDbcLocale())
-            {
-                case LOCALE_deDE: localizedEntry = LOCALE_INNKEEPER_3; break;
-                case LOCALE_enUS: default: localizedEntry = LOCALE_INNKEEPER_0;
-            }
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_INTERACT_1, localizedEntry, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INN);
-        }
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_INTERACT_1, "Make this inn my home.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INN);
 
         player->TalkedToCreature(creature->GetEntry(), creature->GetGUID());
         player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
-        if (action == GOSSIP_ACTION_INFO_DEF + 1 && IsHolidayActive(HOLIDAY_HALLOWS_END) && !player->HasAura(SPELL_TRICK_OR_TREATED))
+        if (action == GOSSIP_ACTION_INFO_DEF+HALLOWEEN_EVENTID && IsEventActive(HALLOWEEN_EVENTID) && !player->HasAura(SPELL_TRICKED_OR_TREATED))
         {
-            player->CastSpell(player, SPELL_TRICK_OR_TREATED, true);
+            player->CastSpell(player, SPELL_TRICKED_OR_TREATED, true);
+			creature->CastSpell(player, roll_chance_i(50) ? SPELL_TRICK : SPELL_TREAT, true);
 
-            if (urand(0, 1))
-                player->CastSpell(player, SPELL_TREAT, true);
-            else
-            {
-                uint32 trickspell = 0;
-                switch (urand(0, 13))
-                {
-                    case 0: trickspell = 24753; break; // cannot cast, random 30sec
-                    case 1: trickspell = 24713; break; // lepper gnome costume
-                    case 2: trickspell = 24735; break; // male ghost costume
-                    case 3: trickspell = 24736; break; // female ghostcostume
-                    case 4: trickspell = 24710; break; // male ninja costume
-                    case 5: trickspell = 24711; break; // female ninja costume
-                    case 6: trickspell = 24708; break; // male pirate costume
-                    case 7: trickspell = 24709; break; // female pirate costume
-                    case 8: trickspell = 24723; break; // skeleton costume
-                    case 9: trickspell = 24753; break; // Trick
-                    case 10: trickspell = 24924; break; // Hallow's End Candy
-                    case 11: trickspell = 24925; break; // Hallow's End Candy
-                    case 12: trickspell = 24926; break; // Hallow's End Candy
-                    case 13: trickspell = 24927; break; // Hallow's End Candy
-                }
-                player->CastSpell(player, trickspell, true);
-            }
             player->CLOSE_GOSSIP_MENU();
             return true;
         }
@@ -134,6 +63,6 @@ public:
 
 void AddSC_npc_innkeeper()
 {
-    new npc_innkeeper();
+    new npc_innkeeper;
 }
 

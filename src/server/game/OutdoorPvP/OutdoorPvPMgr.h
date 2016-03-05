@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,6 +21,7 @@
 #define OUTDOORPVP_OBJECTIVE_UPDATE_INTERVAL 1000
 
 #include "OutdoorPvP.h"
+#include <ace/Singleton.h>
 
 class Player;
 class GameObject;
@@ -37,17 +38,13 @@ struct OutdoorPvPData
 // class to handle player enter / leave / areatrigger / GO use events
 class OutdoorPvPMgr
 {
+    friend class ACE_Singleton<OutdoorPvPMgr, ACE_Null_Mutex>;
+
     private:
         OutdoorPvPMgr();
-        ~OutdoorPvPMgr() { };
+        ~OutdoorPvPMgr() {};
 
     public:
-        static OutdoorPvPMgr* instance()
-        {
-            static OutdoorPvPMgr instance;
-            return &instance;
-        }
-
         // create outdoor pvp events
         void InitOutdoorPvP();
 
@@ -70,7 +67,7 @@ class OutdoorPvPMgr
         bool HandleCustomSpell(Player* player, uint32 spellId, GameObject* go);
 
         // handle custom go if registered
-        bool HandleOpenGo(Player* player, GameObject* go);
+        bool HandleOpenGo(Player* player, uint64 guid);
 
         ZoneScript* GetZoneScript(uint32 zoneId);
 
@@ -78,13 +75,14 @@ class OutdoorPvPMgr
 
         void Update(uint32 diff);
 
-        void HandleGossipOption(Player* player, Creature* creature, uint32 gossipid);
+        void HandleGossipOption(Player* player, uint64 guid, uint32 gossipid);
 
         bool CanTalkTo(Player* player, Creature* creature, GossipMenuItems const& gso);
 
         void HandleDropFlag(Player* player, uint32 spellId);
 
-        std::string GetDefenseMessage(uint32 zoneId, uint32 id, LocaleConstant locale) const;
+		// pussywizard: lock required because different functions affect m_players
+		ACE_Thread_Mutex _lock;
 
     private:
         typedef std::vector<OutdoorPvP*> OutdoorPvPSet;
@@ -106,6 +104,6 @@ class OutdoorPvPMgr
         uint32 m_UpdateTimer;
 };
 
-#define sOutdoorPvPMgr OutdoorPvPMgr::instance()
+#define sOutdoorPvPMgr ACE_Singleton<OutdoorPvPMgr, ACE_Null_Mutex>::instance()
 
 #endif /*OUTDOOR_PVP_MGR_H_*/

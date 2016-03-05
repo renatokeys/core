@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -9,14 +9,13 @@
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 set(Detour_STAT_SRCS
-    Source/DetourAlloc.cpp 
-    Source/DetourCommon.cpp 
-    Source/DetourNavMesh.cpp 
-    Source/DetourNavMeshBuilder.cpp 
-    Source/DetourNavMeshQuery.cpp 
-    Source/DetourNode.cpp 
+    DetourAlloc.cpp 
+    DetourCommon.cpp 
+    DetourNavMesh.cpp 
+    DetourNavMeshBuilder.cpp 
+    DetourNavMeshQuery.cpp 
+    DetourNode.cpp 
 )
-include_directories(Include)
 
 if(WIN32)
   include_directories(

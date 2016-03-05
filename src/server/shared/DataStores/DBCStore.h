@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -63,10 +63,6 @@ struct SqlDbc
             }
         }
     }
-
-private:
-    SqlDbc(SqlDbc const& right) = delete;
-    SqlDbc& operator=(SqlDbc const& right) = delete;
 };
 
 template<class T>
@@ -75,11 +71,7 @@ class DBCStorage
     typedef std::list<char*> StringPoolList;
     public:
         explicit DBCStorage(char const* f)
-#ifdef ELUNA
-            : fmt(f), nCount(0), fieldCount(0), dataTable(NULL), maxdatacount(0), mindatacount(std::numeric_limits<uint32>::max())
-#else
             : fmt(f), nCount(0), fieldCount(0), dataTable(NULL)
-#endif
         {
             indexTable.asT = NULL;
         }
@@ -88,39 +80,10 @@ class DBCStorage
 
         T const* LookupEntry(uint32 id) const
         {
-#ifdef ELUNA
-            if (id <= maxdatacount && id >= mindatacount)
-            {
-                typename std::unordered_map<uint32, T const*>::const_iterator it = data.find(id);
-                if (it != data.end())
-                    return it->second;
-            }
-#endif
             return (id >= nCount) ? NULL : indexTable.asT[id];
         }
 
-        T const* AssertEntry(uint32 id) const
-        {
-            T const* entry = LookupEntry(id);
-            ASSERT(entry);
-            return entry;
-        }
-
-#ifdef ELUNA
-        void SetEntry(uint32 id, T* t)
-        {
-            delete data[id];
-            data[id] = t;
-            maxdatacount = std::max(maxdatacount, id);
-            mindatacount = std::min(mindatacount, id);
-        }
-#endif
-
-#ifdef ELUNA
-        uint32  GetNumRows() const { return std::max(maxdatacount + 1, nCount); }
-#else
         uint32  GetNumRows() const { return nCount; }
-#endif
         char const* GetFormat() const { return fmt; }
         uint32 GetFieldCount() const { return fieldCount; }
 
@@ -157,7 +120,7 @@ class DBCStorage
                     // Check if sql index pos is valid
                     if (int32(result->GetFieldCount() - 1) < sql->sqlIndexPos)
                     {
-                        TC_LOG_ERROR("server.loading", "Invalid index pos for dbc:'%s'", sql->sqlTableName.c_str());
+                        sLog->outError("Invalid index pos for dbc:'%s'", sql->sqlTableName.c_str());
                         return false;
                     }
                 }
@@ -188,7 +151,7 @@ class DBCStorage
                             uint32 id = fields[sql->sqlIndexPos].GetUInt32();
                             if (indexTable.asT[id])
                             {
-                                TC_LOG_ERROR("server.loading", "Index %d already exists in dbc:'%s'", id, sql->sqlTableName.c_str());
+                                sLog->outError("Index %d already exists in dbc:'%s'", id, sql->sqlTableName.c_str());
                                 return false;
                             }
 
@@ -245,7 +208,7 @@ class DBCStorage
                                         offset += 1;
                                         break;
                                     case FT_STRING:
-                                        TC_LOG_ERROR("server.loading", "Unsupported data type in table '%s' at char %d", sql->sqlTableName.c_str(), columnNumber);
+                                        sLog->outError("Unsupported data type in table '%s' at char %d", sql->sqlTableName.c_str(), columnNumber);
                                         return false;
                                     case FT_SORT:
                                         break;
@@ -258,14 +221,14 @@ class DBCStorage
                             }
                             else
                             {
-                                TC_LOG_ERROR("server.loading", "Incorrect sql format string '%s' at char %d", sql->sqlTableName.c_str(), columnNumber);
+                                sLog->outError("Incorrect sql format string '%s' at char %d", sql->sqlTableName.c_str(), columnNumber);
                                 return false;
                             }
                         }
 
                         if (sqlColumnNumber != (result->GetFieldCount() - 1))
                         {
-                            TC_LOG_ERROR("server.loading", "SQL and DBC format strings are not matching for table: '%s'", sql->sqlTableName.c_str());
+                            sLog->outError("SQL and DBC format strings are not matching for table: '%s'", sql->sqlTableName.c_str());
                             return false;
                         }
 
@@ -297,12 +260,6 @@ class DBCStorage
 
         void Clear()
         {
-#ifdef ELUNA
-            data.clear();
-            maxdatacount = 0;
-            mindatacount = std::numeric_limits<uint32>::max();
-#endif
-
             if (!indexTable.asT)
                 return;
 
@@ -334,15 +291,6 @@ class DBCStorage
 
         T* dataTable;
         StringPoolList stringPoolList;
-
-#ifdef ELUNA
-        uint32 maxdatacount;
-        uint32 mindatacount;
-        std::unordered_map<uint32, T const*> data;
-#endif
-
-        DBCStorage(DBCStorage const& right) = delete;
-        DBCStorage& operator=(DBCStorage const& right) = delete;
 };
 
 #endif

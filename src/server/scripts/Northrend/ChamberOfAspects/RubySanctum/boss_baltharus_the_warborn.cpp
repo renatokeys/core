@@ -1,67 +1,104 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN BY XINEF
+*/
 
-#include "ScriptedCreature.h"
+#include "ObjectMgr.h"
 #include "ScriptMgr.h"
-#include "SpellScript.h"
+#include "ScriptedCreature.h"
 #include "SpellAuraEffects.h"
 #include "ruby_sanctum.h"
 
 enum Texts
 {
-    SAY_BALTHARUS_INTRO         = 0,    // Your power wanes, ancient one.... Soon you will join your friends.
-    SAY_AGGRO                   = 1,    // Ah, the entertainment has arrived.
-    SAY_KILL                    = 2,    // Baltharus leaves no survivors! - This world has enough heroes.
-    SAY_CLONE                   = 3,    // Twice the pain and half the fun.
-    SAY_DEATH                   = 4,    // I... didn't see that coming....
+	SAY_BALTHARUS_INTRO			= 0,
+	SAY_AGGRO					= 1,
+	SAY_KILL					= 2,
+	SAY_CLONE					= 3,
+	SAY_DEATH					= 4,
+
+    SAY_XERESTRASZA_EVENT       = 0,
+    SAY_XERESTRASZA_EVENT_1     = 1,
+    SAY_XERESTRASZA_EVENT_2     = 2,
+    SAY_XERESTRASZA_EVENT_3     = 3,
+    SAY_XERESTRASZA_EVENT_4     = 4,
+    SAY_XERESTRASZA_EVENT_5     = 5,
+    SAY_XERESTRASZA_EVENT_6     = 6,
+    SAY_XERESTRASZA_EVENT_7     = 7,
+    SAY_XERESTRASZA_INTRO       = 8
 };
 
 enum Spells
 {
-    SPELL_BARRIER_CHANNEL       = 76221,
-    SPELL_ENERVATING_BRAND      = 74502,
+    SPELL_BARRIER_CHANNEL		= 76221,
+
+    SPELL_ENERVATING_BRAND		= 74502,
     SPELL_SIPHONED_MIGHT        = 74507,
     SPELL_CLEAVE                = 40504,
     SPELL_BLADE_TEMPEST         = 75125,
     SPELL_CLONE                 = 74511,
     SPELL_REPELLING_WAVE        = 74509,
     SPELL_CLEAR_DEBUFFS         = 34098,
-    SPELL_SPAWN_EFFECT          = 64195,
+    SPELL_SPAWN_EFFECT          = 64195
 };
 
 enum Events
 {
-    EVENT_BLADE_TEMPEST         = 1,
-    EVENT_CLEAVE                = 2,
-    EVENT_ENERVATING_BRAND      = 3,
-    EVENT_INTRO_TALK            = 4,
-    EVENT_OOC_CHANNEL           = 5,
+	EVENT_BLADE_TEMPEST			= 1,
+	EVENT_CLEAVE				= 2,
+	EVENT_ENERVATING_BRAND		= 3,
+	EVENT_CHECK_HEALTH1			= 4,
+	EVENT_CHECK_HEALTH2			= 5,
+	EVENT_CHECK_HEALTH3			= 6,
+	EVENT_KILL_TALK				= 7,
+	EVENT_SUMMON_CLONE			= 8,
+
+    EVENT_XERESTRASZA_EVENT_0   = 1,
+    EVENT_XERESTRASZA_EVENT_1   = 2,
+    EVENT_XERESTRASZA_EVENT_2   = 3,
+    EVENT_XERESTRASZA_EVENT_3   = 4,
+    EVENT_XERESTRASZA_EVENT_4   = 5,
+    EVENT_XERESTRASZA_EVENT_5   = 6,
+    EVENT_XERESTRASZA_EVENT_6   = 7,
+    EVENT_XERESTRASZA_EVENT_7   = 8
 };
 
 enum Actions
 {
-    ACTION_CLONE                = 1,
+	ACTION_INTRO_BALTHARUS		= -3975101,
+	ACTION_BALTHARUS_DEATH		= -3975102,
+	ACTION_CLONE				= 1
 };
 
-enum Phases
+class DelayedTalk : public BasicEvent
 {
-    PHASE_ALL       = 0,
-    PHASE_INTRO     = 1,
-    PHASE_COMBAT    = 2
+    public:
+        DelayedTalk(Creature* owner, uint32 talkId) : _owner(owner), _talkId(talkId) { }
+
+        bool Execute(uint64 /*execTime*/, uint32 /*diff*/)
+        {
+			_owner->AI()->Talk(_talkId);
+            return true;
+        }
+
+    private:
+        Creature* _owner;
+		uint32 _talkId;
+};
+
+class RestoreFight : public BasicEvent
+{
+    public:
+        RestoreFight(Creature* owner) : _owner(owner) { }
+
+        bool Execute(uint64 /*execTime*/, uint32 /*diff*/)
+        {
+			_owner->SetReactState(REACT_AGGRESSIVE);
+			_owner->SetInCombatWithZone();
+            return true;
+        }
+
+    private:
+        Creature* _owner;
 };
 
 class boss_baltharus_the_warborn : public CreatureScript
@@ -73,157 +110,151 @@ class boss_baltharus_the_warborn : public CreatureScript
         {
             boss_baltharus_the_warbornAI(Creature* creature) : BossAI(creature, DATA_BALTHARUS_THE_WARBORN)
             {
-                Initialize();
                 _introDone = false;
             }
 
-            void Initialize()
+            void Reset()
             {
-                _cloneCount = RAID_MODE<uint8>(1, 2, 2, 2);
+				BossAI::Reset();
             }
 
-            void Reset() override
-            {
-                _Reset();
-                events.SetPhase(PHASE_INTRO);
-                events.ScheduleEvent(EVENT_OOC_CHANNEL, 0, 0, PHASE_INTRO);
-                Initialize();
-                instance->SetData(DATA_BALTHARUS_SHARED_HEALTH, me->GetMaxHealth());
-            }
+			void InitializeAI()
+			{
+				BossAI::InitializeAI();
+				me->CastSpell(me, SPELL_BARRIER_CHANNEL, false);
+			}
 
-            void DoAction(int32 action) override
+			void JustReachedHome()
+			{
+				BossAI::JustReachedHome();
+				me->CastSpell(me, SPELL_BARRIER_CHANNEL, false);
+			}
+
+            void DoAction(int32 action)
             {
-                switch (action)
-                {
-                    case ACTION_INTRO_BALTHARUS:
-                        if (_introDone)
-                            return;
-                        _introDone = true;
-                        me->setActive(true);
-                        events.ScheduleEvent(EVENT_INTRO_TALK, 7000, 0, PHASE_INTRO);
-                        break;
-                    case ACTION_CLONE:
-                    {
-                        DoCast(me, SPELL_CLEAR_DEBUFFS);
-                        DoCast(me, SPELL_CLONE);
-                        DoCast(me, SPELL_REPELLING_WAVE);
-                        Talk(SAY_CLONE);
-                        --_cloneCount;
-                        break;
-                    }
-                    default:
-                        break;
+                if (action == ACTION_INTRO_BALTHARUS && !_introDone)
+				{
+                    _introDone = true;
+                    me->m_Events.AddEvent(new DelayedTalk(me, SAY_BALTHARUS_INTRO), me->m_Events.CalculateTime(6000));
+				}
+				else if (action == ACTION_CLONE)
+				{
+					me->CastSpell(me, SPELL_REPELLING_WAVE, false);
+                    me->CastSpell(me, SPELL_CLEAR_DEBUFFS, false);
+					events.ScheduleEvent(EVENT_SUMMON_CLONE, 1000);
                 }
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* who)
             {
-                me->InterruptNonMeleeSpells(false);
-                _EnterCombat();
-                events.Reset();
-                events.SetPhase(PHASE_COMBAT);
-                events.ScheduleEvent(EVENT_CLEAVE, 11000, 0, PHASE_COMBAT);
-                events.ScheduleEvent(EVENT_ENERVATING_BRAND, 13000, 0, PHASE_COMBAT);
-                events.ScheduleEvent(EVENT_BLADE_TEMPEST, 15000, 0, PHASE_COMBAT);
                 Talk(SAY_AGGRO);
+				BossAI::EnterCombat(who);
+                me->InterruptNonMeleeSpells(false);
+
+                events.ScheduleEvent(EVENT_CLEAVE, 11000);
+                events.ScheduleEvent(EVENT_ENERVATING_BRAND, 13000);
+                events.ScheduleEvent(EVENT_BLADE_TEMPEST, 15000);
+				if (!Is25ManRaid())
+					events.ScheduleEvent(EVENT_CHECK_HEALTH1, 1000);
+				else
+				{
+					events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
+					events.ScheduleEvent(EVENT_CHECK_HEALTH3, 1000);
+				}
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* killer)
             {
-                _JustDied();
                 Talk(SAY_DEATH);
-                if (Creature* xerestrasza = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_XERESTRASZA)))
+				BossAI::JustDied(killer);
+
+                if (Creature* xerestrasza = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_XERESTRASZA)))
                     xerestrasza->AI()->DoAction(ACTION_BALTHARUS_DEATH);
             }
 
-            void KilledUnit(Unit* victim) override
+            void KilledUnit(Unit* victim)
             {
-                if (victim->GetTypeId() == TYPEID_PLAYER)
+                if (events.GetNextEventTime(EVENT_KILL_TALK) == 0)
+				{
                     Talk(SAY_KILL);
+					events.ScheduleEvent(EVENT_KILL_TALK, 6000);
+				}
             }
 
-            void JustSummoned(Creature* summon) override
+            void JustSummoned(Creature* summon)
             {
                 summons.Summon(summon);
                 summon->SetHealth(me->GetHealth());
                 summon->CastSpell(summon, SPELL_SPAWN_EFFECT, true);
+				summon->SetReactState(REACT_PASSIVE);
+				summon->m_Events.AddEvent(new RestoreFight(summon), summon->m_Events.CalculateTime(2000));
             }
 
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
+            void UpdateAI(uint32 diff)
             {
-                if (GetDifficulty() == RAID_DIFFICULTY_10MAN_NORMAL)
-                {
-                    if (me->HealthBelowPctDamaged(50, damage) && _cloneCount == 1)
-                        DoAction(ACTION_CLONE);
-                }
-                else
-                {
-                    if (me->HealthBelowPctDamaged(66, damage) && _cloneCount == 2)
-                        DoAction(ACTION_CLONE);
-                    else if (me->HealthBelowPctDamaged(33, damage) && _cloneCount == 1)
-                        DoAction(ACTION_CLONE);
-                }
-
-                if (me->GetHealth() > damage)
-                    instance->SetData(DATA_BALTHARUS_SHARED_HEALTH, me->GetHealth() - damage);
-            }
-
-            void UpdateAI(uint32 diff) override
-            {
-                bool introPhase = events.IsInPhase(PHASE_INTRO);
-                if (!UpdateVictim() && !introPhase)
+                if (!UpdateVictim())
                     return;
-
-                if (!introPhase)
-                    me->SetHealth(instance->GetData(DATA_BALTHARUS_SHARED_HEALTH));
 
                 events.Update(diff);
-
-                if (me->HasUnitState(UNIT_STATE_CASTING) && !introPhase)
+                if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
-                while (uint32 eventId = events.ExecuteEvent())
+                switch (events.ExecuteEvent())
                 {
-                    switch (eventId)
-                    {
-                        case EVENT_INTRO_TALK:
-                            Talk(SAY_BALTHARUS_INTRO);
-                            break;
-                        case EVENT_OOC_CHANNEL:
-                            if (Creature* channelTarget = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_CRYSTAL_CHANNEL_TARGET)))
-                                DoCast(channelTarget, SPELL_BARRIER_CHANNEL);
-                            events.ScheduleEvent(EVENT_OOC_CHANNEL, 7000, 0, PHASE_INTRO);
-                            break;
-                        case EVENT_CLEAVE:
-                            DoCastVictim(SPELL_CLEAVE);
-                            events.ScheduleEvent(EVENT_CLEAVE, 24000, 0, PHASE_COMBAT);
-                            break;
-                        case EVENT_BLADE_TEMPEST:
-                            DoCast(me, SPELL_BLADE_TEMPEST);
-                            events.ScheduleEvent(EVENT_BLADE_TEMPEST, 24000, 0, PHASE_COMBAT);
-                            break;
-                        case EVENT_ENERVATING_BRAND:
-                            for (uint8 i = 0; i < RAID_MODE<uint8>(4, 8, 8, 10); i++)
-                                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f, true))
-                                    DoCast(target, SPELL_ENERVATING_BRAND);
-                            events.ScheduleEvent(EVENT_ENERVATING_BRAND, 26000, 0, PHASE_COMBAT);
-                            break;
-                        default:
-                            break;
-                    }
+                    case EVENT_CLEAVE:
+						me->CastSpell(me->GetVictim(), SPELL_CLEAVE, false);
+                        events.ScheduleEvent(EVENT_CLEAVE, 24000);
+                        break;
+                    case EVENT_BLADE_TEMPEST:
+						me->CastSpell(me, SPELL_BLADE_TEMPEST, false);
+                        events.ScheduleEvent(EVENT_BLADE_TEMPEST, 24000);
+                        break;
+                    case EVENT_ENERVATING_BRAND:
+                        for (uint8 i = 0; i < RAID_MODE<uint8>(2, 4, 2, 4); i++)
+                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f, true, -SPELL_ENERVATING_BRAND))
+                                me->CastSpell(target, SPELL_ENERVATING_BRAND, true);
+                        events.ScheduleEvent(EVENT_ENERVATING_BRAND, 26000);
+                        break;
+					case EVENT_CHECK_HEALTH1:
+						if (me->HealthBelowPct(50))
+						{
+							DoAction(ACTION_CLONE);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH1, 1000);
+						break;
+					case EVENT_CHECK_HEALTH2:
+						if (me->HealthBelowPct(66))
+						{
+							DoAction(ACTION_CLONE);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH2, 1000);
+						break;
+					case EVENT_CHECK_HEALTH3:
+						if (me->HealthBelowPct(33))
+						{
+							DoAction(ACTION_CLONE);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH3, 1000);
+						break;
+					case EVENT_SUMMON_CLONE:
+						me->CastSpell(me, SPELL_CLONE, false);
+						Talk(SAY_CLONE);
+						break;
                 }
 
                 DoMeleeAttackIfReady();
             }
 
         private:
-            uint8 _cloneCount;
             bool _introDone;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
-            return GetRubySanctumAI<boss_baltharus_the_warbornAI>(creature);
+            return GetInstanceAI<boss_baltharus_the_warbornAI>(creature);
         }
 };
 
@@ -234,80 +265,55 @@ class npc_baltharus_the_warborn_clone : public CreatureScript
 
         struct npc_baltharus_the_warborn_cloneAI : public ScriptedAI
         {
-            npc_baltharus_the_warborn_cloneAI(Creature* creature) : ScriptedAI(creature),
-                _instance(creature->GetInstanceScript())
+            npc_baltharus_the_warborn_cloneAI(Creature* creature) : ScriptedAI(creature)
             {
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
-                DoZoneInCombat();
                 _events.Reset();
                 _events.ScheduleEvent(EVENT_CLEAVE, urand(5000, 10000));
                 _events.ScheduleEvent(EVENT_BLADE_TEMPEST, urand(18000, 25000));
                 _events.ScheduleEvent(EVENT_ENERVATING_BRAND, urand(10000, 15000));
             }
 
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
-            {
-                // Setting DATA_BALTHARUS_SHARED_HEALTH to 0 when killed would bug the boss.
-                if (me->GetHealth() > damage)
-                    _instance->SetData(DATA_BALTHARUS_SHARED_HEALTH, me->GetHealth() - damage);
-            }
-
-            void JustDied(Unit* killer) override
-            {
-                // This is here because DamageTaken wont trigger if the damage is deadly.
-                if (Creature* baltharus = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_BALTHARUS_THE_WARBORN)))
-                    killer->Kill(baltharus);
-            }
-
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
 
-                me->SetHealth(_instance->GetData(DATA_BALTHARUS_SHARED_HEALTH));
-
                 _events.Update(diff);
-
                 if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
-                while (uint32 eventId = _events.ExecuteEvent())
+                switch (_events.ExecuteEvent())
                 {
-                    switch (eventId)
-                    {
-                        case EVENT_CLEAVE:
-                            DoCastVictim(SPELL_CLEAVE);
-                            _events.ScheduleEvent(EVENT_CLEAVE, 24000);
-                            break;
-                        case EVENT_BLADE_TEMPEST:
-                            DoCastVictim(SPELL_BLADE_TEMPEST);
-                            _events.ScheduleEvent(EVENT_BLADE_TEMPEST, 24000);
-                           break;
-                        case EVENT_ENERVATING_BRAND:
-                            for (uint8 i = 0; i < RAID_MODE<uint8>(4, 8, 8, 10); i++)
-                                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f, true))
-                                    DoCast(target, SPELL_ENERVATING_BRAND);
-                            _events.ScheduleEvent(EVENT_ENERVATING_BRAND, 26000);
-                            break;
-                        default:
-                            break;
-                    }
-               }
+                    case EVENT_CLEAVE:
+						me->CastSpell(me->GetVictim(), SPELL_CLEAVE, false);
+                        _events.ScheduleEvent(EVENT_CLEAVE, 24000);
+                        break;
+                    case EVENT_BLADE_TEMPEST:
+						me->CastSpell(me, SPELL_BLADE_TEMPEST, false);
+                        _events.ScheduleEvent(EVENT_BLADE_TEMPEST, 24000);
+                       break;
+                    case EVENT_ENERVATING_BRAND:
+                        for (uint8 i = 0; i < RAID_MODE<uint8>(4, 10, 4, 10); i++)
+                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f, true, -SPELL_ENERVATING_BRAND))
+                                me->CastSpell(target, SPELL_ENERVATING_BRAND, true);
+                        _events.ScheduleEvent(EVENT_ENERVATING_BRAND, 26000);
+                        break;
+                }
 
                 DoMeleeAttackIfReady();
             }
 
         private:
             EventMap _events;
-            InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
-            return GetRubySanctumAI<npc_baltharus_the_warborn_cloneAI>(creature);
+            return GetInstanceAI<npc_baltharus_the_warborn_cloneAI>(creature);
         }
 };
 
@@ -323,21 +329,137 @@ class spell_baltharus_enervating_brand_trigger : public SpellScriptLoader
             void CheckDistance()
             {
                 if (Unit* caster = GetOriginalCaster())
-                {
                     if (Unit* target = GetHitUnit())
-                        target->CastSpell(caster, SPELL_SIPHONED_MIGHT, true);
-                }
+						if (target == GetCaster())
+							target->CastSpell(caster, SPELL_SIPHONED_MIGHT, true);
             }
 
-            void Register() override
+            void Register()
             {
                 OnHit += SpellHitFn(spell_baltharus_enervating_brand_trigger_SpellScript::CheckDistance);
             }
         };
 
-        SpellScript* GetSpellScript() const override
+        SpellScript* GetSpellScript() const
         {
             return new spell_baltharus_enervating_brand_trigger_SpellScript();
+        }
+};
+
+class npc_xerestrasza : public CreatureScript
+{
+    public:
+        npc_xerestrasza() : CreatureScript("npc_xerestrasza") { }
+
+        struct npc_xerestraszaAI : public ScriptedAI
+        {
+            npc_xerestraszaAI(Creature* creature) : ScriptedAI(creature)
+            {
+                _isIntro = true;
+                _introDone = false;
+            }
+
+            void Reset()
+            {
+                _events.Reset();
+                me->RemoveFlag(UNIT_NPC_FLAGS, GOSSIP_OPTION_QUESTGIVER);
+
+				// Xinef: after soft reset npc is no longer present
+				if (me->GetInstanceScript()->GetBossState(DATA_BALTHARUS_THE_WARBORN) == DONE)
+					me->DespawnOrUnsummon(1);
+            }
+
+            void DoAction(int32 action)
+            {
+                if (action == ACTION_BALTHARUS_DEATH)
+                {
+                    me->setActive(true);
+                    _isIntro = false;
+
+					_events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_0, 6000);
+                    _events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_1, 22000);
+                    _events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_2, 31000);
+                    _events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_3, 38000);
+                    _events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_4, 48000);
+                    _events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_5, 57000);
+                    _events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_6, 67000);
+                    _events.ScheduleEvent(EVENT_XERESTRASZA_EVENT_7, 75000);
+                }
+                else if (action == ACTION_INTRO_BALTHARUS && !_introDone && me->IsAlive())
+                {
+                    _introDone = true;
+                    Talk(SAY_XERESTRASZA_INTRO);
+                }
+            }
+
+            void UpdateAI(uint32 diff)
+            {
+                if (_isIntro)
+                    return;
+
+                _events.Update(diff);
+                switch (_events.ExecuteEvent())
+                {
+					case EVENT_XERESTRASZA_EVENT_0:
+						Talk(SAY_XERESTRASZA_EVENT);
+						me->SetWalk(true);
+						me->GetMotionMaster()->MovePoint(0, 3151.236f, 379.8733f, 86.31996f);
+						break;
+                    case EVENT_XERESTRASZA_EVENT_1:
+                        Talk(SAY_XERESTRASZA_EVENT_1);
+                        break;
+                    case EVENT_XERESTRASZA_EVENT_2:
+                        Talk(SAY_XERESTRASZA_EVENT_2);
+                        break;
+                    case EVENT_XERESTRASZA_EVENT_3:
+                        Talk(SAY_XERESTRASZA_EVENT_3);
+                        break;
+                    case EVENT_XERESTRASZA_EVENT_4:
+                        Talk(SAY_XERESTRASZA_EVENT_4);
+                        break;
+                    case EVENT_XERESTRASZA_EVENT_5:
+                        Talk(SAY_XERESTRASZA_EVENT_5);
+                        break;
+                    case EVENT_XERESTRASZA_EVENT_6:
+                        Talk(SAY_XERESTRASZA_EVENT_6);
+                        break;
+                    case EVENT_XERESTRASZA_EVENT_7:
+                        me->SetFlag(UNIT_NPC_FLAGS, GOSSIP_OPTION_QUESTGIVER);
+                        Talk(SAY_XERESTRASZA_EVENT_7);
+                        me->setActive(false);
+                        break;
+                }
+            }
+
+        private:
+            EventMap _events;
+            bool _isIntro;
+            bool _introDone;
+        };
+
+        CreatureAI* GetAI(Creature* creature) const
+        {
+            return GetInstanceAI<npc_xerestraszaAI>(creature);
+        }
+};
+
+class at_baltharus_plateau : public AreaTriggerScript
+{
+    public:
+        at_baltharus_plateau() : AreaTriggerScript("at_baltharus_plateau") { }
+
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/)
+        {
+            if (InstanceScript* instance = player->GetInstanceScript())
+            {
+                if (Creature* xerestrasza = ObjectAccessor::GetCreature(*player, instance->GetData64(NPC_XERESTRASZA)))
+                    xerestrasza->AI()->DoAction(ACTION_INTRO_BALTHARUS);
+
+                if (Creature* baltharus = ObjectAccessor::GetCreature(*player, instance->GetData64(NPC_BALTHARUS_THE_WARBORN)))
+                    baltharus->AI()->DoAction(ACTION_INTRO_BALTHARUS);
+            }
+
+            return true;
         }
 };
 
@@ -346,4 +468,6 @@ void AddSC_boss_baltharus_the_warborn()
     new boss_baltharus_the_warborn();
     new npc_baltharus_the_warborn_clone();
     new spell_baltharus_enervating_brand_trigger();
+    new npc_xerestrasza();
+    new at_baltharus_plateau();
 }

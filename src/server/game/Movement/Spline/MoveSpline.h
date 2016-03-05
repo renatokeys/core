@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,10 +26,10 @@ namespace Movement
 {
     struct Location : public Vector3
     {
-        Location() : orientation(0) { }
-        Location(float x, float y, float z, float o) : Vector3(x, y, z), orientation(o) { }
-        Location(const Vector3& v) : Vector3(v), orientation(0) { }
-        Location(const Vector3& v, float o) : Vector3(v), orientation(o) { }
+        Location() : orientation(0) {}
+        Location(float x, float y, float z, float o) : Vector3(x, y, z), orientation(o) {}
+        Location(const Vector3& v) : Vector3(v), orientation(0) {}
+        Location(const Vector3& v, float o) : Vector3(v), orientation(o) {}
 
         float orientation;
     };
@@ -46,10 +46,10 @@ namespace Movement
             Result_None         = 0x01,
             Result_Arrived      = 0x02,
             Result_NextCycle    = 0x04,
-            Result_NextSegment  = 0x08
+            Result_NextSegment  = 0x08,
+			Result_JustArrived	= 0x10,
         };
         friend class PacketBuilder;
-
     protected:
         MySpline        spline;
 
@@ -72,17 +72,17 @@ namespace Movement
         void init_spline(const MoveSplineInitArgs& args);
 
     protected:
-        MySpline::ControlArray const& getPath() const { return spline.getPoints(); }
+        const MySpline::ControlArray& getPath(bool visual) const { return spline.getPoints(visual); }
         void computeParabolicElevation(float& el) const;
         void computeFallElevation(float& el) const;
 
         UpdateResult _updateState(int32& ms_time_diff);
         int32 next_timestamp() const { return spline.length(point_Idx + 1); }
         int32 segment_time_elapsed() const { return next_timestamp() - time_passed; }
-        int32 timeElapsed() const { return Duration() - time_passed; }
-        int32 timePassed() const { return time_passed; }
 
     public:
+        int32 timeElapsed() const { return Duration() - time_passed; }	// xinef: moved to public for waypoint movegen
+        int32 timePassed() const { return time_passed; }				// xinef: moved to public for waypoint movegen
         int32 Duration() const { return spline.length(); }
         MySpline const& _Spline() const { return spline; }
         int32 _currentSplineIdx() const { return point_Idx; }
@@ -117,8 +117,9 @@ namespace Movement
         bool Finalized() const { return splineflags.done; }
         bool isCyclic() const { return splineflags.cyclic; }
         bool isFalling() const { return splineflags.falling; }
-        Vector3 FinalDestination() const { return Initialized() ? spline.getPoint(spline.last()) : Vector3(); }
-        Vector3 CurrentDestination() const { return Initialized() ? spline.getPoint(point_Idx + 1) : Vector3(); }
+        bool isWalking() const { return splineflags.walkmode; }
+        Vector3 FinalDestination() const { return Initialized() ? spline.getPoint(spline.last(), false) : Vector3(); }
+        Vector3 CurrentDestination() const { return Initialized() ? spline.getPoint(point_Idx + 1, false) : Vector3(); }
         int32 currentPathIdx() const;
 
         bool onTransport;

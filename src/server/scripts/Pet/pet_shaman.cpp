@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -28,7 +28,7 @@ enum ShamanSpells
     SPELL_SHAMAN_ANGEREDEARTH   = 36213,
     SPELL_SHAMAN_FIREBLAST      = 57984,
     SPELL_SHAMAN_FIRENOVA       = 12470,
-    SPELL_SHAMAN_FIRESHIELD     = 13376
+    SPELL_SHAMAN_FIRESHIELD     = 13377
 };
 
 enum ShamanEvents
@@ -48,18 +48,32 @@ class npc_pet_shaman_earth_elemental : public CreatureScript
 
         struct npc_pet_shaman_earth_elementalAI : public ScriptedAI
         {
-            npc_pet_shaman_earth_elementalAI(Creature* creature) : ScriptedAI(creature) { }
+            npc_pet_shaman_earth_elementalAI(Creature* creature) : ScriptedAI(creature), _initAttack(true) { }
 
 
-            void Reset() override
+            void EnterCombat(Unit*)
             {
                 _events.Reset();
                 _events.ScheduleEvent(EVENT_SHAMAN_ANGEREDEARTH, 0);
-                me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_NATURE, true);
             }
 
-            void UpdateAI(uint32 diff) override
+			void InitializeAI()
+			{
+                me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_NATURE, true);
+			}
+
+            void UpdateAI(uint32 diff)
             {
+				if (_initAttack)
+				{
+					if (!me->IsInCombat())
+						if (Player* owner = me->GetCharmerOrOwnerPlayerOrPlayerItself())
+							if (Unit* target = owner->GetSelectedUnit())
+								if (me->_CanDetectFeignDeathOf(target) && me->CanCreatureAttack(target))
+									AttackStart(target);
+					_initAttack = false;
+				}
+
                 if (!UpdateVictim())
                     return;
 
@@ -76,9 +90,10 @@ class npc_pet_shaman_earth_elemental : public CreatureScript
 
         private:
             EventMap _events;
+			bool _initAttack;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new npc_pet_shaman_earth_elementalAI(creature);
         }
@@ -91,42 +106,51 @@ class npc_pet_shaman_fire_elemental : public CreatureScript
 
         struct npc_pet_shaman_fire_elementalAI : public ScriptedAI
         {
-            npc_pet_shaman_fire_elementalAI(Creature* creature) : ScriptedAI(creature) { }
+            npc_pet_shaman_fire_elementalAI(Creature* creature) : ScriptedAI(creature), _initAttack(true) { }
 
-            void Reset() override
-            {
+			void InitializeAI()
+			{
+                me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_FIRE, true);
+			}
+
+			void EnterCombat(Unit*)
+			{
                 _events.Reset();
                 _events.ScheduleEvent(EVENT_SHAMAN_FIRENOVA, urand(5000, 20000));
                 _events.ScheduleEvent(EVENT_SHAMAN_FIREBLAST, urand(5000, 20000));
-                _events.ScheduleEvent(EVENT_SHAMAN_FIRESHIELD, 0);
-                me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_FIRE, true);
-            }
+                //_events.ScheduleEvent(EVENT_SHAMAN_FIRESHIELD, 0);
 
-            void UpdateAI(uint32 diff) override
+				me->RemoveAurasDueToSpell(SPELL_SHAMAN_FIRESHIELD);
+				me->CastSpell(me, SPELL_SHAMAN_FIRESHIELD, true);
+			}
+
+            void UpdateAI(uint32 diff)
             {
+				if (_initAttack)
+				{
+					if (!me->IsInCombat())
+						if (Player* owner = me->GetCharmerOrOwnerPlayerOrPlayerItself())
+							if (Unit* target = owner->GetSelectedUnit())
+								if (me->_CanDetectFeignDeathOf(target) && me->CanCreatureAttack(target))
+									AttackStart(target);
+					_initAttack = false;
+				}
+
                 if (!UpdateVictim())
                     return;
 
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
-
                 _events.Update(diff);
-
                 while (uint32 eventId = _events.ExecuteEvent())
                 {
                     switch (eventId)
                     {
                         case EVENT_SHAMAN_FIRENOVA:
-                            DoCastVictim(SPELL_SHAMAN_FIRENOVA);
-                            _events.ScheduleEvent(EVENT_SHAMAN_FIRENOVA, urand(5000, 20000));
-                            break;
-                        case EVENT_SHAMAN_FIRESHIELD:
-                            DoCastVictim(SPELL_SHAMAN_FIRESHIELD);
-                            _events.ScheduleEvent(EVENT_SHAMAN_FIRESHIELD, 2000);
+							me->CastSpell(me, SPELL_SHAMAN_FIRENOVA, false);
+                            _events.ScheduleEvent(EVENT_SHAMAN_FIRENOVA, urand(8000, 15000));
                             break;
                         case EVENT_SHAMAN_FIREBLAST:
-                            DoCastVictim(SPELL_SHAMAN_FIREBLAST);
-                            _events.ScheduleEvent(EVENT_SHAMAN_FIREBLAST, urand(5000, 20000));
+							me->CastSpell(me->GetVictim(), SPELL_SHAMAN_FIREBLAST, false);
+                            _events.ScheduleEvent(EVENT_SHAMAN_FIREBLAST, urand(4000, 8000));
                             break;
                         default:
                             break;
@@ -138,9 +162,10 @@ class npc_pet_shaman_fire_elemental : public CreatureScript
 
         private:
             EventMap _events;
+			bool _initAttack;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new npc_pet_shaman_fire_elementalAI(creature);
         }

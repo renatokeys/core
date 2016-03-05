@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -17,8 +17,6 @@
 
 #ifndef DEF_ZULGURUB_H
 #define DEF_ZULGURUB_H
-
-#define DataHeader "ZG"
 
 uint32 const EncounterCount = 13;
 

@@ -1,77 +1,61 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY PUSSYWIZARD, IT OWNS NOW!
+*/
 
-#include "GameObjectAI.h"
-#include "InstanceScript.h"
-#include "Player.h"
 #include "ScriptedGossip.h"
 #include "ScriptMgr.h"
-#include "Spell.h"
+#include "InstanceScript.h"
 #include "icecrown_citadel.h"
+#include "Spell.h"
+#include "Player.h"
 
-static std::vector<uint32> const TeleportSpells =
-{
-    LIGHT_S_HAMMER_TELEPORT,        // 0
-    ORATORY_OF_THE_DAMNED_TELEPORT, // 1
-    0,                              // 2
-    RAMPART_OF_SKULLS_TELEPORT,     // 3
-    DEATHBRINGER_S_RISE_TELEPORT,   // 4
-    UPPER_SPIRE_TELEPORT,           // 5
-    SINDRAGOSA_S_LAIR_TELEPORT      // 6
-};
+#define GOSSIP_SENDER_ICC_PORT 631
 
 class icecrown_citadel_teleport : public GameObjectScript
 {
-    static_assert(DATA_UPPERSPIRE_TELE_ACT == 41, "icecrown_citadel.h DATA_UPPERSPIRE_TELE_ACT set to value != 41, gossip condition of the teleporters won't work as intended.");
-
     public:
         icecrown_citadel_teleport() : GameObjectScript("icecrown_citadel_teleport") { }
 
-        struct icecrown_citadel_teleportAI : public GameObjectAI
+        bool OnGossipHello(Player* player, GameObject* go)
         {
-            icecrown_citadel_teleportAI(GameObject* go) : GameObjectAI(go)
+            if (go->GetEntry() != GO_SCOURGE_TRANSPORTER_FIRST)
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to Light's Hammer.", GOSSIP_SENDER_ICC_PORT, LIGHT_S_HAMMER_TELEPORT); // M_PI + M_PI/6
+            if (InstanceScript* instance = go->GetInstanceScript())
             {
+                if (instance->GetBossState(DATA_LORD_MARROWGAR) == DONE && go->GetEntry() != 202245)
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Oratory of the Damned.", GOSSIP_SENDER_ICC_PORT, ORATORY_OF_THE_DAMNED_TELEPORT); // M_PI + M_PI/6
+                if (instance->GetBossState(DATA_LADY_DEATHWHISPER) == DONE && go->GetEntry() != 202243)
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Rampart of Skulls.", GOSSIP_SENDER_ICC_PORT, RAMPART_OF_SKULLS_TELEPORT); // M_PI/6
+                if (instance->GetBossState(DATA_ICECROWN_GUNSHIP_BATTLE) == DONE && go->GetEntry() != 202244)
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Deathbringer's Rise.", GOSSIP_SENDER_ICC_PORT, DEATHBRINGER_S_RISE_TELEPORT); // M_PI/6
+                if (instance->GetData(DATA_COLDFLAME_JETS) == DONE && go->GetEntry() != 202235)
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Upper Spire.", GOSSIP_SENDER_ICC_PORT, UPPER_SPIRE_TELEPORT); // M_PI/6
+				if (instance->GetBossState(DATA_VALITHRIA_DREAMWALKER) == DONE && instance->GetBossState(DATA_SINDRAGOSA_GAUNTLET) == DONE && go->GetEntry() != 202246)
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to Sindragosa's Lair", GOSSIP_SENDER_ICC_PORT, SINDRAGOSA_S_LAIR_TELEPORT); // M_PI*3/2 + M_PI/6
             }
 
-            bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
+            player->SEND_GOSSIP_MENU(player->GetGossipTextId(go), go->GetGUID());
+            return true;
+        }
+
+        bool OnGossipSelect(Player* player, GameObject* /*go*/, uint32 sender, uint32 action)
+        {
+            player->PlayerTalkClass->ClearMenus();
+            player->CLOSE_GOSSIP_MENU();
+            SpellInfo const* spell = sSpellMgr->GetSpellInfo(action);
+            if (!spell)
+                return false;
+
+            if (player->IsInCombat())
             {
-                if (gossipListId >= TeleportSpells.size())
-                    return false;
-
-                player->PlayerTalkClass->ClearMenus();
-                player->CLOSE_GOSSIP_MENU();
-                SpellInfo const* spell = sSpellMgr->GetSpellInfo(TeleportSpells[gossipListId]);
-                if (!spell)
-                    return false;
-
-                if (player->IsInCombat())
-                {
-                    Spell::SendCastResult(player, spell, 0, SPELL_FAILED_AFFECTING_COMBAT);
-                    return true;
-                }
-
-                player->CastSpell(player, spell, true);
+                Spell::SendCastResult(player, spell, 0, SPELL_FAILED_AFFECTING_COMBAT);
                 return true;
             }
-        };
 
-        GameObjectAI* GetAI(GameObject* go) const override
-        {
-            return GetIcecrownCitadelAI<icecrown_citadel_teleportAI>(go);
+            if (sender == GOSSIP_SENDER_ICC_PORT)
+                player->CastSpell(player, spell, false);
+
+            return true;
         }
 };
 
@@ -80,7 +64,7 @@ class at_frozen_throne_teleport : public AreaTriggerScript
     public:
         at_frozen_throne_teleport() : AreaTriggerScript("at_frozen_throne_teleport") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/)
         {
             if (player->IsInCombat())
             {
@@ -94,7 +78,7 @@ class at_frozen_throne_teleport : public AreaTriggerScript
                     instance->GetBossState(DATA_BLOOD_QUEEN_LANA_THEL) == DONE &&
                     instance->GetBossState(DATA_SINDRAGOSA) == DONE &&
                     instance->GetBossState(DATA_THE_LICH_KING) != IN_PROGRESS)
-                    player->CastSpell(player, FROZEN_THRONE_TELEPORT, true);
+                    player->CastSpell(player, FROZEN_THRONE_TELEPORT, false);
 
             return true;
         }

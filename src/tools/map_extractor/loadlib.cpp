@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -38,14 +38,14 @@ FileLoader::~FileLoader()
     free();
 }
 
-bool FileLoader::loadFile(std::string const& fileName, bool log)
+bool FileLoader::loadFile(char *filename, bool log)
 {
     free();
-    MPQFile mf(fileName.c_str());
+    MPQFile mf(filename);
     if(mf.isEof())
     {
         if (log)
-            printf("No such file %s\n", fileName.c_str());
+            printf("No such file %s\n", filename);
         return false;
     }
 
@@ -57,7 +57,7 @@ bool FileLoader::loadFile(std::string const& fileName, bool log)
     if (prepareLoadedData())
         return true;
 
-    printf("Error loading %s", fileName.c_str());
+    printf("Error loading %s", filename);
     mf.close();
     free();
     return false;

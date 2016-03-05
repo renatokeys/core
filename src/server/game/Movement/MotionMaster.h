@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,10 +23,10 @@
 #include <vector>
 #include "SharedDefines.h"
 #include "Object.h"
+#include "Spline/MoveSpline.h"
 
 class MovementGenerator;
 class Unit;
-class PathGenerator;
 
 // Creature Entry ID used for waypoints show, visible only for GMs
 #define VISUAL_WAYPOINT 1
@@ -52,7 +52,8 @@ enum MovementGeneratorType
     FOLLOW_MOTION_TYPE    = 14,
     ROTATE_MOTION_TYPE    = 15,
     EFFECT_MOTION_TYPE    = 16,
-    NULL_MOTION_TYPE      = 17
+    ESCORT_MOTION_TYPE    = 17,                             // xinef: EscortMovementGenerator.h
+    NULL_MOTION_TYPE      = 18
 };
 
 enum MovementSlot
@@ -65,9 +66,10 @@ enum MovementSlot
 
 enum MMCleanFlag
 {
-    MMCF_NONE   = 0,
-    MMCF_UPDATE = 1, // Clear or Expire called from update
-    MMCF_RESET  = 2  // Flag if need top()->Reset()
+    MMCF_NONE   = 0x00,
+    MMCF_UPDATE = 0x01, // Clear or Expire called from update
+    MMCF_RESET  = 0x02, // Flag if need top()->Reset()
+    MMCF_INUSE  = 0x04, // pussywizard: Flag if in MotionMaster::UpdateMotion
 };
 
 enum RotateDirection
@@ -94,13 +96,12 @@ class MotionMaster //: private std::stack<MovementGenerator *>
             while (!empty() && !top())
                 --_top;
         }
-        void push(_Ty _Val) { ++_top; Impl[_top] = _Val; }
 
-        bool needInitTop() const
-        {
+        bool needInitTop() const 
+        { 
             if (empty())
                 return false;
-            return _needInit[_top];
+            return _needInit[_top]; 
         }
         void InitTop();
     public:
@@ -120,16 +121,18 @@ class MotionMaster //: private std::stack<MovementGenerator *>
 
         bool empty() const { return (_top < 0); }
         int size() const { return _top + 1; }
-        _Ty top() const
-        {
+        _Ty top() const 
+        { 
             ASSERT(!empty());
-            return Impl[_top];
+            return Impl[_top]; 
         }
-        _Ty GetMotionSlot(int slot) const
-        {
+        _Ty GetMotionSlot(int slot) const 
+        { 
             ASSERT(slot >= 0);
-            return Impl[slot];
+            return Impl[slot]; 
         }
+
+        uint8 GetCleanFlags() const { return _cleanFlag; }
 
         void DirectDelete(_Ty curr);
         void DelayedDelete(_Ty curr);
@@ -162,6 +165,13 @@ class MotionMaster //: private std::stack<MovementGenerator *>
                 DirectExpire(reset);
         }
 
+        void MovementExpiredOnSlot(MovementSlot slot, bool reset = true)
+        {
+			// xinef: cannot be used during motion update!
+            if (!(_cleanFlag & MMCF_UPDATE))
+                DirectExpireSlot(slot, reset);
+        }
+
         void MoveIdle();
         void MoveTargetedHome();
         void MoveRandom(float spawndist = 0.0f);
@@ -169,26 +179,24 @@ class MotionMaster //: private std::stack<MovementGenerator *>
         void MoveChase(Unit* target, float dist = 0.0f, float angle = 0.0f);
         void MoveConfused();
         void MoveFleeing(Unit* enemy, uint32 time = 0);
-        void MovePoint(uint32 id, Position const& pos, bool generatePath = true)
-            { MovePoint(id, pos.m_positionX, pos.m_positionY, pos.m_positionZ, generatePath); }
-        void MovePoint(uint32 id, float x, float y, float z, bool generatePath = true);
+        void MovePoint(uint32 id, const Position &pos, bool generatePath = true, bool forceDestination = true)
+            { MovePoint(id, pos.m_positionX, pos.m_positionY, pos.m_positionZ, generatePath, forceDestination); }
+        void MovePoint(uint32 id, float x, float y, float z, bool generatePath = true, bool forceDestination = true, MovementSlot slot = MOTION_SLOT_ACTIVE);
+        void MoveSplinePath(Movement::PointsArray* path);
 
         // These two movement types should only be used with creatures having landing/takeoff animations
-        void MoveLand(uint32 id, Position const& pos);
-        void MoveTakeoff(uint32 id, Position const& pos);
+        void MoveLand(uint32 id, Position const& pos, float speed);
+        void MoveLand(uint32 id, float x, float y, float z, float speed); // pussywizard: added for easy calling by passing 3 floats x, y, z
+        void MoveTakeoff(uint32 id, Position const& pos, float speed);
+        void MoveTakeoff(uint32 id, float x, float y, float z, float speed); // pussywizard: added for easy calling by passing 3 floats x, y, z
 
-        void MoveCharge(float x, float y, float z, float speed = SPEED_CHARGE, uint32 id = EVENT_CHARGE, bool generatePath = false);
-        void MoveCharge(PathGenerator const& path, float speed = SPEED_CHARGE);
+        void MoveCharge(float x, float y, float z, float speed = SPEED_CHARGE, uint32 id = EVENT_CHARGE, const Movement::PointsArray* path = NULL, bool generatePath = false);
         void MoveKnockbackFrom(float srcX, float srcY, float speedXY, float speedZ);
         void MoveJumpTo(float angle, float speedXY, float speedZ);
-        void MoveJump(Position const& pos, float speedXY, float speedZ, uint32 id = EVENT_JUMP, bool hasOrientation = false)
-        {
-            MoveJump(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation(), speedXY, speedZ, id, hasOrientation);
-        }
-        void MoveJump(float x, float y, float z, float o, float speedXY, float speedZ, uint32 id = EVENT_JUMP, bool hasOrientation = false);
-        void MoveCirclePath(float x, float y, float z, float radius, bool clockwise, uint8 stepCount);
-        void MoveSmoothPath(uint32 pointId, G3D::Vector3 const* pathPoints, size_t pathSize, bool walk);
-        void MoveFall(uint32 id = 0);
+        void MoveJump(Position const& pos, float speedXY, float speedZ, uint32 id = 0)
+            { MoveJump(pos.m_positionX, pos.m_positionY, pos.m_positionZ, speedXY, speedZ, id); };
+        void MoveJump(float x, float y, float z, float speedXY, float speedZ, uint32 id = 0, Unit const* target = NULL);
+        void MoveFall(uint32 id = 0, bool addFlagForNPC = false);
 
         void MoveSeekAssistance(float x, float y, float z);
         void MoveSeekAssistanceDistract(uint32 timer);
@@ -199,8 +207,10 @@ class MotionMaster //: private std::stack<MovementGenerator *>
 
         MovementGeneratorType GetCurrentMovementGeneratorType() const;
         MovementGeneratorType GetMotionSlotType(int slot) const;
+		uint32 GetCurrentSplineId() const; // Xinef: Escort system
 
         void propagateSpeedChange();
+        void ReinitializeMovement();
 
         bool GetDestination(float &x, float &y, float &z);
     private:
@@ -210,6 +220,7 @@ class MotionMaster //: private std::stack<MovementGenerator *>
         void DelayedClean();
 
         void DirectExpire(bool reset);
+        void DirectExpireSlot(MovementSlot slot, bool reset);
         void DelayedExpire();
 
         typedef std::vector<_Ty> ExpireList;

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,6 +20,7 @@
 #include "ThreatManager.h"
 #include "Unit.h"
 #include "DBCStructure.h"
+#include "SpellMgr.h"
 #include "SpellInfo.h"
 
 HostileRefManager::~HostileRefManager()
@@ -161,6 +162,26 @@ void HostileRefManager::deleteReference(Unit* creature)
 }
 
 //=================================================
+// delete all references out of specified range
+
+void HostileRefManager::deleteReferencesOutOfRange(float range)
+{
+    HostileReference* ref = getFirst();
+    range = range*range;
+    while (ref)
+    {
+        HostileReference* nextRef = ref->next();
+        Unit* owner = ref->GetSource()->GetOwner();
+        if (!owner->isActiveObject() && owner->GetExactDist2dSq(GetOwner()) > range)
+        {
+            ref->removeReference();
+            delete ref;
+        }
+        ref = nextRef;
+    }
+}
+
+//=================================================
 // set state for one reference, defined by Unit
 
 void HostileRefManager::setOnlineOfflineState(Unit* creature, bool isOnline)
@@ -180,13 +201,14 @@ void HostileRefManager::setOnlineOfflineState(Unit* creature, bool isOnline)
 
 //=================================================
 
-void HostileRefManager::UpdateVisibility()
+void HostileRefManager::UpdateVisibility(bool checkThreat)
 {
     HostileReference* ref = getFirst();
     while (ref)
     {
         HostileReference* nextRef = ref->next();
-        if (!ref->GetSource()->GetOwner()->CanSeeOrDetect(GetOwner()))
+		if ((!checkThreat || ref->GetSource()->getThreatList().size() <= 1) && 
+			!ref->GetSource()->GetOwner()->CanSeeOrDetect(GetOwner()))
         {
             nextRef = ref->next();
             ref->removeReference();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,11 +24,13 @@
 #include "ScriptedCreature.h"
 #include "PassiveAI.h"
 #include "PetAI.h"
+#include "TotemAI.h"
 
 enum PriestSpells
 {
     SPELL_PRIEST_GLYPH_OF_SHADOWFIEND       = 58228,
     SPELL_PRIEST_GLYPH_OF_SHADOWFIEND_MANA  = 58227,
+	SPELL_PRIEST_SHADOWFIEND_DODGE          = 8273,
     SPELL_PRIEST_LIGHTWELL_CHARGES          = 59907
 };
 
@@ -37,25 +39,26 @@ class npc_pet_pri_lightwell : public CreatureScript
     public:
         npc_pet_pri_lightwell() : CreatureScript("npc_pet_pri_lightwell") { }
 
-        struct npc_pet_pri_lightwellAI : public PassiveAI
+        struct npc_pet_pri_lightwellAI : public TotemAI
         {
-            npc_pet_pri_lightwellAI(Creature* creature) : PassiveAI(creature)
-            {
-                DoCast(me, SPELL_PRIEST_LIGHTWELL_CHARGES, false);
-            }
+            npc_pet_pri_lightwellAI(Creature* creature) : TotemAI(creature) { }
 
-            void EnterEvadeMode(EvadeReason /*why*/) override
-            {
-                if (!me->IsAlive())
-                    return;
+			void InitializeAI()
+			{
+				if (Unit* owner = me->ToTempSummon()->GetSummoner())
+				{
+					uint32 hp = uint32(owner->GetMaxHealth()*0.3f);
+					me->SetMaxHealth(hp);
+					me->SetHealth(hp);
+					me->SetLevel(owner->getLevel());
+				}
 
-                me->DeleteThreatList();
-                me->CombatStop(true);
-                me->ResetPlayerDamageReq();
-            }
+				me->CastSpell(me, SPELL_PRIEST_LIGHTWELL_CHARGES, false); // Spell for Lightwell Charges
+				TotemAI::InitializeAI();
+			}
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new npc_pet_pri_lightwellAI(creature);
         }
@@ -70,7 +73,17 @@ class npc_pet_pri_shadowfiend : public CreatureScript
         {
             npc_pet_pri_shadowfiendAI(Creature* creature) : PetAI(creature) { }
 
-            void JustDied(Unit* /*killer*/) override
+			void Reset()
+			{
+				PetAI::Reset();
+				if (!me->HasAura(SPELL_PRIEST_SHADOWFIEND_DODGE))
+					me->AddAura(SPELL_PRIEST_SHADOWFIEND_DODGE, me);
+
+				if (Unit* target = me->SelectNearestTarget(15.0f))
+					AttackStart(target);
+			}
+
+            void JustDied(Unit* /*killer*/)
             {
                 if (me->IsSummon())
                     if (Unit* owner = me->ToTempSummon()->GetSummoner())
@@ -79,7 +92,7 @@ class npc_pet_pri_shadowfiend : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new npc_pet_pri_shadowfiendAI(creature);
         }

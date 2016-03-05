@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -45,35 +45,29 @@ public:
 
     struct npc_corporal_keeshanAI : public npc_escortAI
     {
-        npc_corporal_keeshanAI(Creature* creature) : npc_escortAI(creature)
-        {
-            Initialize();
-        }
+        npc_corporal_keeshanAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Initialize()
+        void Reset()
         {
             timer = 0;
             phase = 0;
             mockingBlowTimer = 5000;
-            shieldBashTimer = 8000;
+            shieldBashTimer  = 8000;
+			me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC);
         }
 
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void sQuestAccept(Player* player, Quest const* quest) override
+        void sQuestAccept(Player* player, Quest const* quest)
         {
             if (quest->GetQuestId() == QUEST_MISSING_IN_ACTION)
             {
                 Talk(SAY_CORPORAL_1, player);
-                me->setFaction(250);
                 npc_escortAI::Start(true, false, player->GetGUID(), quest);
+				me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC);
+				me->setFaction(250);
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -100,7 +94,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (HasEscortState(STATE_ESCORT_NONE))
                 return;
@@ -169,7 +163,7 @@ public:
         uint32 shieldBashTimer;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_corporal_keeshanAI(creature);
     }

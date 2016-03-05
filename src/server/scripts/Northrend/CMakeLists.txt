@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -10,7 +10,6 @@
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
-  Northrend/wintergrasp.cpp
   Northrend/isle_of_conquest.cpp
   Northrend/zone_storm_peaks.cpp
   Northrend/Ulduar/HallsOfLightning/instance_halls_of_lightning.cpp
@@ -20,12 +19,13 @@ set(scripts_STAT_SRCS
   Northrend/Ulduar/HallsOfLightning/boss_volkhan.cpp
   Northrend/Ulduar/HallsOfLightning/boss_loken.cpp
   Northrend/Ulduar/Ulduar/boss_general_vezax.cpp
+  Northrend/Ulduar/Ulduar/ulduar.cpp
   Northrend/Ulduar/Ulduar/boss_thorim.cpp
   Northrend/Ulduar/Ulduar/boss_ignis.cpp
   Northrend/Ulduar/Ulduar/boss_algalon_the_observer.cpp
   Northrend/Ulduar/Ulduar/instance_ulduar.cpp
   Northrend/Ulduar/Ulduar/boss_auriaya.cpp
-  Northrend/Ulduar/Ulduar/boss_yogg_saron.cpp
+  Northrend/Ulduar/Ulduar/boss_yoggsaron.cpp
   Northrend/Ulduar/Ulduar/boss_hodir.cpp
   Northrend/Ulduar/Ulduar/boss_assembly_of_iron.cpp
   Northrend/Ulduar/Ulduar/boss_flame_leviathan.cpp
@@ -40,14 +40,13 @@ set(scripts_STAT_SRCS
   Northrend/Ulduar/HallsOfStone/instance_halls_of_stone.cpp
   Northrend/Ulduar/HallsOfStone/boss_maiden_of_grief.cpp
   Northrend/Ulduar/HallsOfStone/boss_sjonnir.cpp
-  Northrend/Ulduar/HallsOfStone/halls_of_stone.cpp
+  Northrend/Ulduar/HallsOfStone/halls_of_stone.h
+  Northrend/Ulduar/HallsOfStone/brann_bronzebeard.cpp
   Northrend/ChamberOfAspects/ObsidianSanctum/instance_obsidian_sanctum.cpp
   Northrend/ChamberOfAspects/ObsidianSanctum/obsidian_sanctum.h
   Northrend/ChamberOfAspects/ObsidianSanctum/boss_sartharion.cpp
-  Northrend/ChamberOfAspects/ObsidianSanctum/obsidian_sanctum.cpp
   Northrend/ChamberOfAspects/RubySanctum/instance_ruby_sanctum.cpp
   Northrend/ChamberOfAspects/RubySanctum/ruby_sanctum.h
-  Northrend/ChamberOfAspects/RubySanctum/ruby_sanctum.cpp
   Northrend/ChamberOfAspects/RubySanctum/boss_baltharus_the_warborn.cpp
   Northrend/ChamberOfAspects/RubySanctum/boss_saviana_ragefire.cpp
   Northrend/ChamberOfAspects/RubySanctum/boss_general_zarithrian.cpp
@@ -78,7 +77,7 @@ set(scripts_STAT_SRCS
   Northrend/Nexus/Oculus/boss_urom.cpp
   Northrend/Nexus/Oculus/oculus.cpp
   Northrend/Nexus/Oculus/instance_oculus.cpp
-  Northrend/Nexus/Nexus/boss_nexus_commanders.cpp
+  Northrend/Nexus/Nexus/boss_commander_stoutbeard_kolurg.cpp
   Northrend/Nexus/Nexus/boss_ormorok.cpp
   Northrend/Nexus/Nexus/boss_magus_telestra.cpp
   Northrend/Nexus/Nexus/instance_nexus.cpp
@@ -124,11 +123,11 @@ set(scripts_STAT_SRCS
   Northrend/VaultOfArchavon/boss_emalon.cpp
   Northrend/VaultOfArchavon/boss_toravon.cpp
   Northrend/zone_sholazar_basin.cpp
-  Northrend/UtgardeKeep/UtgardePinnacle/boss_svala.cpp
   Northrend/UtgardeKeep/UtgardePinnacle/boss_palehoof.cpp
-  Northrend/UtgardeKeep/UtgardePinnacle/boss_skadi.cpp
-  Northrend/UtgardeKeep/UtgardePinnacle/boss_ymiron.cpp
+  Northrend/UtgardeKeep/UtgardePinnacle/boss_svala.cpp
   Northrend/UtgardeKeep/UtgardePinnacle/instance_utgarde_pinnacle.cpp
+  Northrend/UtgardeKeep/UtgardePinnacle/boss_ymiron.cpp
+  Northrend/UtgardeKeep/UtgardePinnacle/boss_skadi.cpp
   Northrend/UtgardeKeep/UtgardePinnacle/utgarde_pinnacle.h
   Northrend/UtgardeKeep/UtgardeKeep/boss_ingvar_the_plunderer.cpp
   Northrend/UtgardeKeep/UtgardeKeep/boss_skarvald_dalronn.cpp
@@ -143,13 +142,13 @@ set(scripts_STAT_SRCS
   Northrend/AzjolNerub/AzjolNerub/boss_krikthir_the_gatewatcher.cpp
   Northrend/AzjolNerub/AzjolNerub/boss_hadronox.cpp
   Northrend/AzjolNerub/AzjolNerub/boss_anubarak.cpp
-  Northrend/AzjolNerub/Ahnkahet/boss_herald_volazj.cpp
-  Northrend/AzjolNerub/Ahnkahet/boss_prince_taldaram.cpp
-  Northrend/AzjolNerub/Ahnkahet/instance_ahnkahet.cpp
-  Northrend/AzjolNerub/Ahnkahet/boss_jedoga_shadowseeker.cpp
-  Northrend/AzjolNerub/Ahnkahet/boss_elder_nadox.cpp
-  Northrend/AzjolNerub/Ahnkahet/boss_amanitar.cpp
-  Northrend/AzjolNerub/Ahnkahet/ahnkahet.h
+  Northrend/AzjolNerub/ahnkahet/boss_herald_volazj.cpp
+  Northrend/AzjolNerub/ahnkahet/boss_prince_taldaram.cpp
+  Northrend/AzjolNerub/ahnkahet/instance_ahnkahet.cpp
+  Northrend/AzjolNerub/ahnkahet/boss_jedoga_shadowseeker.cpp
+  Northrend/AzjolNerub/ahnkahet/boss_elder_nadox.cpp
+  Northrend/AzjolNerub/ahnkahet/boss_amanitar.cpp
+  Northrend/AzjolNerub/ahnkahet/ahnkahet.h
   Northrend/VioletHold/boss_zuramat.cpp
   Northrend/VioletHold/instance_violet_hold.cpp
   Northrend/VioletHold/boss_lavanthor.cpp
@@ -177,6 +176,7 @@ set(scripts_STAT_SRCS
   Northrend/IcecrownCitadel/boss_sindragosa.cpp
   Northrend/IcecrownCitadel/boss_the_lich_king.cpp
   Northrend/zone_zuldrak.cpp
+  Northrend/zone_wintergrasp.cpp
   Northrend/zone_icecrown.cpp
   Northrend/Gundrak/boss_slad_ran.cpp
   Northrend/Gundrak/instance_gundrak.cpp
@@ -193,7 +193,7 @@ set(scripts_STAT_SRCS
   Northrend/DraktharonKeep/boss_novos.cpp
   Northrend/DraktharonKeep/drak_tharon_keep.h
   Northrend/DraktharonKeep/boss_tharon_ja.cpp
-  Northrend/DraktharonKeep/boss_king_dred.cpp
+  Northrend/DraktharonKeep/boss_dred.cpp
 )
 
 message("  -> Prepared: Northrend")

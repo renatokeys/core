@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,22 +22,16 @@
 
 class ArenaTeamMgr
 {
-private:
+    friend class ACE_Singleton<ArenaTeamMgr, ACE_Null_Mutex>;
     ArenaTeamMgr();
     ~ArenaTeamMgr();
 
 public:
-    static ArenaTeamMgr* instance()
-    {
-        static ArenaTeamMgr instance;
-        return &instance;
-    }
-
-    typedef std::unordered_map<uint32, ArenaTeam*> ArenaTeamContainer;
+    typedef UNORDERED_MAP<uint32, ArenaTeam*> ArenaTeamContainer;
 
     ArenaTeam* GetArenaTeamById(uint32 arenaTeamId) const;
     ArenaTeam* GetArenaTeamByName(std::string const& arenaTeamName) const;
-    ArenaTeam* GetArenaTeamByCaptain(ObjectGuid guid) const;
+    ArenaTeam* GetArenaTeamByCaptain(uint64 guid) const;
 
     void LoadArenaTeams();
     void AddArenaTeam(ArenaTeam* arenaTeam);
@@ -51,11 +45,15 @@ public:
     uint32 GenerateArenaTeamId();
     void SetNextArenaTeamId(uint32 Id) { NextArenaTeamId = Id; }
 
+	uint32 GetNextArenaLogId() { return ++LastArenaLogId; }
+	void SetLastArenaLogId(uint32 id) { LastArenaLogId = id; }
+
 protected:
     uint32 NextArenaTeamId;
     ArenaTeamContainer ArenaTeamStore;
+	uint32 LastArenaLogId;
 };
 
-#define sArenaTeamMgr ArenaTeamMgr::instance()
+#define sArenaTeamMgr ACE_Singleton<ArenaTeamMgr, ACE_Null_Mutex>::instance()
 
 #endif

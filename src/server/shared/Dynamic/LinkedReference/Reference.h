@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -94,10 +94,6 @@ template <class TO, class FROM> class Reference : public LinkedListElement
         TO* getTarget() const { return iRefTo; }
 
         FROM* GetSource() const { return iRefFrom; }
-
-    private:
-        Reference(Reference const&);
-        Reference& operator=(Reference const&);
 };
 
 //=====================================================

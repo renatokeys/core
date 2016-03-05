@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,7 +34,7 @@ EndContentData */
 #include "Player.h"
 #include "SpellInfo.h"
 
-/*######
+/*#####
 ## npc_maghar_captive
 #####*/
 
@@ -69,7 +69,7 @@ class npc_maghar_captive : public CreatureScript
 public:
     npc_maghar_captive() : CreatureScript("npc_maghar_captive") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest)
     {
         if (quest->GetQuestId() == QUEST_TOTEM_KARDASH_H)
         {
@@ -88,7 +88,7 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_maghar_captiveAI(creature);
     }
@@ -101,19 +101,19 @@ public:
         uint32 HealTimer;
         uint32 FrostShockTimer;
 
-        void Reset() override
+        void Reset()
         {
             ChainLightningTimer = 1000;
             HealTimer = 0;
             FrostShockTimer = 6000;
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             DoCast(me, SPELL_EARTHBIND_TOTEM, false);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             if (!HasEscortState(STATE_ESCORT_ESCORTING))
                 return;
@@ -125,7 +125,7 @@ public:
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             switch (waypointId)
             {
@@ -150,7 +150,7 @@ public:
             }
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             if (summoned->GetEntry() == NPC_MURK_BRUTE)
                 summoned->AI()->Talk(SAY_MAG_NO_ESCAPE);
@@ -164,18 +164,18 @@ public:
 
         }
 
-        void SpellHitTarget(Unit* /*target*/, const SpellInfo* spell) override
+        void SpellHitTarget(Unit* /*target*/, const SpellInfo* spell)
         {
             if (spell->Id == SPELL_CHAIN_LIGHTNING)
             {
-                if (rand32() % 10)
+                if (rand()%10)
                     return;
 
                 Talk(SAY_MAG_LIGHTNING);
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             npc_escortAI::UpdateAI(diff);
 
@@ -226,7 +226,7 @@ class npc_creditmarker_visit_with_ancestors : public CreatureScript
 public:
     npc_creditmarker_visit_with_ancestors() : CreatureScript("npc_creditmarker_visit_with_ancestors") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_creditmarker_visit_with_ancestorsAI(creature);
     }
@@ -235,11 +235,11 @@ public:
     {
         npc_creditmarker_visit_with_ancestorsAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Reset() override { }
+        void Reset() { }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
-        void MoveInLineOfSight(Unit* who) override
+        void MoveInLineOfSight(Unit* who)
 
         {
             if (!who)
@@ -290,7 +290,7 @@ class go_corkis_prison : public GameObjectScript
 public:
   go_corkis_prison() : GameObjectScript("go_corkis_prison") { }
 
-  bool OnGossipHello(Player* player, GameObject* go) override
+  bool OnGossipHello(Player* player, GameObject* go)
   {
       go->SetGoState(GO_STATE_READY);
       if (go->GetEntry() == GO_CORKIS_PRISON)
@@ -299,7 +299,7 @@ public:
           {
               corki->GetMotionMaster()->MovePoint(1, go->GetPositionX()+5, go->GetPositionY(), go->GetPositionZ());
               if (player)
-                  player->KilledMonsterCredit(NPC_CORKI_CREDIT_1);
+                  player->KilledMonsterCredit(NPC_CORKI_CREDIT_1, 0);
           }
       }
 
@@ -309,7 +309,7 @@ public:
           {
               corki->GetMotionMaster()->MovePoint(1, go->GetPositionX()-5, go->GetPositionY(), go->GetPositionZ());
               if (player)
-                  player->KilledMonsterCredit(NPC_CORKI_2);
+                  player->KilledMonsterCredit(NPC_CORKI_2, 0);
           }
       }
 
@@ -319,7 +319,7 @@ public:
           {
               corki->GetMotionMaster()->MovePoint(1, go->GetPositionX()+4, go->GetPositionY(), go->GetPositionZ());
               if (player)
-                  player->KilledMonsterCredit(NPC_CORKI_CREDIT_3);
+                  player->KilledMonsterCredit(NPC_CORKI_CREDIT_3, 0);
           }
       }
       return true;
@@ -331,33 +331,25 @@ class npc_corki : public CreatureScript
 public:
   npc_corki() : CreatureScript("npc_corki") { }
 
-  CreatureAI* GetAI(Creature* creature) const override
+  CreatureAI* GetAI(Creature* creature) const
   {
       return new npc_corkiAI(creature);
   }
 
   struct npc_corkiAI : public ScriptedAI
   {
-      npc_corkiAI(Creature* creature) : ScriptedAI(creature)
-      {
-          Initialize();
-      }
+      npc_corkiAI(Creature* creature) : ScriptedAI(creature) { }
 
-      void Initialize()
+      uint32 Say_Timer;
+      bool ReleasedFromCage;
+
+      void Reset()
       {
           Say_Timer = 5000;
           ReleasedFromCage = false;
       }
 
-      uint32 Say_Timer;
-      bool ReleasedFromCage;
-
-      void Reset() override
-      {
-          Initialize();
-      }
-
-      void UpdateAI(uint32 diff) override
+      void UpdateAI(uint32 diff)
       {
           if (ReleasedFromCage)
           {
@@ -371,7 +363,7 @@ public:
           }
       }
 
-      void MovementInform(uint32 type, uint32 id) override
+      void MovementInform(uint32 type, uint32 id)
       {
           if (type == POINT_MOTION_TYPE && id == 1)
           {
@@ -415,7 +407,7 @@ enum KurenaiCaptive
     NPC_KUR_MURK_PUTRIFIER          = 18202,
 };
 
-static float kurenaiAmbushA[]= {-1568.805786f, 8533.873047f, 1.958f};
+static float kurenaiAmbushA[]= {-1520.6f, 8468.4f, -4.1f};
 static float kurenaiAmbushB[]= {-1491.554321f, 8506.483398f, 1.248f};
 
 class npc_kurenai_captive : public CreatureScript
@@ -423,59 +415,51 @@ class npc_kurenai_captive : public CreatureScript
 public:
     npc_kurenai_captive() : CreatureScript("npc_kurenai_captive") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest)
     {
         if (quest->GetQuestId() == QUEST_TOTEM_KARDASH_A)
-        {
-            if (npc_kurenai_captiveAI* EscortAI = dynamic_cast<npc_kurenai_captiveAI*>(creature->AI()))
-            {
-                creature->SetStandState(UNIT_STAND_STATE_STAND);
-                creature->setFaction(231);
-                EscortAI->Start(true, false, player->GetGUID(), quest);
-                creature->AI()->Talk(SAY_KUR_START);
+			creature->AI()->SetGUID(player->GetGUID(), quest->GetQuestId());
 
-                creature->SummonCreature(NPC_KUR_MURK_RAIDER, kurenaiAmbushA[0]+2.5f, kurenaiAmbushA[1]-2.5f, kurenaiAmbushA[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
-                creature->SummonCreature(NPC_KUR_MURK_BRUTE, kurenaiAmbushA[0]-2.5f, kurenaiAmbushA[1]+2.5f, kurenaiAmbushA[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
-                creature->SummonCreature(NPC_KUR_MURK_SCAVENGER, kurenaiAmbushA[0], kurenaiAmbushA[1], kurenaiAmbushA[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
-            }
-        }
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_kurenai_captiveAI(creature);
     }
 
     struct npc_kurenai_captiveAI : public npc_escortAI
     {
-        npc_kurenai_captiveAI(Creature* creature) : npc_escortAI(creature)
-        {
-            Initialize();
-        }
+        npc_kurenai_captiveAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Initialize()
+        uint32 ChainLightningTimer;
+        uint32 HealTimer;
+        uint32 FrostShockTimer;
+
+		void SetGUID(uint64 guid, int32 questId)
+		{
+            me->SetStandState(UNIT_STAND_STATE_STAND);
+            Start(true, false, guid);
+            Talk(SAY_KUR_START);
+
+            me->SummonCreature(NPC_KUR_MURK_RAIDER, kurenaiAmbushA[0]+2.5f, kurenaiAmbushA[1]-2.5f, kurenaiAmbushA[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 50000);
+            me->SummonCreature(NPC_KUR_MURK_BRUTE, kurenaiAmbushA[0]-2.5f, kurenaiAmbushA[1]+2.5f, kurenaiAmbushA[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 50000);
+            me->SummonCreature(NPC_KUR_MURK_SCAVENGER, kurenaiAmbushA[0], kurenaiAmbushA[1], kurenaiAmbushA[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 50000);
+		}
+
+        void Reset()
         {
             ChainLightningTimer = 1000;
             HealTimer = 0;
             FrostShockTimer = 6000;
         }
 
-        uint32 ChainLightningTimer;
-        uint32 HealTimer;
-        uint32 FrostShockTimer;
-
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             DoCast(me, SPELL_KUR_EARTHBIND_TOTEM, false);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             if (!HasEscortState(STATE_ESCORT_ESCORTING))
                 return;
@@ -487,7 +471,7 @@ public:
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             switch (waypointId)
             {
@@ -495,8 +479,8 @@ public:
                 {
                     Talk(SAY_KUR_MORE);
 
-                    if (me->SummonCreature(NPC_KUR_MURK_PUTRIFIER, kurenaiAmbushB[0], kurenaiAmbushB[1], kurenaiAmbushB[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000))
-                        Talk(SAY_KUR_MORE_TWO);
+                    if (Creature* cr = me->SummonCreature(NPC_KUR_MURK_PUTRIFIER, kurenaiAmbushB[0], kurenaiAmbushB[1], kurenaiAmbushB[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000))
+                        cr->AI()->Talk(SAY_KUR_MORE_TWO);
 
                     me->SummonCreature(NPC_KUR_MURK_PUTRIFIER, kurenaiAmbushB[0]-2.5f, kurenaiAmbushB[1]-2.5f, kurenaiAmbushB[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
                     me->SummonCreature(NPC_KUR_MURK_SCAVENGER, kurenaiAmbushB[0]+2.5f, kurenaiAmbushB[1]+2.5f, kurenaiAmbushB[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
@@ -516,25 +500,23 @@ public:
             }
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             if (summoned->GetEntry() == NPC_KUR_MURK_BRUTE)
-                Talk(SAY_KUR_NO_ESCAPE);
+                summoned->AI()->Talk(SAY_KUR_NO_ESCAPE);
 
             // This function is for when we summoned enemies to fight - so that does NOT mean we should make our totem count in this!
             if (summoned->IsTotem())
                 return;
 
-            summoned->SetWalk(false);
-            summoned->GetMotionMaster()->MovePoint(0, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
             summoned->AI()->AttackStart(me);
         }
 
-        void SpellHitTarget(Unit* /*target*/, const SpellInfo* spell) override
+        void SpellHitTarget(Unit* /*target*/, const SpellInfo* spell)
         {
             if (spell->Id == SPELL_KUR_CHAIN_LIGHTNING)
             {
-                if (rand32() % 30)
+                if (rand()%30)
                     return;
 
                 Talk(SAY_KUR_LIGHTNING);
@@ -542,17 +524,15 @@ public:
 
             if (spell->Id == SPELL_KUR_FROST_SHOCK)
             {
-                if (rand32() % 30)
+                if (rand()%30)
                     return;
 
                 Talk(SAY_KUR_SHOCK);
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateEscortAI(uint32 diff)
         {
-            npc_escortAI::UpdateAI(diff);
-
             if (!UpdateVictim())
                 return;
 
@@ -602,7 +582,7 @@ class go_warmaul_prison : public GameObjectScript
     public:
         go_warmaul_prison() : GameObjectScript("go_warmaul_prison") { }
 
-        bool OnGossipHello(Player* player, GameObject* go) override
+        bool OnGossipHello(Player* player, GameObject* go)
         {
             go->UseDoorOrButton();
             if (player->GetQuestStatus(QUEST_FINDING_THE_SURVIVORS) != QUEST_STATUS_INCOMPLETE)
@@ -610,7 +590,7 @@ class go_warmaul_prison : public GameObjectScript
 
             if (Creature* prisoner = go->FindNearestCreature(NPC_MAGHAR_PRISONER, 5.0f))
             {
-                player->KilledMonsterCredit(NPC_MAGHAR_PRISONER);
+                player->KilledMonsterCredit(NPC_MAGHAR_PRISONER, 0);
 
                 prisoner->AI()->Talk(SAY_FREE, player);
                 prisoner->DespawnOrUnsummon(6000);

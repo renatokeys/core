@@ -12,7 +12,7 @@ libmpq_includedir		= $(includedir)/libmpq
 libmpq_include_HEADERS		= mpq.h
 
 libmpq_la_SOURCES		= $(GENERAL_SRCS)
-libmpq_la_LDFLAGS		= -version-info @LIBMPQ_ABI@
+libmpq_la_LDFLAGS		= -release $(PACKAGE_VERSION)
 
 GENERAL_SRCS =			\
 	common.c		\

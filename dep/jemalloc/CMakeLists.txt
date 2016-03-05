@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -53,7 +53,6 @@ set(jemalloc_STAT_SRC
 include_directories(
   ${BUILDDIR}/
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${VALGRIND_INCLUDE_DIR}
 )
 
 add_definitions(-D_GNU_SOURCE -D_REENTRANT)

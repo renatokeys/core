@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -164,22 +164,17 @@ public:
 
     struct boss_rend_blackhandAI : public BossAI
     {
-        boss_rend_blackhandAI(Creature* creature) : BossAI(creature, DATA_WARCHIEF_REND_BLACKHAND)
-        {
-            gythEvent = false;
-            victorGUID.Clear();
-            portcullisGUID.Clear();
-        }
+        boss_rend_blackhandAI(Creature* creature) : BossAI(creature, DATA_WARCHIEF_REND_BLACKHAND) { }
 
-        void Reset() override
+        void Reset()
         {
             _Reset();
             gythEvent = false;
-            victorGUID.Clear();
-            portcullisGUID.Clear();
+            victorGUID = 0;
+            portcullisGUID = 0;
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             _EnterCombat();
             events.ScheduleEvent(EVENT_WHIRLWIND,     urand(13000, 15000));
@@ -187,14 +182,14 @@ public:
             events.ScheduleEvent(EVENT_MORTAL_STRIKE, urand(17000, 19000));
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             _JustDied();
             if (Creature* victor = me->FindNearestCreature(NPC_LORD_VICTOR_NEFARIUS, 75.0f, true))
                 victor->AI()->SetData(1, 2);
         }
 
-        void SetData(uint32 type, uint32 data) override
+        void SetData(uint32 type, uint32 data)
         {
             if (type == AREATRIGGER && data == AREATRIGGER_BLACKROCK_STADIUM)
             {
@@ -214,7 +209,7 @@ public:
             }
         }
 
-        void MovementInform(uint32 type, uint32 id) override
+        void MovementInform(uint32 type, uint32 id)
         {
             if (type == WAYPOINT_MOTION_TYPE)
             {
@@ -232,7 +227,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (gythEvent)
             {
@@ -437,11 +432,11 @@ public:
 
         private:
             bool   gythEvent;
-            ObjectGuid victorGUID;
-            ObjectGuid portcullisGUID;
+            uint64 victorGUID;
+            uint64 portcullisGUID;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_rend_blackhandAI>(creature);
     }

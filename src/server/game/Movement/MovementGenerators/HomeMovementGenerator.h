@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -31,17 +31,19 @@ class HomeMovementGenerator<Creature> : public MovementGeneratorMedium< Creature
 {
     public:
 
-        HomeMovementGenerator() : arrived(false) { }
-        ~HomeMovementGenerator() { }
+        HomeMovementGenerator() : arrived(false), i_recalculateTravel(false) {}
+        ~HomeMovementGenerator() {}
 
         void DoInitialize(Creature*);
         void DoFinalize(Creature*);
         void DoReset(Creature*);
         bool DoUpdate(Creature*, const uint32);
-        MovementGeneratorType GetMovementGeneratorType() const override { return HOME_MOTION_TYPE; }
+        MovementGeneratorType GetMovementGeneratorType() { return HOME_MOTION_TYPE; }
+        void unitSpeedChanged() { i_recalculateTravel = true; }
 
     private:
         void _setTargetLocation(Creature*);
-        bool arrived;
+        bool arrived : 1;
+        bool i_recalculateTravel : 1;
 };
 #endif

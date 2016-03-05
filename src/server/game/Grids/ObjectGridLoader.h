@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,12 +34,12 @@ class ObjectGridLoader
     public:
         ObjectGridLoader(NGridType &grid, Map* map, const Cell &cell)
             : i_cell(cell), i_grid(grid), i_map(map), i_gameObjects(0), i_creatures(0), i_corpses (0)
-            { }
+            {}
 
         void Visit(GameObjectMapType &m);
         void Visit(CreatureMapType &m);
-        void Visit(CorpseMapType &) const { }
-        void Visit(DynamicObjectMapType&) const { }
+        void Visit(CorpseMapType &) const {}
+        void Visit(DynamicObjectMapType&) const {}
 
         void LoadN(void);
 
@@ -54,23 +54,6 @@ class ObjectGridLoader
         uint32 i_corpses;
 };
 
-//Stop the creatures before unloading the NGrid
-class ObjectGridStoper
-{
-    public:
-        void Visit(CreatureMapType &m);
-        template<class T> void Visit(GridRefManager<T> &) { }
-};
-
-//Move the foreign creatures back to respawn positions before unloading the NGrid
-class ObjectGridEvacuator
-{
-    public:
-        void Visit(CreatureMapType &m);
-        void Visit(GameObjectMapType &m);
-        template<class T> void Visit(GridRefManager<T> &) { }
-};
-
 //Clean up and remove from world
 class ObjectGridCleaner
 {
@@ -82,7 +65,6 @@ class ObjectGridCleaner
 class ObjectGridUnloader
 {
     public:
-        void Visit(CorpseMapType& /*m*/) { }    // corpses are deleted with Map
         template<class T> void Visit(GridRefManager<T> &m);
 };
 #endif

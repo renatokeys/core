@@ -1,31 +1,19 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY PUSSYWIZARD, IT OWNS NOW!
+*/
 
 #ifndef ICECROWN_CITADEL_H_
 #define ICECROWN_CITADEL_H_
 
 #include "SpellScript.h"
+#include "Map.h"
+#include "Creature.h"
+#include "SpellMgr.h"
 
 #define ICCScriptName "instance_icecrown_citadel"
-#define DataHeader    "IC"
 
-uint32 const EncounterCount = 13;
 uint32 const WeeklyNPCs = 9;
-uint32 const MaxHeroicAttempts = 50;
+uint32 const MaxHeroicAttempts = 25;
 
 // Defined in boss_valithria_dreamwalker.cpp
 extern Position const ValithriaSpawnPos;
@@ -54,8 +42,14 @@ enum SharedSpells
     SPELL_FROSTMOURNE_TELEPORT_VISUAL   = 73078,
 
     // Shadowmourne questline
-    SPELL_UNSATED_CRAVING               = 71168,
-    SPELL_SHADOWS_FATE                  = 71169
+	SPELL_UNSATED_CRAVING               = 71168,
+    SPELL_SHADOWS_FATE                  = 71169,
+
+	// Misc
+	SPELL_WEB_BEAM						= 69887,
+	SPELL_WEB_BEAM2						= 69986,
+	SPELL_GIANT_INSECT_SWARM			= 70475,
+	SPELL_LEAP_TO_A_RANDOM_LOCATION		= 70485
 };
 
 enum TeleporterSpells
@@ -66,57 +60,68 @@ enum TeleporterSpells
     DEATHBRINGER_S_RISE_TELEPORT    = 70858,
     UPPER_SPIRE_TELEPORT            = 70859,
     FROZEN_THRONE_TELEPORT          = 70860,
-    SINDRAGOSA_S_LAIR_TELEPORT      = 70861
+    SINDRAGOSA_S_LAIR_TELEPORT      = 70861,
 };
 
 enum DataTypes
 {
     // Encounter States/Boss GUIDs
-    DATA_LORD_MARROWGAR                = 0,
-    DATA_LADY_DEATHWHISPER             = 1,
-    DATA_ICECROWN_GUNSHIP_BATTLE       = 2,
-    DATA_DEATHBRINGER_SAURFANG         = 3,
-    DATA_FESTERGUT                     = 4,
-    DATA_ROTFACE                       = 5,
-    DATA_PROFESSOR_PUTRICIDE           = 6,
-    DATA_BLOOD_PRINCE_COUNCIL          = 7,
-    DATA_BLOOD_QUEEN_LANA_THEL         = 8,
-    DATA_SISTER_SVALNA                 = 9,
-    DATA_VALITHRIA_DREAMWALKER         = 10,
-    DATA_SINDRAGOSA                    = 11,
-    DATA_THE_LICH_KING                 = 12,
+    DATA_LORD_MARROWGAR             = 0,
+    DATA_LADY_DEATHWHISPER          = 1,
+    DATA_ICECROWN_GUNSHIP_BATTLE    = 2,
+    DATA_DEATHBRINGER_SAURFANG      = 3,
+    DATA_FESTERGUT                  = 4,
+    DATA_ROTFACE                    = 5,
+    DATA_PROFESSOR_PUTRICIDE        = 6,
+    DATA_BLOOD_PRINCE_COUNCIL       = 7,
+    DATA_BLOOD_QUEEN_LANA_THEL      = 8,
+    DATA_SISTER_SVALNA              = 9,
+    DATA_VALITHRIA_DREAMWALKER      = 10,
+    DATA_SINDRAGOSA                 = 11,
+    DATA_THE_LICH_KING              = 12,
+	DATA_SINDRAGOSA_GAUNTLET		= 13,
+	DATA_BLOOD_PRINCE_TRASH			= 14,
+	MAX_ENCOUNTERS					= 15,
 
     // Additional data
-    DATA_SAURFANG_EVENT_NPC            = 13,
-    DATA_BONED_ACHIEVEMENT             = 14,
-    DATA_OOZE_DANCE_ACHIEVEMENT        = 15,
-    DATA_PUTRICIDE_TABLE               = 16,
-    DATA_NAUSEA_ACHIEVEMENT            = 17,
-    DATA_ORB_WHISPERER_ACHIEVEMENT     = 18,
-    DATA_PRINCE_KELESETH_GUID          = 19,
-    DATA_PRINCE_TALDARAM_GUID          = 20,
-    DATA_PRINCE_VALANAR_GUID           = 21,
-    DATA_BLOOD_PRINCES_CONTROL         = 22,
-    DATA_SINDRAGOSA_FROSTWYRMS         = 23,
-    DATA_SPINESTALKER                  = 24,
-    DATA_RIMEFANG                      = 25,
-    DATA_COLDFLAME_JETS                = 26,
-    DATA_TEAM_IN_INSTANCE              = 27,
-    DATA_BLOOD_QUICKENING_STATE        = 28,
-    DATA_HEROIC_ATTEMPTS               = 29,
-    DATA_CROK_SCOURGEBANE              = 30,
-    DATA_CAPTAIN_ARNATH                = 31,
-    DATA_CAPTAIN_BRANDON               = 32,
-    DATA_CAPTAIN_GRONDEL               = 33,
-    DATA_CAPTAIN_RUPERT                = 34,
-    DATA_VALITHRIA_TRIGGER             = 35,
-    DATA_VALITHRIA_LICH_KING           = 36,
-    DATA_HIGHLORD_TIRION_FORDRING      = 37,
-    DATA_ARTHAS_PLATFORM               = 38,
-    DATA_TERENAS_MENETHIL              = 39,
-    DATA_ENEMY_GUNSHIP                 = 40,
-    DATA_UPPERSPIRE_TELE_ACT           = 41, /// also used by conditions
-    DATA_BLOOD_QUEEN_LANA_THEL_COUNCIL = 42
+    DATA_SAURFANG_EVENT_NPC         = 13,
+    DATA_BONED_ACHIEVEMENT          = 14,
+    DATA_OOZE_DANCE_ACHIEVEMENT     = 15,
+    DATA_PUTRICIDE_TABLE            = 16,
+    DATA_NAUSEA_ACHIEVEMENT         = 17,
+    DATA_ORB_WHISPERER_ACHIEVEMENT  = 18,
+    DATA_PRINCE_KELESETH_GUID       = 19,
+    DATA_PRINCE_TALDARAM_GUID       = 20,
+    DATA_PRINCE_VALANAR_GUID        = 21,
+    DATA_BLOOD_PRINCES_CONTROL      = 22,
+    DATA_SINDRAGOSA_FROSTWYRMS      = 23,
+    DATA_SPINESTALKER               = 24,
+    DATA_RIMEFANG                   = 25,
+    DATA_COLDFLAME_JETS             = 26,
+    DATA_TEAMID_IN_INSTANCE         = 27,
+    DATA_BLOOD_QUICKENING_STATE     = 28,
+    DATA_HEROIC_ATTEMPTS            = 29,
+    DATA_CROK_SCOURGEBANE           = 30,
+    DATA_CAPTAIN_ARNATH             = 31,
+    DATA_CAPTAIN_BRANDON            = 32,
+    DATA_CAPTAIN_GRONDEL            = 33,
+    DATA_CAPTAIN_RUPERT             = 34,
+    DATA_VALITHRIA_TRIGGER          = 35,
+    DATA_VALITHRIA_LICH_KING        = 36,
+    DATA_HIGHLORD_TIRION_FORDRING   = 37,
+    DATA_ARTHAS_PLATFORM            = 38,
+    DATA_TERENAS_MENETHIL           = 39,
+    DATA_ENEMY_GUNSHIP              = 40,
+
+	// pussywizard:
+	DATA_BUFF_AVAILABLE				= 251,
+	DATA_WEEKLY_QUEST_ID			= 252,
+	// NONE							= 253,
+	DATA_PUTRICIDE_TRAP_STATE       = 254,
+	DATA_HAS_LIMITED_ATTEMPTS       = 255,
+	DATA_LK_HC_AVAILABLE            = 256,
+
+	DATA_BPC_TRASH_DIED				= 300,
 };
 
 enum CreaturesIds
@@ -142,6 +147,8 @@ enum CreaturesIds
     NPC_GARROSH_HELLSCREAM                      = 39372,
     NPC_KING_VARIAN_WRYNN                       = 39371,
     NPC_DEATHBOUND_WARD                         = 37007,
+	NPC_HIGH_OVERLORD_SAURFANG_DUMMY            = 32315,
+	NPC_MURADIN_BRONZEBEARD_DUMMY               = 38607,
     NPC_LADY_JAINA_PROUDMOORE_QUEST             = 38606,
     NPC_MURADIN_BRONZEBEARD_QUEST               = 38607,
     NPC_UTHER_THE_LIGHTBRINGER_QUEST            = 38608,
@@ -156,7 +163,7 @@ enum CreaturesIds
     NPC_ALCHEMIST_ADRIANNA                      = 38501,
     NPC_ALRIN_THE_AGILE                         = 38551,
     NPC_INFILTRATOR_MINCHAR_BQ                  = 38558,
-    NPC_INFILTRATOR_MINCHAR_BQ_25               = 39123,
+    NPC_BLOOD_QUICKENING_CREDIT_25              = 39123,
     NPC_MINCHAR_BEAM_STALKER                    = 38557,
     NPC_VALITHRIA_DREAMWALKER_QUEST             = 38589,
 
@@ -174,6 +181,9 @@ enum CreaturesIds
     NPC_EMPOWERED_ADHERENT                      = 38136,
     NPC_REANIMATED_ADHERENT                     = 38010,
     NPC_VENGEFUL_SHADE                          = 38222,
+
+    NPC_DEATHSPEAKER_SERVANT                    = 36805,
+	NPC_RISEN_DEATHSPEAKER_SERVANT              = 36844,
 
     // Icecrown Gunship Battle
     NPC_MARTYR_STALKER_IGB_SAURFANG             = 38569,
@@ -216,14 +226,12 @@ enum CreaturesIds
     // Festergut
     NPC_FESTERGUT                               = 36626,
     NPC_GAS_DUMMY                               = 36659,
-    NPC_MALLEABLE_OOZE_STALKER                  = 38556,
 
     // Rotface
     NPC_ROTFACE                                 = 36627,
     NPC_OOZE_SPRAY_STALKER                      = 37986,
     NPC_PUDDLE_STALKER                          = 37013,
     NPC_UNSTABLE_EXPLOSION_STALKER              = 38107,
-    NPC_VILE_GAS_STALKER                        = 38548,
 
     // Professor Putricide
     NPC_PROFESSOR_PUTRICIDE                     = 36678,
@@ -248,7 +256,6 @@ enum CreaturesIds
     NPC_KINETIC_BOMB_TARGET                     = 38458,
     NPC_KINETIC_BOMB                            = 38454,
     NPC_SHOCK_VORTEX                            = 38422,
-    NPC_BLOOD_QUEEN_LANA_THEL_COUNCIL           = 38004,
 
     // Blood-Queen Lana'thel
     NPC_BLOOD_QUEEN_LANA_THEL                   = 37955,
@@ -282,7 +289,7 @@ enum CreaturesIds
     NPC_MANA_VOID                               = 38068,
     NPC_COLUMN_OF_FROST                         = 37918,
     NPC_ROT_WORM                                = 37907,
-    NPC_THE_LICH_KING_VALITHRIA                 = 16980,
+    NPC_THE_LICH_KING_VALITHRIA                 = 38153,
     NPC_DREAM_PORTAL_PRE_EFFECT                 = 38186,
     NPC_NIGHTMARE_PORTAL_PRE_EFFECT             = 38429,
     NPC_DREAM_PORTAL                            = 37945,
@@ -298,6 +305,18 @@ enum CreaturesIds
     NPC_FROST_BOMB                              = 37186,
     NPC_ICE_TOMB                                = 36980,
 
+	// Sindragosa Gauntlet
+	NPC_SINDRAGOSA_GAUNTLET						= 37503,
+	NPC_NERUBAR_CHAMPION						= 37501,
+	NPC_NERUBAR_WEBWEAVER						= 37502,
+	NPC_NERUBAR_BROODLING						= 37232,
+	NPC_FROSTWARDEN_SORCERESS					= 37229,
+	NPC_FROSTWARDEN_WARRIOR						= 37228,
+
+	// Putricade Trap
+	NPC_PUTRICADES_TRAP							= 38879,
+	NPC_FLASH_EATING_INSECT						= 37782,
+
     // The Lich King
     NPC_THE_LICH_KING                           = 36597,
     NPC_HIGHLORD_TIRION_FORDRING_LK             = 38995,
@@ -309,6 +328,7 @@ enum CreaturesIds
     NPC_ICE_SPHERE                              = 36633,
     NPC_RAGING_SPIRIT                           = 36701,
     NPC_DEFILE                                  = 38757,
+    NPC_SHADOW_TRAP_TRIGGER                     = 39137,
     NPC_VALKYR_SHADOWGUARD                      = 36609,
     NPC_VILE_SPIRIT                             = 37799,
     NPC_WICKED_SPIRIT                           = 39190,
@@ -317,27 +337,25 @@ enum CreaturesIds
     NPC_WORLD_TRIGGER_INFINITE_AOI              = 36171,
     NPC_SPIRIT_BOMB                             = 39189,
     NPC_FROSTMOURNE_TRIGGER                     = 38584,
-
+    NPC_TERENAS_MENETHIL_OUTRO                  = 38579,
+	
     // Generic
-    NPC_INVISIBLE_STALKER                       = 30298
+    NPC_INVISIBLE_STALKER                       = 30298,
+    NPC_SPIRE_FROSTWYRM                         = 37230,
+    NPC_VENGEFUL_FLESHREAPER                    = 37038,
 };
 
 enum GameObjectsIds
 {
-    // ICC Teleporters
-    GO_SCOURGE_TRANSPORTER_LICHKING         = 202223,
-    GO_SCOURGE_TRANSPORTER_UPPERSPIRE       = 202235,
-    GO_SCOURGE_TRANSPORTER_LIGHTSHAMMER     = 202242,
-    GO_SCOURGE_TRANSPORTER_RAMPART          = 202243,
-    GO_SCOURGE_TRANSPORTER_DEATHBRINGER     = 202244,
-    GO_SCOURGE_TRANSPORTER_ORATORY          = 202245,
-    GO_SCOURGE_TRANSPORTER_SINDRAGOSA       = 202246,
+    GO_SCOURGE_TRANSPORTER_FIRST            = 202242,
 
-    // Lower Spire Trash
+    // Traps
     GO_SPIRIT_ALARM_1                       = 201814,
     GO_SPIRIT_ALARM_2                       = 201815,
     GO_SPIRIT_ALARM_3                       = 201816,
     GO_SPIRIT_ALARM_4                       = 201817,
+    GO_GEIST_ALARM_1                        = 201888,
+    GO_GEIST_ALARM_2                        = 201889,
 
     // Lord Marrogar
     GO_DOODAD_ICECROWN_ICEWALL02            = 201910,
@@ -347,7 +365,7 @@ enum GameObjectsIds
     // Lady Deathwhisper
     GO_ORATORY_OF_THE_DAMNED_ENTRANCE       = 201563,
     GO_LADY_DEATHWHISPER_ELEVATOR           = 202220,
-
+  
     // Icecrown Gunship Battle - Horde raid
     GO_ORGRIMS_HAMMER_H                     = 201812,
     GO_THE_SKYBREAKER_H                     = 201811,
@@ -370,6 +388,7 @@ enum GameObjectsIds
     GO_DEATHBRINGER_S_CACHE_25N             = 202240,
     GO_DEATHBRINGER_S_CACHE_10H             = 202238,
     GO_DEATHBRINGER_S_CACHE_25H             = 202241,
+    GO_SCOURGE_TRANSPORTER_SAURFANG         = 202244,
 
     // Professor Putricide
     GO_ORANGE_PLAGUE_MONSTER_ENTRANCE       = 201371,
@@ -382,6 +401,8 @@ enum GameObjectsIds
     GO_SCIENTIST_ENTRANCE                   = 201372,
     GO_DRINK_ME                             = 201584,
     GO_PLAGUE_SIGIL                         = 202182,
+    GO_GAS_RELEASE_VALVE                    = 201616,
+    GO_OOZE_RELEASE_VALVE                   = 201615,
 
     // Blood Prince Council
     GO_CRIMSON_HALL_DOOR                    = 201376,
@@ -414,6 +435,7 @@ enum GameObjectsIds
     GO_SIGIL_OF_THE_FROSTWING               = 202181,
 
     // The Lich King
+    GO_SCOURGE_TRANSPORTER_LK               = 202223,
     GO_ARTHAS_PLATFORM                      = 202161,
     GO_ARTHAS_PRECIPICE                     = 202078,
     GO_DOODAD_ICECROWN_THRONEFROSTYWIND01   = 202188,
@@ -425,7 +447,7 @@ enum GameObjectsIds
     GO_DOODAD_ICECROWN_SNOWEDGEWARNING01    = 202190,
     GO_FROZEN_LAVAMAN                       = 202436,
     GO_LAVAMAN_PILLARS_CHAINED              = 202437,
-    GO_LAVAMAN_PILLARS_UNCHAINED            = 202438
+    GO_LAVAMAN_PILLARS_UNCHAINED            = 202438,
 };
 
 enum AchievementCriteriaIds
@@ -457,10 +479,6 @@ enum AchievementCriteriaIds
     // Blood-Queen Lana'thel
     CRITERIA_KILL_LANA_THEL_10M         = 13340,
     CRITERIA_KILL_LANA_THEL_25M         = 13360,
-    CRITERIA_ONCE_BITTEN_TWICE_SHY_10N  = 12780,
-    CRITERIA_ONCE_BITTEN_TWICE_SHY_25N  = 13012,
-    CRITERIA_ONCE_BITTEN_TWICE_SHY_10V  = 13011,
-    CRITERIA_ONCE_BITTEN_TWICE_SHY_25V  = 13013
 };
 
 enum SharedActions
@@ -488,11 +506,10 @@ enum SharedActions
 
     // Sindragosa
     ACTION_START_FROSTWYRM      = -368530,
-    ACTION_TRIGGER_ASPHYXIATION = -368531,
 
     // The Lich King
     ACTION_RESTORE_LIGHT        = -72262,
-    ACTION_FROSTMOURNE_INTRO    = -36823
+    ACTION_FROSTMOURNE_INTRO    = -36823,
 };
 
 enum WeekliesICC
@@ -505,8 +522,13 @@ enum WeekliesICC
     QUEST_RESIDUE_RENDEZVOUS_25             = 24878,
     QUEST_BLOOD_QUICKENING_10               = 24874,
     QUEST_BLOOD_QUICKENING_25               = 24879,
-    QUEST_RESPITE_FOR_A_TORNMENTED_SOUL_10  = 24872,
-    QUEST_RESPITE_FOR_A_TORNMENTED_SOUL_25  = 24880
+    QUEST_RESPITE_FOR_A_TORMENTED_SOUL_10   = 24872,
+    QUEST_RESPITE_FOR_A_TORMENTED_SOUL_25   = 24880,
+};
+
+enum QuestsICC
+{
+	QUEST_A_FEAST_OF_SOULS					= 24547
 };
 
 enum WorldStatesICC
@@ -515,30 +537,36 @@ enum WorldStatesICC
     WORLDSTATE_EXECUTION_TIME       = 4904,
     WORLDSTATE_SHOW_ATTEMPTS        = 4940,
     WORLDSTATE_ATTEMPTS_REMAINING   = 4941,
-    WORLDSTATE_ATTEMPTS_MAX         = 4942
+    WORLDSTATE_ATTEMPTS_MAX         = 4942,
+};
+
+enum PutricideEventFlags
+{
+	PUTRICIDE_EVENT_FLAG_FESTERGUT_VALVE	= 1,
+	PUTRICIDE_EVENT_FLAG_ROTFACE_VALVE		= 2,
+	PUTRICIDE_EVENT_FLAG_TRAP_INPROGRESS	= 4,
+	PUTRICIDE_EVENT_FLAG_TRAP_FINISHED		= 8,
 };
 
 enum AreaIds
 {
     AREA_ICECROWN_CITADEL   = 4812,
-    AREA_THE_FROZEN_THRONE  = 4859
+    AREA_THE_FROZEN_THRONE  = 4859,
 };
 
 class spell_trigger_spell_from_caster : public SpellScriptLoader
 {
     public:
-        spell_trigger_spell_from_caster(char const* scriptName, uint32 triggerId, TriggerCastFlags triggerFlags = TRIGGERED_FULL_MASK)
-            : SpellScriptLoader(scriptName), _triggerId(triggerId), _triggerFlags(triggerFlags) { }
+        spell_trigger_spell_from_caster(char const* scriptName, uint32 triggerId) : SpellScriptLoader(scriptName), _triggerId(triggerId) { }
 
         class spell_trigger_spell_from_caster_SpellScript : public SpellScript
         {
             PrepareSpellScript(spell_trigger_spell_from_caster_SpellScript);
 
         public:
-            spell_trigger_spell_from_caster_SpellScript(uint32 triggerId, TriggerCastFlags triggerFlags)
-                : SpellScript(), _triggerId(triggerId), _triggerFlags(triggerFlags) { }
+            spell_trigger_spell_from_caster_SpellScript(uint32 triggerId) : SpellScript(), _triggerId(triggerId) { }
 
-            bool Validate(SpellInfo const* /*spell*/) override
+            bool Validate(SpellInfo const* /*spell*/)
             {
                 if (!sSpellMgr->GetSpellInfo(_triggerId))
                     return false;
@@ -547,32 +575,34 @@ class spell_trigger_spell_from_caster : public SpellScriptLoader
 
             void HandleTrigger()
             {
-                GetCaster()->CastSpell(GetHitUnit(), _triggerId, _triggerFlags);
+                GetCaster()->CastSpell(GetHitUnit(), _triggerId, true);
             }
 
-            void Register() override
+            void Register()
             {
                 AfterHit += SpellHitFn(spell_trigger_spell_from_caster_SpellScript::HandleTrigger);
             }
 
             uint32 _triggerId;
-            TriggerCastFlags _triggerFlags;
         };
 
-        SpellScript* GetSpellScript() const override
+        SpellScript* GetSpellScript() const
         {
-            return new spell_trigger_spell_from_caster_SpellScript(_triggerId, _triggerFlags);
+            return new spell_trigger_spell_from_caster_SpellScript(_triggerId);
         }
 
     private:
         uint32 _triggerId;
-        TriggerCastFlags _triggerFlags;
 };
 
-template<class AI, class T>
-inline AI* GetIcecrownCitadelAI(T* obj)
+template<class AI>
+CreatureAI* GetIcecrownCitadelAI(Creature* creature)
 {
-    return GetInstanceAI<AI>(obj, ICCScriptName);
+    if (InstanceMap* instance = creature->GetMap()->ToInstanceMap())
+        if (instance->GetInstanceScript())
+            if (instance->GetScriptId() == sObjectMgr->GetScriptId(ICCScriptName))
+                return new AI(creature);
+    return NULL;
 }
 
 #endif // ICECROWN_CITADEL_H_

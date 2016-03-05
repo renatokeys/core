@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -38,7 +38,33 @@ EndContentData */
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "Player.h"
+#include "SpellMgr.h"
 
+// Ours
+class AreaTrigger_at_voltarus_middle : public AreaTriggerScript
+{
+    public:
+
+        AreaTrigger_at_voltarus_middle()
+            : AreaTriggerScript("at_voltarus_middle")
+        {
+        }
+
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/)
+        {
+            if (player->IsAlive() && !player->IsInCombat())
+                if (player->HasItemCount(39319)) // Scepter of Domination
+				{
+					player->TeleportTo(571, 6242.67f, -1972.10f, 484.783f, 0.6f);
+					return true;
+				}
+
+            return false;
+        }
+};
+
+
+// Theirs
 /*######
 ## at_coilfang_waterfall
 ######*/
@@ -51,9 +77,13 @@ enum CoilfangGOs
 class AreaTrigger_at_coilfang_waterfall : public AreaTriggerScript
 {
     public:
-        AreaTrigger_at_coilfang_waterfall() : AreaTriggerScript("at_coilfang_waterfall") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
+        AreaTrigger_at_coilfang_waterfall()
+            : AreaTriggerScript("at_coilfang_waterfall")
+        {
+        }
+
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/)
         {
             if (GameObject* go = GetClosestGameObjectWithEntry(player, GO_COILFANG_WATERFALL, 35.0f))
                 if (go->getLootState() == GO_READY)
@@ -79,19 +109,23 @@ enum LegionTeleporter
 class AreaTrigger_at_legion_teleporter : public AreaTriggerScript
 {
     public:
-        AreaTrigger_at_legion_teleporter() : AreaTriggerScript("at_legion_teleporter") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
+        AreaTrigger_at_legion_teleporter()
+            : AreaTriggerScript("at_legion_teleporter")
+        {
+        }
+
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/)
         {
             if (player->IsAlive() && !player->IsInCombat())
             {
-                if (player->GetTeam() == ALLIANCE && player->GetQuestRewardStatus(QUEST_GAINING_ACCESS_A))
+                if (player->GetTeamId() == TEAM_ALLIANCE && player->GetQuestRewardStatus(QUEST_GAINING_ACCESS_A))
                 {
                     player->CastSpell(player, SPELL_TELE_A_TO, false);
                     return true;
                 }
 
-                if (player->GetTeam() == HORDE && player->GetQuestRewardStatus(QUEST_GAINING_ACCESS_H))
+                if (player->GetTeamId() == TEAM_HORDE && player->GetQuestRewardStatus(QUEST_GAINING_ACCESS_H))
                 {
                     player->CastSpell(player, SPELL_TELE_H_TO, false);
                     return true;
@@ -117,9 +151,13 @@ enum StormwrightShelf
 class AreaTrigger_at_stormwright_shelf : public AreaTriggerScript
 {
     public:
-        AreaTrigger_at_stormwright_shelf() : AreaTriggerScript("at_stormwright_shelf") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
+        AreaTrigger_at_stormwright_shelf()
+            : AreaTriggerScript("at_stormwright_shelf")
+        {
+        }
+
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/)
         {
             if (!player->isDead() && player->GetQuestStatus(QUEST_STRENGTH_OF_THE_TEMPEST) == QUEST_STATUS_INCOMPLETE)
                 player->CastSpell(player, SPELL_CREATE_TRUE_POWER_OF_THE_TEMPEST, false);
@@ -141,9 +179,13 @@ enum ScentLarkorwi
 class AreaTrigger_at_scent_larkorwi : public AreaTriggerScript
 {
     public:
-        AreaTrigger_at_scent_larkorwi() : AreaTriggerScript("at_scent_larkorwi") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
+        AreaTrigger_at_scent_larkorwi()
+            : AreaTriggerScript("at_scent_larkorwi")
+        {
+        }
+
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/)
         {
             if (!player->isDead() && player->GetQuestStatus(QUEST_SCENT_OF_LARKORWI) == QUEST_STATUS_INCOMPLETE)
             {
@@ -168,14 +210,18 @@ enum AtLastRites
 class AreaTrigger_at_last_rites : public AreaTriggerScript
 {
     public:
-        AreaTrigger_at_last_rites() : AreaTriggerScript("at_last_rites") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger) override
+        AreaTrigger_at_last_rites()
+            : AreaTriggerScript("at_last_rites")
         {
-            if (!(player->GetQuestStatus(QUEST_LAST_RITES) == QUEST_STATUS_INCOMPLETE ||
-                player->GetQuestStatus(QUEST_LAST_RITES) == QUEST_STATUS_COMPLETE ||
-                player->GetQuestStatus(QUEST_BREAKING_THROUGH) == QUEST_STATUS_INCOMPLETE ||
-                player->GetQuestStatus(QUEST_BREAKING_THROUGH) == QUEST_STATUS_COMPLETE))
+        }
+
+        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger)
+        {
+			QuestStatus QLR = player->GetQuestStatus(QUEST_LAST_RITES);
+			QuestStatus QBT = player->GetQuestStatus(QUEST_BREAKING_THROUGH);
+            if (!(QLR == QUEST_STATUS_INCOMPLETE || QLR  == QUEST_STATUS_COMPLETE ||
+                  QBT == QUEST_STATUS_INCOMPLETE || QBT == QUEST_STATUS_COMPLETE))
                 return false;
 
             WorldLocation pPosition;
@@ -184,17 +230,17 @@ class AreaTrigger_at_last_rites : public AreaTriggerScript
             {
                 case 5332:
                 case 5338:
+                case 5339:
                     pPosition = WorldLocation(571, 3733.68f, 3563.25f, 290.812f, 3.665192f);
                     break;
                 case 5334:
                     pPosition = WorldLocation(571, 3802.38f, 3585.95f, 49.5765f, 0.0f);
                     break;
                 case 5340:
-                    if (player->GetQuestStatus(QUEST_LAST_RITES) == QUEST_STATUS_INCOMPLETE ||
-                        player->GetQuestStatus(QUEST_LAST_RITES) == QUEST_STATUS_COMPLETE)
-                        pPosition = WorldLocation(571, 3687.91f, 3577.28f, 473.342f);
-                    else
-                        pPosition = WorldLocation(571, 3739.38f, 3567.09f, 341.58f);
+					if (QBT == QUEST_STATUS_INCOMPLETE)
+						pPosition = WorldLocation(571, 3758, 3562, 345.51f, 0.0f);
+					else
+						pPosition = WorldLocation(571, 3687.91f, 3577.28f, 473.342f, 0.0f);
                     break;
                 default:
                     return false;
@@ -226,9 +272,10 @@ enum Waygate
 class AreaTrigger_at_sholazar_waygate : public AreaTriggerScript
 {
     public:
+
         AreaTrigger_at_sholazar_waygate() : AreaTriggerScript("at_sholazar_waygate") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger)
         {
             if (!player->isDead() && (player->GetQuestStatus(QUEST_MEETING_A_GREAT_ONE) != QUEST_STATUS_NONE ||
                 (player->GetQuestStatus(QUEST_THE_MAKERS_OVERLOOK) == QUEST_STATUS_REWARDED && player->GetQuestStatus(QUEST_THE_MAKERS_PERCH) == QUEST_STATUS_REWARDED)))
@@ -265,7 +312,7 @@ class AreaTrigger_at_nats_landing : public AreaTriggerScript
     public:
         AreaTrigger_at_nats_landing() : AreaTriggerScript("at_nats_landing") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/)
         {
             if (!player->IsAlive() || !player->HasAura(SPELL_FISH_PASTE))
                 return false;
@@ -310,7 +357,7 @@ class AreaTrigger_at_brewfest : public AreaTriggerScript
             _triggerTimes[AT_BREWFEST_DUROTAR] = _triggerTimes[AT_BREWFEST_DUN_MOROGH] = 0;
         }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger)
         {
             uint32 triggerId = trigger->id;
             // Second trigger happened too early after first, skip for now
@@ -363,7 +410,7 @@ class AreaTrigger_at_area_52_entrance : public AreaTriggerScript
             _triggerTimes[AT_AREA_52_SOUTH] = _triggerTimes[AT_AREA_52_NORTH] = _triggerTimes[AT_AREA_52_WEST] = _triggerTimes[AT_AREA_52_EAST] = 0;
         }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger)
         {
             float x = 0.0f, y = 0.0f, z = 0.0f;
 
@@ -408,73 +455,12 @@ class AreaTrigger_at_area_52_entrance : public AreaTriggerScript
         std::map<uint32, time_t> _triggerTimes;
 };
 
-/*######
- ## at_frostgrips_hollow
- ######*/
-
-enum FrostgripsHollow
-{
-    QUEST_THE_LONESOME_WATCHER      = 12877,
-
-    NPC_STORMFORGED_MONITOR         = 29862,
-    NPC_STORMFORGED_ERADICTOR       = 29861,
-
-    TYPE_WAYPOINT                   = 0,
-    DATA_START                      = 0
-};
-
-Position const stormforgedMonitorPosition = {6963.95f, 45.65f, 818.71f, 4.948f};
-Position const stormforgedEradictorPosition = {6983.18f, 7.15f, 806.33f, 2.228f};
-
-class AreaTrigger_at_frostgrips_hollow : public AreaTriggerScript
-{
-public:
-    AreaTrigger_at_frostgrips_hollow() : AreaTriggerScript("at_frostgrips_hollow")
-    {
-        stormforgedMonitorGUID.Clear();
-        stormforgedEradictorGUID.Clear();
-    }
-
-    bool OnTrigger(Player* player, AreaTriggerEntry const* /* trigger */) override
-    {
-        if (player->GetQuestStatus(QUEST_THE_LONESOME_WATCHER) != QUEST_STATUS_INCOMPLETE)
-            return false;
-
-        Creature* stormforgedMonitor = ObjectAccessor::GetCreature(*player, stormforgedMonitorGUID);
-        if (stormforgedMonitor)
-            return false;
-
-        Creature* stormforgedEradictor = ObjectAccessor::GetCreature(*player, stormforgedEradictorGUID);
-        if (stormforgedEradictor)
-            return false;
-
-        stormforgedMonitor = player->SummonCreature(NPC_STORMFORGED_MONITOR, stormforgedMonitorPosition, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
-        if (stormforgedMonitor)
-        {
-            stormforgedMonitorGUID = stormforgedMonitor->GetGUID();
-            stormforgedMonitor->SetWalk(false);
-            /// The npc would search an alternative way to get to the last waypoint without this unit state.
-            stormforgedMonitor->AddUnitState(UNIT_STATE_IGNORE_PATHFINDING);
-            stormforgedMonitor->GetMotionMaster()->MovePath(NPC_STORMFORGED_MONITOR * 100, false);
-        }
-
-        stormforgedEradictor = player->SummonCreature(NPC_STORMFORGED_ERADICTOR, stormforgedEradictorPosition, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
-        if (stormforgedEradictor)
-        {
-            stormforgedEradictorGUID = stormforgedEradictor->GetGUID();
-            stormforgedEradictor->GetMotionMaster()->MovePath(NPC_STORMFORGED_ERADICTOR * 100, false);
-        }
-
-        return true;
-    }
-
-private:
-    ObjectGuid stormforgedMonitorGUID;
-    ObjectGuid stormforgedEradictorGUID;
-};
-
 void AddSC_areatrigger_scripts()
 {
+	// Ours
+	new AreaTrigger_at_voltarus_middle();
+
+	// Theirs
     new AreaTrigger_at_coilfang_waterfall();
     new AreaTrigger_at_legion_teleporter();
     new AreaTrigger_at_stormwright_shelf();
@@ -484,5 +470,4 @@ void AddSC_areatrigger_scripts()
     new AreaTrigger_at_nats_landing();
     new AreaTrigger_at_brewfest();
     new AreaTrigger_at_area_52_entrance();
-    new AreaTrigger_at_frostgrips_hollow();
 }

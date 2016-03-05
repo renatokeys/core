@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,6 +21,8 @@
 #include "hyjal.h"
 #include "ScriptedEscortAI.h"
 
+#define MINRAIDDAMAGE  700000//minimal damage before trash can drop loot and reputation, resets if faction leader dies
+
 struct hyjal_trashAI : public npc_escortAI
 {
     hyjal_trashAI(Creature* creature);
@@ -29,7 +31,7 @@ struct hyjal_trashAI : public npc_escortAI
 
     void JustDied(Unit* /*killer*/);
 
-    void DamageTaken(Unit* done_by, uint32 &damage);
+    void DamageTaken(Unit* done_by, uint32 &damage, DamageEffectType, SpellSchoolMask);
 
     public:
         InstanceScript* instance;

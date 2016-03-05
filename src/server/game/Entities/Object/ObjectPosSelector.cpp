@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,7 +21,7 @@
 ObjectPosSelector::ObjectPosSelector(float x, float y, float size, float dist)
 : m_center_x(x), m_center_y(y), m_size(size), m_dist(dist)
 {
-    m_anglestep = std::acos(m_dist/(m_dist+2*m_size));
+    m_anglestep = acos(m_dist/(m_dist+2*m_size));
 
     m_nextUsedPos[USED_POS_PLUS]  = m_UsedPosLists[USED_POS_PLUS].end();
     m_nextUsedPos[USED_POS_MINUS] = m_UsedPosLists[USED_POS_MINUS].end();

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -57,11 +57,11 @@ class npc_ame : public CreatureScript
 public:
     npc_ame() : CreatureScript("npc_ame") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
         if (quest->GetQuestId() == QUEST_CHASING_AME)
         {
-            ENSURE_AI(npc_escortAI, (creature->AI()))->Start(false, false, player->GetGUID());
+            CAST_AI(npc_escortAI, (creature->AI()))->Start(false, false, player->GetGUID());
             creature->AI()->Talk(SAY_READY, player);
             creature->SetUInt32Value(UNIT_FIELD_BYTES_1, 0);
             // Change faction so mobs attack
@@ -70,26 +70,18 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_ameAI(creature);
     }
 
     struct npc_ameAI : public npc_escortAI
     {
-        npc_ameAI(Creature* creature) : npc_escortAI(creature)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            DemoralizingShoutTimer = 5000;
-        }
+        npc_ameAI(Creature* creature) : npc_escortAI(creature) { }
 
         uint32 DemoralizingShoutTimer;
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             if (Player* player = GetPlayerForEscort())
             {
@@ -118,23 +110,23 @@ public:
             }
         }
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            DemoralizingShoutTimer = 5000;
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             summoned->AI()->AttackStart(me);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             if (Player* player = GetPlayerForEscort())
                 player->FailQuest(QUEST_CHASING_AME);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             npc_escortAI::UpdateAI(diff);
             if (!UpdateVictim())
@@ -181,7 +173,7 @@ class npc_ringo : public CreatureScript
 public:
     npc_ringo() : CreatureScript("npc_ringo") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest)
     {
         if (quest->GetQuestId() == QUEST_A_LITTLE_HELP)
         {
@@ -195,38 +187,30 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_ringoAI(creature);
     }
 
     struct npc_ringoAI : public FollowerAI
     {
-        npc_ringoAI(Creature* creature) : FollowerAI(creature)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            FaintTimer = urand(30000, 60000);
-            EndEventProgress = 0;
-            EndEventTimer = 1000;
-            SpraggleGUID.Clear();
-        }
+        npc_ringoAI(Creature* creature) : FollowerAI(creature) { }
 
         uint32 FaintTimer;
         uint32 EndEventProgress;
         uint32 EndEventTimer;
 
-        ObjectGuid SpraggleGUID;
+        uint64 SpraggleGUID;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            FaintTimer = urand(30000, 60000);
+            EndEventProgress = 0;
+            EndEventTimer = 1000;
+            SpraggleGUID = 0;
         }
 
-        void MoveInLineOfSight(Unit* who) override
+        void MoveInLineOfSight(Unit* who)
 
         {
             FollowerAI::MoveInLineOfSight(who);
@@ -247,7 +231,7 @@ public:
             }
         }
 
-        void SpellHit(Unit* /*pCaster*/, const SpellInfo* pSpell) override
+        void SpellHit(Unit* /*pCaster*/, const SpellInfo* pSpell)
         {
             if (HasFollowState(STATE_FOLLOW_INPROGRESS | STATE_FOLLOW_PAUSED) && pSpell->Id == SPELL_REVIVE_RINGO)
                 ClearFaint();
@@ -278,7 +262,7 @@ public:
             SetFollowPaused(false);
         }
 
-        void UpdateFollowerAI(uint32 Diff) override
+        void UpdateFollowerAI(uint32 Diff)
         {
             if (!UpdateVictim())
             {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -88,29 +88,23 @@ class boss_ossirian : public CreatureScript
         {
             boss_ossirianAI(Creature* creature) : BossAI(creature, DATA_OSSIRIAN)
             {
-                Initialize();
                 SaidIntro = false;
             }
 
-            void Initialize()
-            {
-                CrystalIterator = 0;
-                TriggerGUID.Clear();
-                CrystalGUID.Clear();
-            }
-
-            ObjectGuid TriggerGUID;
-            ObjectGuid CrystalGUID;
+            uint64 TriggerGUID;
+            uint64 CrystalGUID;
             uint8 CrystalIterator;
             bool SaidIntro;
 
-            void Reset() override
+            void Reset()
             {
                 _Reset();
-                Initialize();
+                CrystalIterator = 0;
+                TriggerGUID = 0;
+                CrystalGUID = 0;
             }
 
-            void SpellHit(Unit* caster, SpellInfo const* spell) override
+            void SpellHit(Unit* caster, SpellInfo const* spell)
             {
                 for (uint8 i = 0; i < NUM_WEAKNESS; ++i)
                 {
@@ -123,7 +117,7 @@ class boss_ossirian : public CreatureScript
                 }
             }
 
-            void DoAction(int32 action) override
+            void DoAction(int32 action)
             {
                 if (action == ACTION_TRIGGER_WEAKNESS)
                     if (Creature* Trigger = me->GetMap()->GetCreature(TriggerGUID))
@@ -131,7 +125,7 @@ class boss_ossirian : public CreatureScript
                             Trigger->CastSpell(Trigger, SpellWeakness[urand(0, 4)], false);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 events.Reset();
@@ -143,6 +137,8 @@ class boss_ossirian : public CreatureScript
                 Talk(SAY_AGGRO);
 
                 Map* map = me->GetMap();
+                if (!map->IsDungeon())
+                    return;
 
                 WorldPacket data(SMSG_WEATHER, (4+4+4));
                 data << uint32(WEATHER_STATE_HEAVY_SANDSTORM) << float(1) << uint8(0);
@@ -150,27 +146,28 @@ class boss_ossirian : public CreatureScript
 
                 for (uint8 i = 0; i < NUM_TORNADOS; ++i)
                 {
-                    Position Point = me->GetRandomPoint(RoomCenter, RoomRadius);
-                    if (Creature* Tornado = map->SummonCreature(NPC_SAND_VORTEX, Point))
+                    Position Point;
+                    me->GetRandomPoint(RoomCenter, RoomRadius, Point);
+                    if (Creature* Tornado = me->GetMap()->SummonCreature(NPC_SAND_VORTEX, Point))
                         Tornado->CastSpell(Tornado, SPELL_SAND_STORM, true);
                 }
 
                 SpawnNextCrystal();
             }
 
-            void KilledUnit(Unit* /*victim*/) override
+            void KilledUnit(Unit* /*victim*/)
             {
                 Talk(SAY_SLAY);
             }
 
-            void EnterEvadeMode(EvadeReason why) override
+            void EnterEvadeMode()
             {
                 Cleanup();
                 summons.DespawnAll();
-                BossAI::EnterEvadeMode(why);
+                BossAI::EnterEvadeMode();
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 Cleanup();
                 _JustDied();
@@ -202,7 +199,7 @@ class boss_ossirian : public CreatureScript
                 }
             }
 
-            void MoveInLineOfSight(Unit* who) override
+            void MoveInLineOfSight(Unit* who)
 
             {
                 if (!SaidIntro)
@@ -213,7 +210,7 @@ class boss_ossirian : public CreatureScript
                 BossAI::MoveInLineOfSight(who);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -271,7 +268,7 @@ class boss_ossirian : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetInstanceAI<boss_ossirianAI>(creature);
         }
@@ -282,7 +279,7 @@ class go_ossirian_crystal : public GameObjectScript
     public:
         go_ossirian_crystal() : GameObjectScript("go_ossirian_crystal") { }
 
-        bool OnGossipHello(Player* player, GameObject* /*go*/) override
+        bool OnGossipHello(Player* player, GameObject* /*go*/)
         {
             InstanceScript* Instance = player->GetInstanceScript();
             if (!Instance)

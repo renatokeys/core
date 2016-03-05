@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -31,7 +31,6 @@ EndContentData */
 #include "ScriptedCreature.h"
 #include "ScriptedEscortAI.h"
 #include "Player.h"
-#include "SpellScript.h"
 
 /*####
 # npc_ruul_snowhoof
@@ -66,20 +65,20 @@ public:
     {
         npc_ruul_snowhoofAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Reset() override
+        void Reset()
         {
             if (GameObject* Cage = me->FindNearestGameObject(GO_CAGE, 20))
                 Cage->SetGoState(GO_STATE_READY);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             summoned->AI()->AttackStart(me);
         }
 
-        void sQuestAccept(Player* player, Quest const* quest) override
+        void sQuestAccept(Player* player, Quest const* quest)
         {
             if (quest->GetQuestId() == QUEST_FREEDOM_TO_RUUL)
             {
@@ -88,7 +87,7 @@ public:
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -117,13 +116,13 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             npc_escortAI::UpdateAI(diff);
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_ruul_snowhoofAI(creature);
     }
@@ -181,24 +180,16 @@ public:
 
     struct npc_muglashAI : public npc_escortAI
     {
-        npc_muglashAI(Creature* creature) : npc_escortAI(creature)
-        {
-            Initialize();
-        }
+        npc_muglashAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Initialize()
+        void Reset()
         {
             eventTimer = 10000;
             waveId = 0;
             _isBrazierExtinguished = false;
         }
 
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             if (Player* player = GetPlayerForEscort())
                 if (HasEscortState(STATE_ESCORT_PAUSED))
@@ -209,19 +200,19 @@ public:
                 }
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             if (HasEscortState(STATE_ESCORT_ESCORTING))
                 if (Player* player = GetPlayerForEscort())
                     player->FailQuest(QUEST_VORSHA);
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             summoned->AI()->AttackStart(me);
         }
 
-        void sQuestAccept(Player* player, Quest const* quest) override
+        void sQuestAccept(Player* player, Quest const* quest)
         {
             if (quest->GetQuestId() == QUEST_VORSHA)
             {
@@ -231,7 +222,7 @@ public:
             }
         }
 
-            void WaypointReached(uint32 waypointId) override
+            void WaypointReached(uint32 waypointId)
             {
                 if (Player* player = GetPlayerForEscort())
                 {
@@ -287,7 +278,7 @@ public:
                 }
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 npc_escortAI::UpdateAI(diff);
 
@@ -317,7 +308,7 @@ public:
 
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_muglashAI(creature);
     }
@@ -328,7 +319,7 @@ class go_naga_brazier : public GameObjectScript
     public:
         go_naga_brazier() : GameObjectScript("go_naga_brazier") { }
 
-        bool OnGossipHello(Player* /*player*/, GameObject* go) override
+        bool OnGossipHello(Player* /*player*/, GameObject* go)
         {
             if (Creature* creature = GetClosestCreatureWithEntry(go, NPC_MUGLASH, INTERACTION_DISTANCE*2))
             {
@@ -345,42 +336,9 @@ class go_naga_brazier : public GameObjectScript
         }
 };
 
-enum KingoftheFoulwealdMisc
-{
-    GO_BANNER = 178205
-};
-
-class spell_destroy_karangs_banner : public SpellScriptLoader
-{
-    public:
-        spell_destroy_karangs_banner() : SpellScriptLoader("spell_destroy_karangs_banner") { }
-
-        class spell_destroy_karangs_banner_SpellScript : public SpellScript
-        {
-            PrepareSpellScript(spell_destroy_karangs_banner_SpellScript);
-
-            void HandleAfterCast()
-            {
-                if (GameObject* banner = GetCaster()->FindNearestGameObject(GO_BANNER, GetSpellInfo()->GetMaxRange(true)))
-                    banner->Delete();
-            }
-
-            void Register() override
-            {
-                AfterCast += SpellCastFn(spell_destroy_karangs_banner_SpellScript::HandleAfterCast);
-            }
-        };
-
-        SpellScript* GetSpellScript() const override
-        {
-            return new spell_destroy_karangs_banner_SpellScript();
-        }
-};
-
 void AddSC_ashenvale()
 {
     new npc_ruul_snowhoof();
     new npc_muglash();
     new go_naga_brazier();
-    new spell_destroy_karangs_banner();
 }

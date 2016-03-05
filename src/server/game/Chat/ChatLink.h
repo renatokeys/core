@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,13 +15,12 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TRINITYCORE_CHATLINK_H
-#define TRINITYCORE_CHATLINK_H
+#ifndef SUNWELLCORE_CHATLINK_H
+#define SUNWELLCORE_CHATLINK_H
 
 #include "SharedDefines.h"
 #include <sstream>
 #include <list>
-#include <cstring>
 
 struct ItemLocale;
 struct ItemTemplate;
@@ -58,11 +57,11 @@ class ItemChatLink : public ChatLink
 {
 public:
     ItemChatLink() : ChatLink(), _item(NULL), _suffix(NULL), _property(NULL)
-    {
+    { 
         memset(_data, 0, sizeof(_data));
     }
-    virtual bool Initialize(std::istringstream& iss) override;
-    virtual bool ValidateName(char* buffer, const char* context) override;
+    virtual bool Initialize(std::istringstream& iss);
+    virtual bool ValidateName(char* buffer, const char* context);
 
 protected:
     std::string FormatName(uint8 index, ItemLocale const* locale, char* const* suffixStrings) const;
@@ -77,9 +76,9 @@ protected:
 class QuestChatLink : public ChatLink
 {
 public:
-    QuestChatLink() : ChatLink(), _quest(nullptr), _questLevel(0) { }
-    virtual bool Initialize(std::istringstream& iss) override;
-    virtual bool ValidateName(char* buffer, const char* context) override;
+    QuestChatLink() : ChatLink(), _quest(NULL), _questLevel(0) { }
+    virtual bool Initialize(std::istringstream& iss);
+    virtual bool ValidateName(char* buffer, const char* context);
 
 protected:
     Quest const* _quest;
@@ -90,9 +89,9 @@ protected:
 class SpellChatLink : public ChatLink
 {
 public:
-    SpellChatLink() : ChatLink(), _spell(nullptr) { }
-    virtual bool Initialize(std::istringstream& iss) override;
-    virtual bool ValidateName(char* buffer, const char* context) override;
+    SpellChatLink() : ChatLink(), _spell(NULL) { }
+    virtual bool Initialize(std::istringstream& iss);
+    virtual bool ValidateName(char* buffer, const char* context);
 
 protected:
     SpellInfo const* _spell;
@@ -103,11 +102,11 @@ class AchievementChatLink : public ChatLink
 {
 public:
     AchievementChatLink() : ChatLink(), _guid(0), _achievement(NULL)
-    {
+    { 
         memset(_data, 0, sizeof(_data));
     }
-    virtual bool Initialize(std::istringstream& iss) override;
-    virtual bool ValidateName(char* buffer, const char* context) override;
+    virtual bool Initialize(std::istringstream& iss);
+    virtual bool ValidateName(char* buffer, const char* context);
 
 protected:
     uint32 _guid;
@@ -120,7 +119,7 @@ class TradeChatLink : public SpellChatLink
 {
 public:
     TradeChatLink() : SpellChatLink(), _minSkillLevel(0), _maxSkillLevel(0), _guid(0) { }
-    virtual bool Initialize(std::istringstream& iss) override;
+    virtual bool Initialize(std::istringstream& iss);
 private:
     int32 _minSkillLevel;
     int32 _maxSkillLevel;
@@ -133,7 +132,7 @@ class TalentChatLink : public SpellChatLink
 {
 public:
     TalentChatLink() : SpellChatLink(), _talentId(0), _rankId(0) { }
-    virtual bool Initialize(std::istringstream& iss) override;
+    virtual bool Initialize(std::istringstream& iss);
 
 private:
     uint32 _talentId;
@@ -145,7 +144,7 @@ class EnchantmentChatLink : public SpellChatLink
 {
 public:
     EnchantmentChatLink() : SpellChatLink() { }
-    virtual bool Initialize(std::istringstream& iss) override;
+    virtual bool Initialize(std::istringstream& iss);
 };
 
 // GlyphChatLink - link to glyph
@@ -153,7 +152,7 @@ class GlyphChatLink : public SpellChatLink
 {
 public:
     GlyphChatLink() : SpellChatLink(), _slotId(0), _glyph(NULL) { }
-    virtual bool Initialize(std::istringstream& iss) override;
+    virtual bool Initialize(std::istringstream& iss);
 private:
     uint32 _slotId;
     GlyphPropertiesEntry const* _glyph;
@@ -174,4 +173,4 @@ private:
 };
 
 
-#endif // TRINITYCORE_CHATLINK_H
+#endif

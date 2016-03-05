@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -28,11 +28,11 @@ class GroupReference : public Reference<Group, Player>
 {
     protected:
         uint8 iSubGroup;
-        void targetObjectBuildLink() override;
-        void targetObjectDestroyLink() override;
-        void sourceObjectDestroyLink() override;
+        void targetObjectBuildLink();
+        void targetObjectDestroyLink();
+        void sourceObjectDestroyLink();
     public:
-        GroupReference() : Reference<Group, Player>(), iSubGroup(0) { }
+        GroupReference() : Reference<Group, Player>(), iSubGroup(0) {}
         ~GroupReference() { unlink(); }
         GroupReference* next() { return (GroupReference*)Reference<Group, Player>::next(); }
         GroupReference const* next() const { return (GroupReference const*)Reference<Group, Player>::next(); }

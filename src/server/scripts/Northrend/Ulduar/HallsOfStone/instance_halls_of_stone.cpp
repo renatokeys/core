@@ -1,217 +1,253 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY XINEF, IT OWNS NOW!
+*/
 
-#include "InstanceScript.h"
-#include "Player.h"
 #include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "halls_of_stone.h"
-
-DoorData const doorData[] =
-{
-    { GO_SJONNIR_DOOR, DATA_TRIBUNAL_OF_AGES, DOOR_TYPE_PASSAGE },
-    { 0,               0,                     DOOR_TYPE_ROOM } // END
-};
 
 class instance_halls_of_stone : public InstanceMapScript
 {
-    public:
-        instance_halls_of_stone() : InstanceMapScript(HoSScriptName, 599) { }
+public:
+    instance_halls_of_stone() : InstanceMapScript("instance_halls_of_stone", 599) { }
 
-        struct instance_halls_of_stone_InstanceMapScript : public InstanceScript
-        {
-            instance_halls_of_stone_InstanceMapScript(Map* map) : InstanceScript(map)
-            {
-                SetHeaders(DataHeader);
-                SetBossNumber(EncounterCount);
-                LoadDoorData(doorData);
-            }
+    InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+    {
+        return new instance_halls_of_stone_InstanceMapScript(pMap);
+    }
 
-            void OnCreatureCreate(Creature* creature) override
-            {
-                switch (creature->GetEntry())
-                {
-                    case NPC_KRYSTALLUS:
-                        KrystallusGUID = creature->GetGUID();
-                        break;
-                    case NPC_MAIDEN:
-                        MaidenOfGriefGUID = creature->GetGUID();
-                        break;
-                    case NPC_SJONNIR:
-                        SjonnirGUID = creature->GetGUID();
-                        break;
-                    case NPC_MARNAK:
-                        MarnakGUID = creature->GetGUID();
-                        break;
-                    case NPC_KADDRAK:
-                        KaddrakGUID = creature->GetGUID();
-                        break;
-                    case NPC_ABEDNEUM:
-                        AbedneumGUID = creature->GetGUID();
-                        break;
-                    case NPC_BRANN:
-                        BrannGUID = creature->GetGUID();
-                        break;
-                    default:
-                        break;
-                }
-            }
+    struct instance_halls_of_stone_InstanceMapScript : public InstanceScript
+	{
+		instance_halls_of_stone_InstanceMapScript(Map* map) : InstanceScript(map){ Initialize(); }
 
-            void OnGameObjectCreate(GameObject* go) override
-            {
-                switch (go->GetEntry())
-                {
-                    case GO_ABEDNEUM:
-                        AbedneumGoGUID = go->GetGUID();
-                        break;
-                    case GO_MARNAK:
-                        MarnakGoGUID = go->GetGUID();
-                        break;
-                    case GO_KADDRAK:
-                        KaddrakGoGUID = go->GetGUID();
-                        break;
-                    case GO_TRIBUNAL_CONSOLE:
-                        TribunalConsoleGUID = go->GetGUID();
-                        break;
-                    case GO_TRIBUNAL_CHEST:
-                    case GO_TRIBUNAL_CHEST_HERO:
-                        TribunalChestGUID = go->GetGUID();
-                        if (GetBossState(DATA_TRIBUNAL_OF_AGES) == DONE)
-                            go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
-                        break;
-                    case GO_TRIBUNAL_SKY_FLOOR:
-                        TribunalSkyFloorGUID = go->GetGUID();
-                        break;
-                    case GO_SJONNIR_DOOR:
-                        AddDoor(go, true);
-                        break;
-                    default:
-                        break;
-                }
-            }
+		uint32 Encounter[MAX_ENCOUNTER];
 
-            void OnGameObjectRemove(GameObject* go) override
-            {
-                switch (go->GetEntry())
-                {
-                    case GO_SJONNIR_DOOR:
-                        AddDoor(go, false);
-                        break;
-                    default:
-                        break;
-                }
-            }
+		uint64 goKaddrakGUID;
+		uint64 goMarnakGUID;
+		uint64 goAbedneumGUID;
+		uint64 goTribunalConsoleGUID;
+		uint64 goSkyRoomFloorGUID;
+		uint64 goSjonnirConsoleGUID;
+		uint64 goSjonnirDoorGUID;
+		uint64 goLeftPipeGUID;
+		uint64 goRightPipeGUID;
 
-            ObjectGuid GetGuidData(uint32 type) const override
-            {
-                switch (type)
-                {
-                    case DATA_MAIDEN_OF_GRIEF:
-                        return MaidenOfGriefGUID;
-                    case DATA_KRYSTALLUS:
-                        return KrystallusGUID;
-                    case DATA_SJONNIR:
-                        return SjonnirGUID;
-                    case DATA_KADDRAK:
-                        return KaddrakGUID;
-                    case DATA_MARNAK:
-                        return MarnakGUID;
-                    case DATA_ABEDNEUM:
-                        return AbedneumGUID;
-                    case DATA_GO_TRIBUNAL_CONSOLE:
-                        return TribunalConsoleGUID;
-                    case DATA_GO_KADDRAK:
-                        return KaddrakGoGUID;
-                    case DATA_GO_ABEDNEUM:
-                        return AbedneumGoGUID;
-                    case DATA_GO_MARNAK:
-                        return MarnakGoGUID;
-                    case DATA_GO_SKY_FLOOR:
-                        return TribunalSkyFloorGUID;
-                    default:
-                        break;
-                }
+		uint64 SjonnirGUID;
+		uint64 BrannGUID;
 
-                return ObjectGuid::Empty;
-            }
+		bool brannAchievement;
+		bool sjonnirAchievement;
 
-            bool SetBossState(uint32 type, EncounterState state) override
-            {
-                if (!InstanceScript::SetBossState(type, state))
-                    return false;
+		void Initialize()
+		{
+			memset(&Encounter, 0, sizeof(Encounter));
 
-                switch (type)
-                {
-                    case DATA_TRIBUNAL_OF_AGES:
-                        if (state == DONE)
-                        {
-                            if (GameObject* go = instance->GetGameObject(TribunalChestGUID))
-                                go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
-                        }
-                        break;
-                    default:
-                        break;
-                }
+			goKaddrakGUID = 0;
+			goMarnakGUID = 0;
+			goAbedneumGUID = 0;
+			goTribunalConsoleGUID = 0;
+			goSkyRoomFloorGUID = 0;
+			goSjonnirConsoleGUID = 0;
+			goSjonnirDoorGUID = 0;
+			goLeftPipeGUID = 0;
+			goRightPipeGUID = 0;
 
-                return true;
-            }
+			SjonnirGUID = 0;
+			BrannGUID = 0;
 
-            bool CheckRequiredBosses(uint32 bossId, Player const* player = nullptr) const override
-            {
-                if (_SkipCheckRequiredBosses(player))
-                    return true;
+			brannAchievement = false;
+			sjonnirAchievement = false;
+		}
 
-                switch (bossId)
-                {
-                    case DATA_SJONNIR:
-                        if (GetBossState(DATA_TRIBUNAL_OF_AGES) != DONE)
-                            return false;
-                        break;
-                    default:
-                        break;
-                }
+		bool IsEncounterInProgress() const
+		{
+			for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
+			{
+				if (Encounter[i] == IN_PROGRESS)
+					return true;
+			}
+			return false;
+		}
 
-                return true;
-            }
+		void OnGameObjectCreate(GameObject *go)
+		{
+			switch(go->GetEntry())
+			{
+				case GO_KADDRAK: 
+					goKaddrakGUID = go->GetGUID();
+					break;
+				case GO_ABEDNEUM: 
+					goAbedneumGUID = go->GetGUID();
+					if (Encounter[BOSS_TRIBUNAL_OF_AGES] == DONE)
+						go->SetGoState(GO_STATE_ACTIVE);
+					break;
+				case GO_MARNAK: 
+					goMarnakGUID = go->GetGUID(); 
+					break;
+				case GO_TRIBUNAL_CONSOLE: 
+					goTribunalConsoleGUID = go->GetGUID(); 
+					break;
+				case GO_SKY_FLOOR: 
+					goSkyRoomFloorGUID = go->GetGUID();
+					if (Encounter[BOSS_TRIBUNAL_OF_AGES] == DONE)
+						go->SetGoState(GO_STATE_ACTIVE);
+					break;
+				case GO_SJONNIR_CONSOLE: 
+					goSjonnirConsoleGUID = go->GetGUID();
+					break;
+				case GO_SJONNIR_DOOR: 
+					goSjonnirDoorGUID = go->GetGUID();
+					if (Encounter[BOSS_TRIBUNAL_OF_AGES] == DONE)
+						go->SetGoState(GO_STATE_ACTIVE);
+					break;
+				case GO_LEFT_PIPE:
+					goLeftPipeGUID = go->GetGUID();
+					break;
+				case GO_RIGHT_PIPE:
+					goRightPipeGUID = go->GetGUID();
+					break;
+			}
+		}
 
-        protected:
-            ObjectGuid KrystallusGUID;
-            ObjectGuid MaidenOfGriefGUID;
-            ObjectGuid SjonnirGUID;
 
-            ObjectGuid KaddrakGUID;
-            ObjectGuid AbedneumGUID;
-            ObjectGuid MarnakGUID;
-            ObjectGuid BrannGUID;
+		void OnCreatureCreate(Creature *creature)
+		{
+			switch(creature->GetEntry())
+			{
+			case NPC_SJONNIR:	
+				SjonnirGUID = creature->GetGUID();
+				break;
+			case NPC_BRANN:
+				BrannGUID = creature->GetGUID();
+				break;
+			}
+		}
 
-            ObjectGuid TribunalConsoleGUID;
-            ObjectGuid TribunalChestGUID;
-            ObjectGuid TribunalSkyFloorGUID;
-            ObjectGuid KaddrakGoGUID;
-            ObjectGuid AbedneumGoGUID;
-            ObjectGuid MarnakGoGUID;
-        };
+		uint64 GetData64(uint32 id) const
+		{
+			switch(id)
+			{
+				case GO_TRIBUNAL_CONSOLE:		return goTribunalConsoleGUID;
+				case GO_SJONNIR_CONSOLE:		return goSjonnirConsoleGUID;
+				case GO_SJONNIR_DOOR:			return goSjonnirDoorGUID;
+				case GO_LEFT_PIPE:				return goLeftPipeGUID;
+				case GO_RIGHT_PIPE:				return goRightPipeGUID;
+				case GO_KADDRAK:				return goKaddrakGUID;
+				case GO_MARNAK:					return goMarnakGUID;
+				case GO_ABEDNEUM:				return goAbedneumGUID;
 
-        InstanceScript* GetInstanceScript(InstanceMap* map) const override
-        {
-            return new instance_halls_of_stone_InstanceMapScript(map);
-        }
+				case NPC_SJONNIR:				return SjonnirGUID;
+				case NPC_BRANN:					return BrannGUID;
+			}
+			return 0;
+		}
+
+		uint32 GetData(uint32 id) const
+		{
+			switch(id)
+			{
+				case BOSS_KRYSTALLUS:
+				case BOSS_MAIDEN_OF_GRIEF:
+				case BOSS_TRIBUNAL_OF_AGES:
+				case BOSS_SJONNIR:
+				case BRANN_BRONZEBEARD:
+					return Encounter[id];
+			}
+			return 0;
+		}
+
+		bool CheckAchievementCriteriaMeet(uint32 criteria_id, Player const* source, Unit const* target = NULL, uint32 miscvalue1 = 0)
+		{
+			switch(criteria_id)
+			{
+				case 7590: // Brann Spankin' New (2154)
+					return brannAchievement;
+				case 7593: // Abuse the Ooze (2155)
+					return sjonnirAchievement;
+			}
+			return false;
+		}
+
+		void SetData(uint32 type, uint32 data)
+		{
+			if (type < MAX_ENCOUNTER)
+				Encounter[type] = data;
+
+			if (type == BOSS_TRIBUNAL_OF_AGES && data == DONE)
+			{
+				if (GameObject* pA = instance->GetGameObject(goAbedneumGUID))
+					pA->SetGoState(GO_STATE_ACTIVE);
+				if (GameObject* pF = instance->GetGameObject(goSkyRoomFloorGUID))
+					pF->SetGoState(GO_STATE_ACTIVE);
+
+				// Make sjonnir attackable
+				if (Creature *cr = instance->GetCreature(SjonnirGUID))
+					cr->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+			}
+			if (type == BOSS_TRIBUNAL_OF_AGES && data == NOT_STARTED)
+			{
+				if (GameObject* pA = instance->GetGameObject(goAbedneumGUID))
+					pA->SetGoState(GO_STATE_READY);
+				if (GameObject* pF = instance->GetGameObject(goSkyRoomFloorGUID))
+					pF->SetGoState(GO_STATE_READY);
+			}
+
+			if (type == DATA_BRANN_ACHIEVEMENT)
+			{
+				brannAchievement = (bool)data;
+				return;
+			}
+			if (type == DATA_SJONNIR_ACHIEVEMENT)
+			{
+				sjonnirAchievement = (bool)data;
+				return;
+			}
+			
+			if (data == DONE)
+				SaveToDB();
+		}
+
+		std::string GetSaveData()
+		{
+			OUT_SAVE_INST_DATA;
+
+			std::ostringstream saveStream;
+			saveStream << "H O S " << Encounter[0] << ' ' << Encounter[1] << ' ' << Encounter[2] << ' ' << Encounter[3] << ' ' << Encounter[4];
+
+			OUT_SAVE_INST_DATA_COMPLETE;
+			return saveStream.str();
+		}
+
+		void Load(const char* strIn)
+		{
+			if (!strIn)
+			{
+				OUT_LOAD_INST_DATA_FAIL;
+				return;
+			}
+
+			OUT_LOAD_INST_DATA(strIn);
+
+			char dataHead1, dataHead2, dataHead3;
+
+			std::istringstream loadStream(strIn);
+			loadStream >> dataHead1 >> dataHead2 >> dataHead3;
+
+			if (dataHead1 == 'H' && dataHead2 == 'O' && dataHead3 == 'S')
+			{
+				for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
+				{
+					loadStream >> Encounter[i];
+					if( Encounter[i] == IN_PROGRESS )
+						Encounter[i] = NOT_STARTED;
+				}
+			}
+			OUT_LOAD_INST_DATA_COMPLETE;
+		}
+	};
 };
 
 void AddSC_instance_halls_of_stone()
 {
-    new instance_halls_of_stone();
+	new instance_halls_of_stone();
 }

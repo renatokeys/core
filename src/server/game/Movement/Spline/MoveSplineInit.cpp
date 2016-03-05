@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include "MovementPacketBuilder.h"
 #include "Unit.h"
 #include "Transport.h"
+#include "Vehicle.h"
 #include "WorldPacket.h"
 #include "Opcodes.h"
 
@@ -59,7 +60,6 @@ namespace Movement
     {
         MoveSpline& move_spline = *unit->movespline;
 
-        // Elevators also use MOVEMENTFLAG_ONTRANSPORT but we do not keep track of their position changes (movementInfo.transport.guid is 0 in that case)
         bool transport = unit->HasUnitMovementFlag(MOVEMENTFLAG_ONTRANSPORT) && unit->GetTransGUID();
         Location real_position;
         // there is a big chance that current position is unknown if current state is not finalized, need compute it
@@ -116,16 +116,24 @@ namespace Movement
         move_spline.Initialize(args);
 
         WorldPacket data(SMSG_MONSTER_MOVE, 64);
-        data << unit->GetPackGUID();
+        data.append(unit->GetPackGUID());
         if (transport)
         {
             data.SetOpcode(SMSG_MONSTER_MOVE_TRANSPORT);
-            data << unit->GetTransGUID().WriteAsPacked();
+            data.appendPackGUID(unit->GetTransGUID());
             data << int8(unit->GetTransSeat());
         }
 
-        PacketBuilder::WriteMonsterMove(move_spline, data);
-        unit->SendMessageToSet(&data, true);
+		Movement::SplineBase::ControlArray* visualPoints = const_cast<Movement::SplineBase::ControlArray*>(move_spline._Spline().allocateVisualPoints());
+		visualPoints->resize(move_spline._Spline().getPointCount());
+		// Xinef: Apply hover in creature movement packet
+		if (unit->IsHovering())
+			std::transform(move_spline._Spline().getPoints(false).begin(), move_spline._Spline().getPoints(false).end(), visualPoints->begin(), HoverMovementTransform(unit->GetHoverHeight()));
+		else
+			std::copy(move_spline._Spline().getPoints(false).begin(), move_spline._Spline().getPoints(false).end(), visualPoints->begin());
+
+		PacketBuilder::WriteMonsterMove(move_spline, data);
+        unit->SendMessageToSet(&data,true);
 
         return move_spline.Duration();
     }
@@ -162,22 +170,22 @@ namespace Movement
         move_spline.Initialize(args);
 
         WorldPacket data(SMSG_MONSTER_MOVE, 64);
-        data << unit->GetPackGUID();
+        data.append(unit->GetPackGUID());
         if (transport)
         {
             data.SetOpcode(SMSG_MONSTER_MOVE_TRANSPORT);
-            data << unit->GetTransGUID().WriteAsPacked();
+            data.appendPackGUID(unit->GetTransGUID());
             data << int8(unit->GetTransSeat());
         }
 
+		// Xinef: increase z position in packet
+		loc.z += unit->GetHoverHeight();
         PacketBuilder::WriteStopMovement(loc, args.splineId, data);
         unit->SendMessageToSet(&data, true);
     }
-
     MoveSplineInit::MoveSplineInit(Unit* m) : unit(m)
     {
         args.splineId = splineIdGen.NewId();
-        // Elevators also use MOVEMENTFLAG_ONTRANSPORT but we do not keep track of their position changes
         args.TransformForTransport = unit->HasUnitMovementFlag(MOVEMENTFLAG_ONTRANSPORT) && unit->GetTransGUID();
         // mix existing state into new
         args.flags.walkmode = unit->m_movementInfo.HasMovementFlag(MOVEMENTFLAG_WALKING);
@@ -187,7 +195,7 @@ namespace Movement
     void MoveSplineInit::SetFacing(const Unit* target)
     {
         args.flags.EnableFacingTarget();
-        args.facing.target = target->GetGUID().GetRawValue();
+        args.facing.target = target->GetGUID();
     }
 
     void MoveSplineInit::SetFacing(float angle)

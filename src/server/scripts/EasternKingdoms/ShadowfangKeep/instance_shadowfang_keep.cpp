@@ -1,27 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Instance_Shadowfang_Keep
-SD%Complete: 90
-SDComment:
-SDCategory: Shadowfang Keep
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptedCreature.h"
 #include "ScriptMgr.h"
@@ -29,14 +8,6 @@ EndScriptData */
 #include "shadowfang_keep.h"
 #include "TemporarySummon.h"
 
-#define MAX_ENCOUNTER              4
-
-enum Yells
-{
-    SAY_BOSS_DIE_AD         = 4,
-    SAY_BOSS_DIE_AS         = 3,
-    SAY_ARCHMAGE            = 0
-};
 
 enum Creatures
 {
@@ -46,242 +17,189 @@ enum Creatures
     NPC_ARUGAL_VOIDWALKER   = 4627
 };
 
-enum GameObjects
-{
-    GO_COURTYARD_DOOR       = 18895, //door to open when talking to NPC's
-    GO_SORCERER_DOOR        = 18972, //door to open when Fenrus the Devourer
-    GO_ARUGAL_DOOR          = 18971  //door to open when Wolf Master Nandos
-};
 
-enum Spells
-{
-    SPELL_ASHCROMBE_TELEPORT    = 15742
-};
-
-const Position SpawnLocation[] =
-{
-    {-148.199f, 2165.647f, 128.448f, 1.026f},
-    {-153.110f, 2168.620f, 128.448f, 1.026f},
-    {-145.905f, 2180.520f, 128.448f, 4.183f},
-    {-140.794f, 2178.037f, 128.448f, 4.090f},
-    {-138.640f, 2170.159f, 136.577f, 2.737f}
-};
 class instance_shadowfang_keep : public InstanceMapScript
 {
-public:
-    instance_shadowfang_keep() : InstanceMapScript("instance_shadowfang_keep", 33) { }
+	public:
+		instance_shadowfang_keep() : InstanceMapScript("instance_shadowfang_keep", 33) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* map) const override
-    {
-        return new instance_shadowfang_keep_InstanceMapScript(map);
-    }
+		InstanceScript* GetInstanceScript(InstanceMap* map) const
+		{
+			return new instance_shadowfang_keep_InstanceMapScript(map);
+		}
 
-    struct instance_shadowfang_keep_InstanceMapScript : public InstanceScript
-    {
-        instance_shadowfang_keep_InstanceMapScript(Map* map) : InstanceScript(map)
+		struct instance_shadowfang_keep_InstanceMapScript : public InstanceScript
+		{
+			instance_shadowfang_keep_InstanceMapScript(Map* map) : InstanceScript(map) { }
+
+			void Initialize()
+			{
+				memset(&_encounters, 0, sizeof(_encounters));
+			}
+
+			void OnGameObjectCreate(GameObject* gameobject)
+			{
+				switch (gameobject->GetEntry())
+				{
+					case GO_COURTYARD_DOOR:
+						if (_encounters[TYPE_COURTYARD] == DONE)
+							HandleGameObject(0, true, gameobject);
+						break;
+					case GO_SORCERER_DOOR:
+						if (_encounters[TYPE_FENRUS_THE_DEVOURER] == DONE)
+							HandleGameObject(0, true, gameobject);
+						break;
+					case GO_ARUGAL_DOOR:
+						if (_encounters[TYPE_WOLF_MASTER_NANDOS] == DONE)
+							HandleGameObject(0, true, gameobject);
+						break;
+				}
+			}
+
+			void SetData(uint32 type, uint32 data)
+			{
+				switch (type)
+				{
+					case TYPE_COURTYARD:
+					case TYPE_FENRUS_THE_DEVOURER:
+					case TYPE_WOLF_MASTER_NANDOS:
+						_encounters[type] = data;
+						break;
+				}
+
+				if (data == DONE)
+					SaveToDB();
+			}
+
+			std::string GetSaveData()
+			{
+				std::ostringstream saveStream;
+				saveStream << "S K " << _encounters[0] << ' ' << _encounters[1] << ' ' << _encounters[2];
+				return saveStream.str();
+			}
+
+			void Load(const char* in)
+			{
+				if (!in)
+					return;
+
+				char dataHead1, dataHead2;
+				std::istringstream loadStream(in);
+				loadStream >> dataHead1 >> dataHead2;
+				if (dataHead1 == 'S' && dataHead2 == 'K')
+				{
+					for (uint8 i = 0; i < MAX_ENCOUNTERS; ++i)
+					{
+						loadStream >> _encounters[i];
+						if (_encounters[i] == IN_PROGRESS)
+							_encounters[i] = NOT_STARTED;
+					}
+				}
+			}
+
+		private:
+			uint32 _encounters[MAX_ENCOUNTERS];
+		};
+
+};
+
+class spell_shadowfang_keep_haunting_spirits : public SpellScriptLoader
+{
+    public:
+        spell_shadowfang_keep_haunting_spirits() : SpellScriptLoader("spell_shadowfang_keep_haunting_spirits") { }
+
+        class spell_shadowfang_keep_haunting_spirits_AuraScript : public AuraScript
         {
-            SetHeaders(DataHeader);
-            memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
+            PrepareAuraScript(spell_shadowfang_keep_haunting_spirits_AuraScript);
 
-            uiPhase = 0;
-            uiTimer = 0;
-        }
-
-        uint32 m_auiEncounter[MAX_ENCOUNTER];
-        std::string str_data;
-
-        ObjectGuid uiAshGUID;
-        ObjectGuid uiAdaGUID;
-        ObjectGuid uiArchmageArugalGUID;
-
-        ObjectGuid DoorCourtyardGUID;
-        ObjectGuid DoorSorcererGUID;
-        ObjectGuid DoorArugalGUID;
-
-        uint8 uiPhase;
-        uint16 uiTimer;
-
-        void OnCreatureCreate(Creature* creature) override
-        {
-            switch (creature->GetEntry())
+            void CalcPeriodic(AuraEffect const* /*aurEff*/, bool& isPeriodic, int32& amplitude)
             {
-                case NPC_ASH: uiAshGUID = creature->GetGUID(); break;
-                case NPC_ADA: uiAdaGUID = creature->GetGUID(); break;
-                case NPC_ARCHMAGE_ARUGAL: uiArchmageArugalGUID = creature->GetGUID(); break;
-            }
-        }
-
-        void OnGameObjectCreate(GameObject* go) override
-        {
-            switch (go->GetEntry())
-            {
-                case GO_COURTYARD_DOOR:
-                    DoorCourtyardGUID = go->GetGUID();
-                    if (m_auiEncounter[0] == DONE)
-                        HandleGameObject(ObjectGuid::Empty, true, go);
-                    break;
-                case GO_SORCERER_DOOR:
-                    DoorSorcererGUID = go->GetGUID();
-                    if (m_auiEncounter[2] == DONE)
-                        HandleGameObject(ObjectGuid::Empty, true, go);
-                    break;
-                case GO_ARUGAL_DOOR:
-                    DoorArugalGUID = go->GetGUID();
-                    if (m_auiEncounter[3] == DONE)
-                        HandleGameObject(ObjectGuid::Empty, true, go);
-                    break;
-            }
-        }
-
-        void DoSpeech()
-        {
-            Creature* pAda = instance->GetCreature(uiAdaGUID);
-            Creature* pAsh = instance->GetCreature(uiAshGUID);
-
-            if (pAda && pAda->IsAlive() && pAsh && pAsh->IsAlive())
-            {
-                pAda->AI()->Talk(SAY_BOSS_DIE_AD);
-                pAsh->AI()->Talk(SAY_BOSS_DIE_AS);
-            }
-        }
-
-        void SetData(uint32 type, uint32 data) override
-        {
-            switch (type)
-            {
-                case TYPE_FREE_NPC:
-                    if (data == DONE)
-                        DoUseDoorOrButton(DoorCourtyardGUID);
-                    m_auiEncounter[0] = data;
-                    break;
-                case TYPE_RETHILGORE:
-                    if (data == DONE)
-                        DoSpeech();
-                    m_auiEncounter[1] = data;
-                    break;
-                case TYPE_FENRUS:
-                    switch (data)
-                    {
-                        case DONE:
-                            uiTimer = 1000;
-                            uiPhase = 1;
-                            break;
-                        case 7:
-                            DoUseDoorOrButton(DoorSorcererGUID);
-                            break;
-                    }
-                    m_auiEncounter[2] = data;
-                    break;
-                case TYPE_NANDOS:
-                    if (data == DONE)
-                        DoUseDoorOrButton(DoorArugalGUID);
-                    m_auiEncounter[3] = data;
-                    break;
+                isPeriodic = true;
+                amplitude = irand(30*IN_MILLISECONDS, 90*IN_MILLISECONDS);
             }
 
-            if (data == DONE)
+            void HandleDummyTick(AuraEffect const* aurEff)
             {
-                OUT_SAVE_INST_DATA;
-
-                std::ostringstream saveStream;
-                saveStream << m_auiEncounter[0] << ' ' << m_auiEncounter[1] << ' ' << m_auiEncounter[2] << ' ' << m_auiEncounter[3];
-
-                str_data = saveStream.str();
-
-                SaveToDB();
-                OUT_SAVE_INST_DATA_COMPLETE;
+                GetTarget()->CastSpell((Unit*)NULL, aurEff->GetAmount(), true);
             }
-        }
 
-        uint32 GetData(uint32 type) const override
+            void HandleUpdatePeriodic(AuraEffect* aurEff)
+            {
+                aurEff->CalculatePeriodic(GetCaster());
+            }
+
+            void Register()
+            {
+                DoEffectCalcPeriodic += AuraEffectCalcPeriodicFn(spell_shadowfang_keep_haunting_spirits_AuraScript::CalcPeriodic, EFFECT_0, SPELL_AURA_DUMMY);
+                OnEffectPeriodic += AuraEffectPeriodicFn(spell_shadowfang_keep_haunting_spirits_AuraScript::HandleDummyTick, EFFECT_0, SPELL_AURA_DUMMY);
+                OnEffectUpdatePeriodic += AuraEffectUpdatePeriodicFn(spell_shadowfang_keep_haunting_spirits_AuraScript::HandleUpdatePeriodic, EFFECT_0, SPELL_AURA_DUMMY);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
         {
-            switch (type)
-            {
-                case TYPE_FREE_NPC:
-                    return m_auiEncounter[0];
-                case TYPE_RETHILGORE:
-                    return m_auiEncounter[1];
-                case TYPE_FENRUS:
-                    return m_auiEncounter[2];
-                case TYPE_NANDOS:
-                    return m_auiEncounter[3];
-            }
-            return 0;
+            return new spell_shadowfang_keep_haunting_spirits_AuraScript();
         }
+};
 
-        std::string GetSaveData() override
+enum ForsakenSpells
+{
+	SPELL_FORSAKEN_SKILL_SWORD			= 7038,
+	SPELL_FORSAKEN_SKILL_SHADOW			= 7053
+};
+
+class spell_shadowfang_keep_forsaken_skills : public SpellScriptLoader
+{
+    public:
+        spell_shadowfang_keep_forsaken_skills() : SpellScriptLoader("spell_shadowfang_keep_forsaken_skills") { }
+
+        class spell_shadowfang_keep_forsaken_skills_AuraScript : public AuraScript
         {
-            return str_data;
-        }
+            PrepareAuraScript(spell_shadowfang_keep_forsaken_skills_AuraScript);
 
-        void Load(const char* in) override
+			bool Load()
+			{
+				_forsakenSpell = 0;
+				return true;
+			}
+
+            void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+			{
+				_forsakenSpell = urand(SPELL_FORSAKEN_SKILL_SWORD, SPELL_FORSAKEN_SKILL_SHADOW);
+				if (_forsakenSpell == SPELL_FORSAKEN_SKILL_SHADOW - 1)
+					++_forsakenSpell;
+				GetUnitOwner()->CastSpell(GetUnitOwner(), _forsakenSpell, true);
+			}
+
+            void HandleDummyTick(AuraEffect const* aurEff)
+            {
+				PreventDefaultAction();
+				GetUnitOwner()->RemoveAurasDueToSpell(_forsakenSpell);
+				_forsakenSpell = urand(SPELL_FORSAKEN_SKILL_SWORD, SPELL_FORSAKEN_SKILL_SHADOW);
+				if (_forsakenSpell == SPELL_FORSAKEN_SKILL_SHADOW - 1)
+					++_forsakenSpell;
+				GetUnitOwner()->CastSpell(GetUnitOwner(), _forsakenSpell, true);
+            }
+
+			void Register()
+			{
+				OnEffectApply += AuraEffectApplyFn(spell_shadowfang_keep_forsaken_skills_AuraScript::OnApply, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
+                OnEffectPeriodic += AuraEffectPeriodicFn(spell_shadowfang_keep_forsaken_skills_AuraScript::HandleDummyTick, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+            }
+
+		private:
+			uint32 _forsakenSpell;
+        };
+
+        AuraScript* GetAuraScript() const
         {
-            if (!in)
-            {
-                OUT_LOAD_INST_DATA_FAIL;
-                return;
-            }
-
-            OUT_LOAD_INST_DATA(in);
-
-            std::istringstream loadStream(in);
-            loadStream >> m_auiEncounter[0] >> m_auiEncounter[1] >> m_auiEncounter[2] >> m_auiEncounter[3];
-
-            for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-            {
-                if (m_auiEncounter[i] == IN_PROGRESS)
-                    m_auiEncounter[i] = NOT_STARTED;
-            }
-
-            OUT_LOAD_INST_DATA_COMPLETE;
+            return new spell_shadowfang_keep_forsaken_skills_AuraScript();
         }
-
-        void Update(uint32 uiDiff) override
-        {
-            if (GetData(TYPE_FENRUS) != DONE)
-                return;
-
-            Creature* pArchmage = instance->GetCreature(uiArchmageArugalGUID);
-
-            if (!pArchmage || !pArchmage->IsAlive())
-                return;
-
-            if (uiPhase)
-            {
-                if (uiTimer <= uiDiff)
-                {
-                    switch (uiPhase)
-                    {
-                        case 1:
-                        {
-                            Creature* summon = pArchmage->SummonCreature(pArchmage->GetEntry(), SpawnLocation[4], TEMPSUMMON_TIMED_DESPAWN, 10000);
-                            summon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
-                            summon->SetReactState(REACT_DEFENSIVE);
-                            summon->CastSpell(summon, SPELL_ASHCROMBE_TELEPORT, true);
-                            summon->AI()->Talk(SAY_ARCHMAGE);
-                            uiTimer = 2000;
-                            uiPhase = 2;
-                            break;
-                        }
-                        case 2:
-                        {
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[0], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[1], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[2], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[3], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
-                            uiPhase = 0;
-                            break;
-                        }
-
-                    }
-                } else uiTimer -= uiDiff;
-            }
-        }
-    };
-
 };
 
 void AddSC_instance_shadowfang_keep()
 {
     new instance_shadowfang_keep();
+    new spell_shadowfang_keep_haunting_spirits();
+	new spell_shadowfang_keep_forsaken_skills();
 }

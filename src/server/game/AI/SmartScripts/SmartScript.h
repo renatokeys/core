@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -65,22 +65,22 @@ class SmartScript
 
         bool IsUnit(WorldObject* obj)
         {
-            return obj && (obj->GetTypeId() == TYPEID_UNIT || obj->GetTypeId() == TYPEID_PLAYER);
+            return obj && obj->IsInWorld() && (obj->GetTypeId() == TYPEID_UNIT || obj->GetTypeId() == TYPEID_PLAYER);
         }
 
         bool IsPlayer(WorldObject* obj)
         {
-            return obj && obj->GetTypeId() == TYPEID_PLAYER;
+            return obj && obj->IsInWorld() && obj->GetTypeId() == TYPEID_PLAYER;
         }
 
         bool IsCreature(WorldObject* obj)
         {
-            return obj && obj->GetTypeId() == TYPEID_UNIT;
+            return obj && obj->IsInWorld() && obj->GetTypeId() == TYPEID_UNIT;
         }
 
         bool IsGameObject(WorldObject* obj)
         {
-            return obj && obj->GetTypeId() == TYPEID_GAMEOBJECT;
+            return obj && obj->IsInWorld() && obj->GetTypeId() == TYPEID_GAMEOBJECT;
         }
 
         void OnUpdate(const uint32 diff);
@@ -118,7 +118,7 @@ class SmartScript
                 smart = false;
 
             if (!smart)
-                TC_LOG_ERROR("sql.sql", "SmartScript: Action target Creature (GUID: %u Entry: %u) is not using SmartAI, action called by Creature (GUID: %u Entry: %u) skipped to prevent crash.", c ? c->GetSpawnId() : 0, c ? c->GetEntry() : 0, me ? me->GetSpawnId() : 0, me ? me->GetEntry() : 0);
+                sLog->outErrorDb("SmartScript: Action target Creature(entry: %u) is not using SmartAI, action skipped to prevent crash.", c ? c->GetEntry() : (me ? me->GetEntry() : 0));
 
             return smart;
         }
@@ -132,7 +132,7 @@ class SmartScript
             if (!go || go->GetAIName() != "SmartGameObjectAI")
                 smart = false;
             if (!smart)
-                TC_LOG_ERROR("sql.sql", "SmartScript: Action target GameObject (GUID: %u Entry: %u) is not using SmartGameObjectAI, action called by GameObject (GUID: %u Entry: %u) skipped to prevent crash.", g ? g->GetSpawnId() : 0, g ? g->GetEntry() : 0, go ? go->GetSpawnId() : 0, go ? go->GetEntry() : 0);
+                sLog->outErrorDb("SmartScript: Action target GameObject(entry: %u) is not using SmartGameObjectAI, action skipped to prevent crash.", g ? g->GetEntry() : (go ? go->GetEntry() : 0));
 
             return smart;
         }
@@ -147,24 +147,18 @@ class SmartScript
 
         void StoreCounter(uint32 id, uint32 value, uint32 reset)
         {
-            CounterMap::const_iterator itr = mCounterList.find(id);
+            CounterMap::iterator itr = mCounterList.find(id);
             if (itr != mCounterList.end())
             {
                 if (reset == 0)
-                    value += GetCounterValue(id);
-                mCounterList.erase(id);
+                    itr->second += value;
+				else
+					itr->second = value;
             }
+			else
+				mCounterList.insert(std::make_pair(id, value));
 
-            mCounterList.insert(std::make_pair(id, value));
-            ProcessEventsFor(SMART_EVENT_COUNTER_SET);
-        }
-
-        uint32 GetCounterId(uint32 id)
-        {
-            CounterMap::iterator itr = mCounterList.find(id);
-            if (itr != mCounterList.end())
-                return itr->first;
-            return 0;
+            ProcessEventsFor(SMART_EVENT_COUNTER_SET, NULL, id);
         }
 
         uint32 GetCounterValue(uint32 id)
@@ -175,27 +169,35 @@ class SmartScript
             return 0;
         }
 
-        GameObject* FindGameObjectNear(WorldObject* searchObject, ObjectGuid::LowType guid) const
+        GameObject* FindGameObjectNear(WorldObject* searchObject, uint32 guid) const
         {
-            auto bounds = searchObject->GetMap()->GetGameObjectBySpawnIdStore().equal_range(guid);
-            if (bounds.first == bounds.second)
-                return nullptr;
+            GameObject* gameObject = NULL;
 
-            return bounds.first->second;
+            CellCoord p(Trinity::ComputeCellCoord(searchObject->GetPositionX(), searchObject->GetPositionY()));
+            Cell cell(p);
+
+            Trinity::GameObjectWithDbGUIDCheck goCheck(*searchObject, guid);
+            Trinity::GameObjectSearcher<Trinity::GameObjectWithDbGUIDCheck> checker(searchObject, gameObject, goCheck);
+
+            TypeContainerVisitor<Trinity::GameObjectSearcher<Trinity::GameObjectWithDbGUIDCheck>, GridTypeMapContainer > objectChecker(checker);
+            cell.Visit(p, objectChecker, *searchObject->GetMap(), *searchObject, searchObject->GetVisibilityRange());
+
+            return gameObject;
         }
 
-        Creature* FindCreatureNear(WorldObject* searchObject, ObjectGuid::LowType guid) const
+        Creature* FindCreatureNear(WorldObject* searchObject, uint32 guid) const
         {
-            auto bounds = searchObject->GetMap()->GetCreatureBySpawnIdStore().equal_range(guid);
-            if (bounds.first == bounds.second)
-                return nullptr;
+            Creature* creature = NULL;
+            CellCoord p(Trinity::ComputeCellCoord(searchObject->GetPositionX(), searchObject->GetPositionY()));
+            Cell cell(p);
 
-            auto creatureItr = std::find_if(bounds.first, bounds.second, [](Map::CreatureBySpawnIdContainer::value_type const& pair)
-            {
-                return pair.second->IsAlive();
-            });
+            Trinity::CreatureWithDbGUIDCheck target_check(searchObject, guid);
+            Trinity::CreatureSearcher<Trinity::CreatureWithDbGUIDCheck> checker(searchObject, creature, target_check);
 
-            return creatureItr != bounds.second ? creatureItr->second : bounds.first->second;
+            TypeContainerVisitor<Trinity::CreatureSearcher <Trinity::CreatureWithDbGUIDCheck>, GridTypeMapContainer > unit_checker(checker);
+            cell.Visit(p, unit_checker, *searchObject->GetMap(), *searchObject, searchObject->GetVisibilityRange());
+
+            return creature;
         }
 
         ObjectListMap* mTargetStorage;
@@ -203,59 +205,69 @@ class SmartScript
         void OnReset();
         void ResetBaseObject()
         {
-            WorldObject* lookupRoot = me;
-            if (!lookupRoot)
-                lookupRoot = go;
-
-            if (lookupRoot)
+            if (meOrigGUID)
             {
-                if (!meOrigGUID.IsEmpty())
+                if (Creature* m = HashMapHolder<Creature>::Find(meOrigGUID))
                 {
-                    if (Creature* m = ObjectAccessor::GetCreature(*lookupRoot, meOrigGUID))
-                    {
-                        me = m;
-                        go = NULL;
-                    }
-                }
-
-                if (!goOrigGUID.IsEmpty())
-                {
-                    if (GameObject* o = ObjectAccessor::GetGameObject(*lookupRoot, goOrigGUID))
-                    {
-                        me = NULL;
-                        go = o;
-                    }
+                    me = m;
+                    go = NULL;
                 }
             }
-            goOrigGUID.Clear();
-            meOrigGUID.Clear();
+            if (goOrigGUID)
+            {
+                if (GameObject* o = HashMapHolder<GameObject>::Find(goOrigGUID))
+                {
+                    me = NULL;
+                    go = o;
+                }
+            }
+            goOrigGUID = 0;
+            meOrigGUID = 0;
         }
 
         //TIMED_ACTIONLIST (script type 9 aka script9)
         void SetScript9(SmartScriptHolder& e, uint32 entry);
-        Unit* GetLastInvoker();
-        ObjectGuid mLastInvoker;
-        typedef std::unordered_map<uint32, uint32> CounterMap;
+        Unit* GetLastInvoker(Unit* invoker = NULL);
+        uint64 mLastInvoker;
+        typedef UNORDERED_MAP<uint32, uint32> CounterMap;
         CounterMap mCounterList;
 
+		// Xinef: Fix Combat Movement
+		void SetActualCombatDist(uint32 dist) { mActualCombatDist = dist; }
+		void RestoreMaxCombatDist() { mActualCombatDist = mMaxCombatDist; }
+		uint32 GetActualCombatDist() const { return mActualCombatDist; }
+		uint32 GetMaxCombatDist() const { return mMaxCombatDist; }
+
+		// Xinef: SmartCasterAI, replace above
+		void SetCasterActualDist(float dist) { smartCasterActualDist = dist; }
+		void RestoreCasterMaxDist() { smartCasterActualDist = smartCasterMaxDist; }
+		Powers GetCasterPowerType() const { return smartCasterPowerType; }
+		float GetCasterActualDist() const { return smartCasterActualDist; }
+		float GetCasterMaxDist() const { return smartCasterMaxDist; }
+
+		bool AllowPhaseReset() const { return _allowPhaseReset; }
+		void SetPhaseReset(bool allow) { _allowPhaseReset = allow; }
+
     private:
-        void IncPhase(int32 p = 1)
-        {
-            if (p >= 0)
-                mEventPhase += (uint32)p;
-            else
-                DecPhase(abs(p));
-        }
+        void IncPhase(uint32 p)
+		{
+			// Xinef: protect phase from overflowing
+			mEventPhase = std::min<uint32>(SMART_EVENT_PHASE_12, mEventPhase + p);
+		}
 
-        void DecPhase(int32 p = 1)
-        {
-            if (mEventPhase > (uint32)p)
-                mEventPhase -= (uint32)p;
-            else
-                mEventPhase = 0;
-        }
-
-        bool IsInPhase(uint32 p) const { return ((1 << (mEventPhase - 1)) & p) != 0; }
+        void DecPhase(uint32 p) 
+		{
+			if (p >= mEventPhase)
+				mEventPhase = 0;
+			else
+				mEventPhase -= p;
+		}
+        bool IsInPhase(uint32 p) const 
+		{ 
+			if (mEventPhase == 0)
+				return false;
+			return (1 << (mEventPhase - 1)) & p;
+		}
         void SetPhase(uint32 p = 0) { mEventPhase = p; }
 
         SmartAIEventList mEvents;
@@ -263,38 +275,68 @@ class SmartScript
         SmartAIEventList mTimedActionList;
         bool isProcessingTimedActionList;
         Creature* me;
-        ObjectGuid meOrigGUID;
+        uint64 meOrigGUID;
         GameObject* go;
-        ObjectGuid goOrigGUID;
+        uint64 goOrigGUID;
         AreaTriggerEntry const* trigger;
         SmartScriptType mScriptType;
         uint32 mEventPhase;
 
+        UNORDERED_MAP<int32, int32> mStoredDecimals;
         uint32 mPathId;
-        SmartAIEventList mStoredEvents;
-        std::list<uint32>mRemIDs;
+        SmartAIEventStoredList mStoredEvents;
+        std::list<uint32> mRemIDs;
 
         uint32 mTextTimer;
         uint32 mLastTextID;
         uint32 mTalkerEntry;
         bool mUseTextTimer;
 
+		// Xinef: Fix Combat Movement
+		uint32 mActualCombatDist;
+		uint32 mMaxCombatDist;
+
+		// Xinef: SmartCasterAI, replace above in future
+		uint32 smartCasterActualDist;
+		uint32 smartCasterMaxDist;
+		Powers smartCasterPowerType;
+
+		// Xinef: misc
+		bool _allowPhaseReset;
+
         SMARTAI_TEMPLATE mTemplate;
         void InstallEvents();
 
-        void RemoveStoredEvent(uint32 id)
+        void RemoveStoredEvent (uint32 id)
         {
             if (!mStoredEvents.empty())
             {
-                for (SmartAIEventList::iterator i = mStoredEvents.begin(); i != mStoredEvents.end(); ++i)
+                for (SmartAIEventStoredList::iterator i = mStoredEvents.begin(); i != mStoredEvents.end(); ++i)
                 {
                     if (i->event_id == id)
                     {
                         mStoredEvents.erase(i);
                         return;
                     }
+
                 }
             }
+        }
+        SmartScriptHolder FindLinkedEvent (uint32 link)
+        {
+            if (!mEvents.empty())
+            {
+                for (SmartAIEventList::iterator i = mEvents.begin(); i != mEvents.end(); ++i)
+                {
+                    if (i->event_id == link)
+                    {
+                        return (*i);
+                    }
+
+                }
+            }
+            SmartScriptHolder s;
+            return s;
         }
 };
 

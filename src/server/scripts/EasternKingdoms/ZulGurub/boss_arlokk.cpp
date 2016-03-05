@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -92,36 +92,28 @@ class boss_arlokk : public CreatureScript
 
         struct boss_arlokkAI : public BossAI
         {
-            boss_arlokkAI(Creature* creature) : BossAI(creature, DATA_ARLOKK)
-            {
-                Initialize();
-            }
+            boss_arlokkAI(Creature* creature) : BossAI(creature, DATA_ARLOKK) { }
 
-            void Initialize()
-            {
-                _summonCountA = 0;
-                _summonCountB = 0;
-            }
-
-            void Reset() override
+            void Reset()
             {
                 if (events.IsInPhase(PHASE_TWO))
                     me->HandleStatModifier(UNIT_MOD_DAMAGE_MAINHAND, TOTAL_PCT, 35.0f, false); // hack
                 _Reset();
-                Initialize();
+                _summonCountA = 0;
+                _summonCountB = 0;
                 me->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 0, uint32(WEAPON_DAGGER));
                 me->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, uint32(WEAPON_DAGGER));
                 me->SetWalk(false);
                 me->GetMotionMaster()->MovePoint(0, PosMoveOnSpawn[0]);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 _JustDied();
                 Talk(SAY_DEATH);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 events.ScheduleEvent(EVENT_SHADOW_WORD_PAIN, urand(7000, 9000), 0, PHASE_ONE);
@@ -147,7 +139,7 @@ class boss_arlokk : public CreatureScript
                                 _triggersSideAGUID[sideA] = trigger->GetGUID();
                                 ++sideA;
                             }
-                            else
+                             else
                             {
                                 _triggersSideBGUID[sideB] = trigger->GetGUID();
                                 ++sideB;
@@ -157,15 +149,15 @@ class boss_arlokk : public CreatureScript
                 }
             }
 
-            void EnterEvadeMode(EvadeReason why) override
+            void EnterEvadeMode()
             {
-                BossAI::EnterEvadeMode(why);
-                if (GameObject* object = ObjectAccessor::GetGameObject(*me, instance->GetGuidData(GO_GONG_OF_BETHEKK)))
+                BossAI::EnterEvadeMode();
+                if (GameObject* object = ObjectAccessor::GetGameObject(*me, instance->GetData64(GO_GONG_OF_BETHEKK)))
                     object->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                 me->DespawnOrUnsummon(4000);
             }
 
-            void SetData(uint32 id, uint32 /*value*/) override
+            void SetData(uint32 id, uint32 /*value*/)
             {
                 if (id == 1)
                     --_summonCountA;
@@ -173,7 +165,7 @@ class boss_arlokk : public CreatureScript
                     --_summonCountB;
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -303,11 +295,11 @@ class boss_arlokk : public CreatureScript
         private:
             uint8 _summonCountA;
             uint8 _summonCountB;
-            ObjectGuid _triggersSideAGUID[5];
-            ObjectGuid _triggersSideBGUID[5];
+            uint64 _triggersSideAGUID[5];
+            uint64 _triggersSideBGUID[5];
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetZulGurubAI<boss_arlokkAI>(creature);
         }
@@ -340,12 +332,9 @@ class npc_zulian_prowler : public CreatureScript
 
         struct npc_zulian_prowlerAI : public ScriptedAI
         {
-            npc_zulian_prowlerAI(Creature* creature) : ScriptedAI(creature), _instance(creature->GetInstanceScript())
-            {
-                _sideData = 0;
-            }
+            npc_zulian_prowlerAI(Creature* creature) : ScriptedAI(creature), _instance(creature->GetInstanceScript()) { }
 
-            void Reset() override
+            void Reset()
             {
                 if (me->GetPositionY() < -1625.0f)
                     _sideData = 1;
@@ -355,27 +344,27 @@ class npc_zulian_prowler : public CreatureScript
                 DoCast(me, SPELL_SNEAK_RANK_1_1);
                 DoCast(me, SPELL_SNEAK_RANK_1_2);
 
-                if (Unit* arlokk = ObjectAccessor::GetUnit(*me, _instance->GetGuidData(NPC_ARLOKK)))
+                if (Unit* arlokk = ObjectAccessor::GetUnit(*me, _instance->GetData64(NPC_ARLOKK)))
                     me->GetMotionMaster()->MovePoint(0, arlokk->GetPositionX(), arlokk->GetPositionY(), arlokk->GetPositionZ());
                 _events.ScheduleEvent(EVENT_ATTACK, 6000);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 me->GetMotionMaster()->Clear(false);
                 me->RemoveAura(SPELL_SNEAK_RANK_1_1);
                 me->RemoveAura(SPELL_SNEAK_RANK_1_2);
             }
 
-            void SpellHit(Unit* caster, SpellInfo const* spell) override
+            void SpellHit(Unit* caster, SpellInfo const* spell)
             {
                 if (spell->Id == SPELL_MARK_OF_ARLOKK_TRIGGER) // Should only hit if line of sight
                     me->Attack(caster, true);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
-                if (Unit* arlokk = ObjectAccessor::GetUnit(*me, _instance->GetGuidData(NPC_ARLOKK)))
+                if (Unit* arlokk = ObjectAccessor::GetUnit(*me, _instance->GetData64(NPC_ARLOKK)))
                 {
                     if (arlokk->IsAlive())
                         arlokk->GetAI()->SetData(_sideData, 0);
@@ -383,7 +372,7 @@ class npc_zulian_prowler : public CreatureScript
                 me->DespawnOrUnsummon(4000);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (UpdateVictim())
                 {
@@ -413,7 +402,7 @@ class npc_zulian_prowler : public CreatureScript
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return GetZulGurubAI<npc_zulian_prowlerAI>(creature);
         }
@@ -432,7 +421,7 @@ class go_gong_of_bethekk : public GameObjectScript
 {
     public: go_gong_of_bethekk() : GameObjectScript("go_gong_of_bethekk") { }
 
-        bool OnGossipHello(Player* /*player*/, GameObject* go) override
+        bool OnGossipHello(Player* /*player*/, GameObject* go)
         {
             if (go->GetInstanceScript())
             {

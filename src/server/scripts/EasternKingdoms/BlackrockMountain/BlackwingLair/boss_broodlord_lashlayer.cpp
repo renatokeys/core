@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -50,10 +50,16 @@ public:
 
     struct boss_broodlordAI : public BossAI
     {
-        boss_broodlordAI(Creature* creature) : BossAI(creature, DATA_BROODLORD_LASHLAYER) { }
+        boss_broodlordAI(Creature* creature) : BossAI(creature, BOSS_BROODLORD) { }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
+            if (instance->GetBossState(BOSS_VAELASTRAZ) != DONE)
+            {
+                EnterEvadeMode();
+                return;
+            }
+
             _EnterCombat();
             Talk(SAY_AGGRO);
 
@@ -64,7 +70,7 @@ public:
             events.ScheduleEvent(EVENT_CHECK, 1000);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -108,7 +114,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_broodlordAI>(creature);
     }

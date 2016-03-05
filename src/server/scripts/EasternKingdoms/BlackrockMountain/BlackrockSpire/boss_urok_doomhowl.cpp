@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,7 +23,8 @@ enum Spells
 {
     SPELL_REND                      = 16509,
     SPELL_STRIKE                    = 15580,
-    SPELL_INTIMIDATING_ROAR         = 16508
+    SPELL_INTIMIDATING_ROAR         = 16508,
+	SPELL_UROK_SPAWN				= 16473,
 };
 
 enum Says
@@ -46,14 +47,20 @@ public:
 
     struct boss_urok_doomhowlAI : public BossAI
     {
-        boss_urok_doomhowlAI(Creature* creature) : BossAI(creature, DATA_UROK_DOOMHOWL) { }
+        boss_urok_doomhowlAI(Creature* creature) : BossAI(creature, DATA_UROK_DOOMHOWL) {}
 
-        void Reset() override
+        void Reset()
         {
             _Reset();
         }
 
-        void EnterCombat(Unit* /*who*/) override
+		void InitializeAI()
+		{
+			me->CastSpell(me, SPELL_UROK_SPAWN, true);
+			BossAI::InitializeAI();
+		}
+
+        void EnterCombat(Unit* /*who*/)
         {
             _EnterCombat();
             events.ScheduleEvent(SPELL_REND, urand(17000,20000));
@@ -61,12 +68,12 @@ public:
             Talk(SAY_AGGRO);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             _JustDied();
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -96,7 +103,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new boss_urok_doomhowlAI(creature);
     }

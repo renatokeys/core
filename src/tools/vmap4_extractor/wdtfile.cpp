@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,7 +19,6 @@
 #include "vmapexport.h"
 #include "wdtfile.h"
 #include "adtfile.h"
-
 #include <cstdio>
 
 char * wdtGetPlainName(char * FileName)
@@ -31,7 +30,7 @@ char * wdtGetPlainName(char * FileName)
     return FileName;
 }
 
-WDTFile::WDTFile(char* file_name, char* file_name1) : gWmoInstansName(NULL), gnWMO(0), WDT(file_name)
+WDTFile::WDTFile(char* file_name, char* file_name1) : WDT(file_name), gWmoInstansName(NULL), gnWMO(0)
 {
     filename.append(file_name1,strlen(file_name1));
 }
@@ -78,7 +77,7 @@ bool WDTFile::init(char* /*map_id*/, unsigned int mapID)
                 WDT.read(buf, size);
                 char *p=buf;
                 int q = 0;
-                gWmoInstansName = new std::string[size];
+                gWmoInstansName = new string[size];
                 while (p < buf + size)
                 {
                     char* s=wdtGetPlainName(p);
@@ -104,7 +103,6 @@ bool WDTFile::init(char* /*map_id*/, unsigned int mapID)
                 }
 
                 delete[] gWmoInstansName;
-                gWmoInstansName = NULL;
             }
         }
         WDT.seek((int)nextpos);

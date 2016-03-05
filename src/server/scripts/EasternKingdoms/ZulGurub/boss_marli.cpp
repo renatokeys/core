@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,10 +29,10 @@ EndScriptData */
 
 enum Says
 {
-    SAY_AGGRO                 = 0,
-    SAY_TRANSFORM             = 1,
-    SAY_SPIDER_SPAWN          = 2,
-    SAY_DEATH                 = 3
+    SAY_AGGRO               = 0,
+    SAY_TRANSFORM           = 1,
+    SAY_SPIDER_SPAWN        = 2,
+    SAY_DEATH               = 3
 };
 
 enum Spells
@@ -64,11 +64,6 @@ enum Phases
     PHASE_THREE               = 3
 };
 
-enum Misc
-{
-    NPC_SPIDER                = 15041
-};
-
 class boss_marli : public CreatureScript
 {
     public: boss_marli() : CreatureScript("boss_marli") { }
@@ -77,27 +72,27 @@ class boss_marli : public CreatureScript
         {
             boss_marliAI(Creature* creature) : BossAI(creature, DATA_MARLI) { }
 
-            void Reset() override
+            void Reset()
             {
                 if (events.IsInPhase(PHASE_THREE))
                     me->HandleStatModifier(UNIT_MOD_DAMAGE_MAINHAND, TOTAL_PCT, 35.0f, false); // hack
                 _Reset();
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*killer*/)
             {
                 _JustDied();
                 Talk(SAY_DEATH);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
                 events.ScheduleEvent(EVENT_SPAWN_START_SPIDERS, 1000, 0, PHASE_ONE);
                 Talk(SAY_AGGRO);
             }
 
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -112,12 +107,23 @@ class boss_marli : public CreatureScript
                     switch (eventId)
                     {
                         case EVENT_SPAWN_START_SPIDERS:
+
                             if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                             {
                                 Talk(SAY_SPIDER_SPAWN);
-                                for (uint8 i = 0; i < 4; ++i)
-                                    if (Creature* spider = me->SummonCreature(NPC_SPIDER, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000))
-                                        spider->AI()->AttackStart(target);
+                                Creature* Spider = NULL;
+                                Spider = me->SummonCreature(15041, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000);
+                                if (Spider)
+                                    Spider->AI()->AttackStart(target);
+                                Spider = me->SummonCreature(15041, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000);
+                                if (Spider)
+                                    Spider->AI()->AttackStart(target);
+                                Spider = me->SummonCreature(15041, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000);
+                                if (Spider)
+                                    Spider->AI()->AttackStart(target);
+                                Spider = me->SummonCreature(15041, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000);
+                                if (Spider)
+                                    Spider->AI()->AttackStart(target);
                             }
                             events.ScheduleEvent(EVENT_ASPECT_OF_MARLI, 12000, 0, PHASE_TWO);
                             events.ScheduleEvent(EVENT_TRANSFORM, 45000, 0, PHASE_TWO);
@@ -136,8 +142,11 @@ class boss_marli : public CreatureScript
                             break;
                         case EVENT_SPAWN_SPIDER:
                             if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                                if (Creature* spider = me->SummonCreature(NPC_SPIDER, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000))
-                                    spider->AI()->AttackStart(target);
+                            {
+                                Creature* Spider = me->SummonCreature(15041, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000);
+                                if (Spider)
+                                    Spider->AI()->AttackStart(target);
+                            }
                             events.ScheduleEvent(EVENT_SPAWN_SPIDER, urand(12000, 17000));
                             break;
                         case EVENT_TRANSFORM:
@@ -204,7 +213,7 @@ class boss_marli : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new boss_marliAI(creature);
         }
@@ -217,26 +226,20 @@ class npc_spawn_of_marli : public CreatureScript
 
         struct npc_spawn_of_marliAI : public ScriptedAI
         {
-            npc_spawn_of_marliAI(Creature* creature) : ScriptedAI(creature)
-            {
-                Initialize();
-            }
+            npc_spawn_of_marliAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Initialize()
+            uint32 LevelUp_Timer;
+
+            void Reset()
             {
                 LevelUp_Timer = 3000;
             }
 
-            uint32 LevelUp_Timer;
-
-            void Reset() override
+            void EnterCombat(Unit* /*who*/)
             {
-                Initialize();
             }
 
-            void EnterCombat(Unit* /*who*/) override { }
-
-            void UpdateAI(uint32 diff) override
+            void UpdateAI(uint32 diff)
             {
                 //Return since we have no target
                 if (!UpdateVictim())
@@ -253,7 +256,7 @@ class npc_spawn_of_marli : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const override
+        CreatureAI* GetAI(Creature* creature) const
         {
             return new npc_spawn_of_marliAI(creature);
         }

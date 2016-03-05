@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,18 +19,17 @@
 /* ScriptData
 SDName: Shadowmoon_Valley
 SD%Complete: 100
-SDComment: Quest support: 10583, 10601, 10804, 10854, 10458, 10481, 10480, 10781, 10451. Vendor Drake Dealer Hurlunk.
+SDComment: Quest support: 10519, 10583, 10601, 10804, 10854, 10458, 10481, 10480, 10781, 10451. Vendor Drake Dealer Hurlunk.
 SDCategory: Shadowmoon Valley
 EndScriptData */
 
 /* ContentData
-npc_invis_infernal_caster
-npc_infernal_attacker
 npc_mature_netherwing_drake
 npc_enslaved_netherwing_drake
 npc_drake_dealer_hurlunk
 npcs_flanis_swiftwing_and_kagrosh
 npc_karynaku
+npc_oronok_tornheart
 npc_earthmender_wilda
 npc_torloth_the_magnificent
 npc_illidari_spawn
@@ -48,6 +47,99 @@ EndContentData */
 #include "Player.h"
 #include "WorldSession.h"
 
+// Ours
+class spell_q10612_10613_the_fel_and_the_furious : public SpellScriptLoader
+{
+    public:
+        spell_q10612_10613_the_fel_and_the_furious() : SpellScriptLoader("spell_q10612_10613_the_fel_and_the_furious") { }
+
+        class spell_q10612_10613_the_fel_and_the_furious_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_q10612_10613_the_fel_and_the_furious_SpellScript);
+
+            void HandleScriptEffect(SpellEffIndex effIndex)
+            {
+				Player* charmer = GetCaster()->GetCharmerOrOwnerPlayerOrPlayerItself();
+				if (!charmer)
+					return;
+
+				std::list<GameObject*> gList;
+				GetCaster()->GetGameObjectListWithEntryInGrid(gList, 184979, 30.0f);
+				uint8 counter = 0;
+				for (std::list<GameObject*>::const_iterator itr = gList.begin(); itr != gList.end(); ++itr, ++counter)
+				{
+					if (counter >= 10)
+						break;
+					GameObject* go = *itr;
+					if (!go->isSpawned())
+						continue;
+					Creature* cr2 = go->SummonTrigger(go->GetPositionX(), go->GetPositionY(), go->GetPositionZ()+2.0f, 0.0f, 100);
+					if (cr2)
+					{
+						cr2->setFaction(14);
+						cr2->SetUInt32Value(UNIT_FIELD_FLAGS, 0);
+						GetCaster()->CastSpell(cr2, 38083, true);
+					}
+
+					go->SetLootState(GO_JUST_DEACTIVATED);
+					charmer->KilledMonsterCredit(21959, 0);
+				}
+            }
+
+            void Register()
+            {
+				OnEffectHitTarget += SpellEffectFn(spell_q10612_10613_the_fel_and_the_furious_SpellScript::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_q10612_10613_the_fel_and_the_furious_SpellScript();
+        }
+};
+
+class spell_q10563_q10596_to_legion_hold : public SpellScriptLoader
+{
+public:
+    spell_q10563_q10596_to_legion_hold() : SpellScriptLoader("spell_q10563_q10596_to_legion_hold") { }
+
+    class spell_q10563_q10596_to_legion_hold_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_q10563_q10596_to_legion_hold_AuraScript)
+        
+		void HandleEffectRemove(AuraEffect const * /*aurEff*/, AuraEffectHandleModes /*mode*/)
+        {
+            if (Player* player = GetTarget()->ToPlayer())
+			{
+				player->KilledMonsterCredit(21502, 0);
+				player->SetControlled(false, UNIT_STATE_STUNNED);
+			}
+        }
+
+		void HandleEffectApply(AuraEffect const * /*aurEff*/, AuraEffectHandleModes /*mode*/)
+        {
+            if (Player* player = GetTarget()->ToPlayer())
+			{
+				player->SetControlled(true, UNIT_STATE_STUNNED);
+				player->SummonCreature(21633, -3311.13f, 2946.15f, 171.1f, 4.86f, TEMPSUMMON_TIMED_DESPAWN, 64000);
+			}
+        }
+
+        void Register()
+        {
+			OnEffectApply += AuraEffectApplyFn(spell_q10563_q10596_to_legion_hold_AuraScript::HandleEffectApply, EFFECT_0, SPELL_AURA_TRANSFORM, AURA_EFFECT_HANDLE_REAL);
+            OnEffectRemove += AuraEffectRemoveFn(spell_q10563_q10596_to_legion_hold_AuraScript::HandleEffectRemove, EFFECT_0, SPELL_AURA_TRANSFORM, AURA_EFFECT_HANDLE_REAL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const
+    {
+        return new spell_q10563_q10596_to_legion_hold_AuraScript();
+    }
+};
+
+
+// Theirs
 /*#####
 # npc_invis_infernal_caster
 #####*/
@@ -75,14 +167,14 @@ public:
             ground = 0.f;
         }
 
-        void Reset() override
+        void Reset()
         {
-            ground = me->GetMap()->GetHeight(me->GetPositionX(), me->GetPositionY(), me->GetPositionZMinusOffset());
+            ground = me->GetMap()->GetHeight(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
             SummonInfernal();
             events.ScheduleEvent(EVENT_CAST_SUMMON_INFERNAL, urand(1000, 3000));
         }
 
-        void SetData(uint32 id, uint32 data) override
+        void SetData(uint32 id, uint32 data)
         {
             if (id == TYPE_INFERNAL && data == DATA_DIED)
                 SummonInfernal();
@@ -94,7 +186,7 @@ public:
             infernalGUID = infernal->GetGUID();
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             events.Update(diff);
 
@@ -118,11 +210,11 @@ public:
 
     private:
         EventMap events;
-        ObjectGuid infernalGUID;
+        uint64 infernalGUID;
         float ground;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_invis_infernal_casterAI(creature);
     }
@@ -141,25 +233,28 @@ public:
     {
         npc_infernal_attackerAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Reset() override
+        void Reset()
         {
             me->SetDisplayId(MODEL_INVISIBLE);
             me->GetMotionMaster()->MoveRandom(5.0f);
         }
 
-        void IsSummonedBy(Unit* summoner) override
+        void IsSummonedBy(Unit* summoner)
         {
+			if (!summoner)
+				return;
+
             if (summoner->ToCreature())
                 casterGUID = summoner->ToCreature()->GetGUID();;
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             if (Creature* caster = ObjectAccessor::GetCreature(*me, casterGUID))
                 caster->AI()->SetData(TYPE_INFERNAL, DATA_DIED);
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellInfo* spell) override
+        void SpellHit(Unit* /*caster*/, const SpellInfo* spell)
         {
             if (spell->Id == SPELL_SUMMON_INFERNAL)
             {
@@ -168,7 +263,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 /*diff*/) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -177,10 +272,10 @@ public:
         }
 
     private:
-        ObjectGuid casterGUID;
+        uint64 casterGUID;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_infernal_attackerAI(creature);
     }
@@ -210,21 +305,26 @@ class npc_mature_netherwing_drake : public CreatureScript
 public:
     npc_mature_netherwing_drake() : CreatureScript("npc_mature_netherwing_drake") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_mature_netherwing_drakeAI(creature);
     }
 
     struct npc_mature_netherwing_drakeAI : public ScriptedAI
     {
-        npc_mature_netherwing_drakeAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
+        npc_mature_netherwing_drakeAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Initialize()
+        uint64 uiPlayerGUID;
+
+        bool bCanEat;
+        bool bIsEating;
+
+        uint32 EatTimer;
+        uint32 CastTimer;
+
+        void Reset()
         {
-            uiPlayerGUID.Clear();
+            uiPlayerGUID = 0;
 
             bCanEat = false;
             bIsEating = false;
@@ -233,20 +333,7 @@ public:
             CastTimer = 5000;
         }
 
-        ObjectGuid uiPlayerGUID;
-
-        bool bCanEat;
-        bool bIsEating;
-
-        uint32 EatTimer;
-        uint32 CastTimer;
-
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void SpellHit(Unit* pCaster, SpellInfo const* spell) override
+        void SpellHit(Unit* pCaster, SpellInfo const* spell)
         {
             if (bCanEat || bIsEating)
                 return;
@@ -258,7 +345,7 @@ public:
             }
         }
 
-        void MovementInform(uint32 type, uint32 id) override
+        void MovementInform(uint32 type, uint32 id)
         {
             if (type != POINT_MOTION_TYPE)
                 return;
@@ -271,7 +358,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (bCanEat || bIsEating)
             {
@@ -301,7 +388,7 @@ public:
 
                         if (Player* player = ObjectAccessor::GetPlayer(*me, uiPlayerGUID))
                         {
-                            player->KilledMonsterCredit(NPC_EVENT_PINGER);
+                            player->KilledMonsterCredit(NPC_EVENT_PINGER, 0);
 
                             if (GameObject* go = player->FindNearestGameObject(GO_CARCASS, 10))
                                 go->Delete();
@@ -356,7 +443,7 @@ class npc_enslaved_netherwing_drake : public CreatureScript
 public:
     npc_enslaved_netherwing_drake() : CreatureScript("npc_enslaved_netherwing_drake") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_enslaved_netherwing_drakeAI(creature);
     }
@@ -365,15 +452,16 @@ public:
     {
         npc_enslaved_netherwing_drakeAI(Creature* creature) : ScriptedAI(creature)
         {
+            PlayerGUID = 0;
             Tapped = false;
             Reset();
         }
 
-        ObjectGuid PlayerGUID;
+        uint64 PlayerGUID;
         uint32 FlyTimer;
         bool Tapped;
 
-        void Reset() override
+        void Reset()
         {
             if (!Tapped)
                 me->setFaction(FACTION_DEFAULT);
@@ -383,7 +471,7 @@ public:
             me->SetVisible(true);
         }
 
-        void SpellHit(Unit* caster, const SpellInfo* spell) override
+        void SpellHit(Unit* caster, const SpellInfo* spell)
         {
             if (!caster)
                 return;
@@ -409,7 +497,7 @@ public:
             }
         }
 
-        void MovementInform(uint32 type, uint32 id) override
+        void MovementInform(uint32 type, uint32 id)
         {
             if (type != POINT_MOTION_TYPE)
                 return;
@@ -422,16 +510,16 @@ public:
                     if (player)
                         DoCast(player, SPELL_FORCE_OF_NELTHARAKU, true);
 
-                    PlayerGUID.Clear();
+                    PlayerGUID = 0;
                 }
                 me->SetVisible(false);
                 me->SetDisableGravity(false);
-                me->DealDamage(me, me->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
+                Unit::DealDamage(me, me, me->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
                 me->RemoveCorpse();
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
             {
@@ -456,10 +544,10 @@ public:
 
                                 Position pos;
                                 if (Unit* EscapeDummy = me->FindNearestCreature(NPC_ESCAPE_DUMMY, 30))
-                                    pos = EscapeDummy->GetPosition();
+                                    EscapeDummy->GetPosition(&pos);
                                 else
                                 {
-                                    pos = me->GetRandomNearPosition(20);
+                                    me->GetRandomNearPosition(pos, 20);
                                     pos.m_positionZ += 25;
                                 }
 
@@ -486,35 +574,27 @@ class npc_dragonmaw_peon : public CreatureScript
 public:
     npc_dragonmaw_peon() : CreatureScript("npc_dragonmaw_peon") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_dragonmaw_peonAI(creature);
     }
 
     struct npc_dragonmaw_peonAI : public ScriptedAI
     {
-        npc_dragonmaw_peonAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
+        npc_dragonmaw_peonAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Initialize()
+        uint64 PlayerGUID;
+        bool Tapped;
+        uint32 PoisonTimer;
+
+        void Reset()
         {
-            PlayerGUID.Clear();
+            PlayerGUID = 0;
             Tapped = false;
             PoisonTimer = 0;
         }
 
-        ObjectGuid PlayerGUID;
-        bool Tapped;
-        uint32 PoisonTimer;
-
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void SpellHit(Unit* caster, const SpellInfo* spell) override
+        void SpellHit(Unit* caster, const SpellInfo* spell)
         {
             if (!caster)
                 return;
@@ -532,7 +612,7 @@ public:
             }
         }
 
-        void MovementInform(uint32 type, uint32 id) override
+        void MovementInform(uint32 type, uint32 id)
         {
             if (type != POINT_MOTION_TYPE)
                 return;
@@ -544,7 +624,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (PoisonTimer)
             {
@@ -554,16 +634,12 @@ public:
                     {
                         Player* player = ObjectAccessor::GetPlayer(*me, PlayerGUID);
                         if (player && player->GetQuestStatus(11020) == QUEST_STATUS_INCOMPLETE)
-                            player->KilledMonsterCredit(23209);
+                            player->KilledMonsterCredit(23209, 0);
                     }
                     PoisonTimer = 0;
-                    me->DealDamage(me, me->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
+                    Unit::DealDamage(me, me, me->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
                 } else PoisonTimer -= diff;
             }
-            if (!UpdateVictim())
-                return;
-
-            DoMeleeAttackIfReady();
         }
     };
 };
@@ -577,7 +653,7 @@ class npc_drake_dealer_hurlunk : public CreatureScript
 public:
     npc_drake_dealer_hurlunk() : CreatureScript("npc_drake_dealer_hurlunk") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_TRADE)
@@ -586,7 +662,7 @@ public:
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (creature->IsVendor() && player->GetReputationRank(1015) == REP_EXALTED)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
@@ -609,7 +685,7 @@ class npcs_flanis_swiftwing_and_kagrosh : public CreatureScript
 public:
     npcs_flanis_swiftwing_and_kagrosh() : CreatureScript("npcs_flanis_swiftwing_and_kagrosh") { }
 
-    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_INFO_DEF+1)
@@ -618,7 +694,7 @@ public:
             uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 30658, 1, NULL);
             if (msg == EQUIP_ERR_OK)
             {
-                player->StoreNewItem(dest, 30658, true);
+                player->StoreNewItem(dest, 30658, 1, true);
                 player->PlayerTalkClass->ClearMenus();
             }
         }
@@ -628,14 +704,14 @@ public:
             uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 30659, 1, NULL);
             if (msg == EQUIP_ERR_OK)
             {
-                player->StoreNewItem(dest, 30659, true);
+                player->StoreNewItem(dest, 30659, 1, true);
                 player->PlayerTalkClass->ClearMenus();
             }
         }
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (player->GetQuestStatus(10583) == QUEST_STATUS_INCOMPLETE && !player->HasItemCount(30658, 1, true))
             player->ADD_GOSSIP_ITEM(0, GOSSIP_HSK1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
@@ -648,7 +724,7 @@ public:
     }
 };
 
-/*######
+/*####
 # npc_karynaku
 ####*/
 
@@ -667,7 +743,7 @@ class npc_karynaku : public CreatureScript
     public:
         npc_karynaku() : CreatureScript("npc_karynaku") { }
 
-        bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
+        bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
         {
             if (quest->GetQuestId() == QUEST_ALLY_OF_NETHER)
                 player->ActivateTaxiPathTo(TAXI_PATH_ID);
@@ -708,7 +784,7 @@ class npc_earthmender_wilda : public CreatureScript
 public:
     npc_earthmender_wilda() : CreatureScript("npc_earthmender_wilda") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) override
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest)
     {
         if (quest->GetQuestId() == QUEST_ESCAPE_COILSCAR)
         {
@@ -721,31 +797,23 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_earthmender_wildaAI(creature);
     }
 
     struct npc_earthmender_wildaAI : public npc_escortAI
     {
-        npc_earthmender_wildaAI(Creature* creature) : npc_escortAI(creature)
-        {
-            Initialize();
-        }
+        npc_earthmender_wildaAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Initialize()
+        uint32 m_uiHealingTimer;
+
+        void Reset()
         {
             m_uiHealingTimer = 0;
         }
 
-        uint32 m_uiHealingTimer;
-
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId)
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -803,7 +871,7 @@ public:
             }
         }
 
-        void JustSummoned(Creature* summoned) override
+        void JustSummoned(Creature* summoned)
         {
             if (summoned->GetEntry() == NPC_COILSKAR_ASSASSIN)
                 summoned->AI()->AttackStart(me);
@@ -821,10 +889,10 @@ public:
             DoSummon(NPC_COILSKAR_ASSASSIN, me, 15.0f, 5000, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT);
         }
 
-        void EnterCombat(Unit* who) override
+        void EnterCombat(Unit* who)
         {
             //don't always use
-            if (rand32() % 5)
+            if (rand()%5)
                 return;
 
             //only aggro text if not player
@@ -836,7 +904,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 uiDiff) override
+        void UpdateAI(uint32 uiDiff)
         {
             npc_escortAI::UpdateAI(uiDiff);
 
@@ -891,8 +959,13 @@ static TorlothCinematic TorlothAnim[]=
     {0, 0}
 };
 
+struct Location
+{
+    float x, y, z, o;
+};
+
 //Cordinates for Spawns
-static Position SpawnLocation[]=
+static Location SpawnLocation[]=
 {
     //Cords used for:
     {-4615.8556f, 1342.2532f, 139.9f, 1.612f}, //Illidari Soldier
@@ -954,49 +1027,38 @@ class npc_torloth_the_magnificent : public CreatureScript
 public:
     npc_torloth_the_magnificent() : CreatureScript("npc_torloth_the_magnificent") { }
 
-    CreatureAI* GetAI(Creature* c) const override
+    CreatureAI* GetAI(Creature* c) const
     {
         return new npc_torloth_the_magnificentAI(c);
     }
 
     struct npc_torloth_the_magnificentAI : public ScriptedAI
     {
-        npc_torloth_the_magnificentAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-            SpellTimer1 = 0;
-            SpellTimer2 = 0;
-            SpellTimer3 = 0;
-        }
-
-        void Initialize()
-        {
-            AnimationTimer = 4000;
-            AnimationCount = 0;
-            LordIllidanGUID.Clear();
-            AggroTargetGUID.Clear();
-            Timers = false;
-        }
+        npc_torloth_the_magnificentAI(Creature* creature) : ScriptedAI(creature) { }
 
         uint32 AnimationTimer, SpellTimer1, SpellTimer2, SpellTimer3;
 
         uint8 AnimationCount;
 
-        ObjectGuid LordIllidanGUID;
-        ObjectGuid AggroTargetGUID;
+        uint64 LordIllidanGUID;
+        uint64 AggroTargetGUID;
 
         bool Timers;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            AnimationTimer = 4000;
+            AnimationCount = 0;
+            LordIllidanGUID = 0;
+            AggroTargetGUID = 0;
+            Timers = false;
 
             me->AddUnitState(UNIT_STATE_ROOT);
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-            me->SetTarget(ObjectGuid::Empty);
+            me->SetTarget(0);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
         void HandleAnimation()
         {
@@ -1043,7 +1105,7 @@ public:
             ++AnimationCount;
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (AnimationTimer)
             {
@@ -1069,26 +1131,26 @@ public:
                 if (SpellTimer1 <= diff)
                 {
                     DoCastVictim(SpawnCast[6].SpellId);//Cleave
-                    SpellTimer1 = SpawnCast[6].Timer2 + (rand32() % 10 * 1000);
+                    SpellTimer1 = SpawnCast[6].Timer2 + (rand()%10 * 1000);
                 } else SpellTimer1 -= diff;
 
                 if (SpellTimer2 <= diff)
                 {
                     DoCastVictim(SpawnCast[7].SpellId);//Shadowfury
-                    SpellTimer2 = SpawnCast[7].Timer2 + (rand32() % 5 * 1000);
+                    SpellTimer2 = SpawnCast[7].Timer2 + (rand()%5 * 1000);
                 } else SpellTimer2 -= diff;
 
                 if (SpellTimer3 <= diff)
                 {
                     DoCast(me, SpawnCast[8].SpellId);
-                    SpellTimer3 = SpawnCast[8].Timer2 + (rand32() % 7 * 1000);//Spell Reflection
+                    SpellTimer3 = SpawnCast[8].Timer2 + (rand()%7 * 1000);//Spell Reflection
                 } else SpellTimer3 -= diff;
             }
 
             DoMeleeAttackIfReady();
         }
 
-        void JustDied(Unit* killer) override
+        void JustDied(Unit* killer)
         {
             switch (killer->GetTypeId())
             {
@@ -1120,33 +1182,16 @@ class npc_lord_illidan_stormrage : public CreatureScript
 public:
     npc_lord_illidan_stormrage() : CreatureScript("npc_lord_illidan_stormrage") { }
 
-    CreatureAI* GetAI(Creature* c) const override
+    CreatureAI* GetAI(Creature* c) const
     {
         return new npc_lord_illidan_stormrageAI(c);
     }
 
     struct npc_lord_illidan_stormrageAI : public ScriptedAI
     {
-        npc_lord_illidan_stormrageAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
+        npc_lord_illidan_stormrageAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Initialize()
-        {
-            PlayerGUID.Clear();
-
-            WaveTimer = 10000;
-            AnnounceTimer = 7000;
-            LiveCount = 0;
-            WaveCount = 0;
-
-            EventStarted = false;
-            Announced = false;
-            Failed = false;
-        }
-
-        ObjectGuid PlayerGUID;
+        uint64 PlayerGUID;
 
         uint32 WaveTimer;
         uint32 AnnounceTimer;
@@ -1158,26 +1203,37 @@ public:
         bool Announced;
         bool Failed;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            PlayerGUID = 0;
+
+            WaveTimer = 10000;
+            AnnounceTimer = 7000;
+            LiveCount = 0;
+            WaveCount = 0;
+
+            EventStarted = false;
+            Announced = false;
+            Failed = false;
 
             me->SetVisible(false);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
-        void MoveInLineOfSight(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
+        void MoveInLineOfSight(Unit* /*who*/) { }
 
-        void AttackStart(Unit* /*who*/) override { }
+        void AttackStart(Unit* /*who*/) { }
 
         void SummonNextWave();
 
         void CheckEventFail()
         {
             Player* player = ObjectAccessor::GetPlayer(*me, PlayerGUID);
-
             if (!player)
+			{
+				Failed = true;
                 return;
+			}
 
             if (Group* EventGroup = player->GetGroup())
             {
@@ -1232,7 +1288,7 @@ public:
                 Announced = false;
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!PlayerGUID || !EventStarted)
                 return;
@@ -1270,47 +1326,36 @@ class npc_illidari_spawn : public CreatureScript
 public:
     npc_illidari_spawn() : CreatureScript("npc_illidari_spawn") { }
 
-    CreatureAI* GetAI(Creature* c) const override
+    CreatureAI* GetAI(Creature* c) const
     {
         return new npc_illidari_spawnAI(c);
     }
 
     struct npc_illidari_spawnAI : public ScriptedAI
     {
-        npc_illidari_spawnAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-            SpellTimer1 = 0;
-            SpellTimer2 = 0;
-            SpellTimer3 = 0;
-        }
+        npc_illidari_spawnAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Initialize()
-        {
-            LordIllidanGUID.Clear();
-            Timers = false;
-        }
-
-        ObjectGuid LordIllidanGUID;
+        uint64 LordIllidanGUID;
         uint32 SpellTimer1, SpellTimer2, SpellTimer3;
         bool Timers;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            LordIllidanGUID = 0;
+            Timers = false;
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             me->RemoveCorpse();
             if (Creature* LordIllidan = (ObjectAccessor::GetCreature(*me, LordIllidanGUID)))
                 if (LordIllidan)
-                    ENSURE_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, LordIllidan->AI())->LiveCounter();
+                    CAST_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, LordIllidan->AI())->LiveCounter();
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -1319,18 +1364,18 @@ public:
             {
                 if (me->GetEntry() == 22075)//Illidari Soldier
                 {
-                    SpellTimer1 = SpawnCast[0].Timer1 + (rand32() % 4 * 1000);
+                    SpellTimer1 = SpawnCast[0].Timer1 + (rand()%4 * 1000);
                 }
                 if (me->GetEntry() == 22074)//Illidari Mind Breaker
                 {
-                    SpellTimer1 = SpawnCast[1].Timer1 + (rand32() % 10 * 1000);
-                    SpellTimer2 = SpawnCast[2].Timer1 + (rand32() % 4 * 1000);
-                    SpellTimer3 = SpawnCast[3].Timer1 + (rand32() % 4 * 1000);
+                    SpellTimer1 = SpawnCast[1].Timer1 + (rand()%10 * 1000);
+                    SpellTimer2 = SpawnCast[2].Timer1 + (rand()%4 * 1000);
+                    SpellTimer3 = SpawnCast[3].Timer1 + (rand()%4 * 1000);
                 }
                 if (me->GetEntry() == 19797)// Illidari Highlord
                 {
-                    SpellTimer1 = SpawnCast[4].Timer1 + (rand32() % 4 * 1000);
-                    SpellTimer2 = SpawnCast[5].Timer1 + (rand32() % 4 * 1000);
+                    SpellTimer1 = SpawnCast[4].Timer1 + (rand()%4 * 1000);
+                    SpellTimer2 = SpawnCast[5].Timer1 + (rand()%4 * 1000);
                 }
                 Timers = true;
             }
@@ -1340,7 +1385,7 @@ public:
                 if (SpellTimer1 <= diff)
                 {
                     DoCastVictim(SpawnCast[0].SpellId);//Spellbreaker
-                    SpellTimer1 = SpawnCast[0].Timer2 + (rand32() % 5 * 1000);
+                    SpellTimer1 = SpawnCast[0].Timer2 + (rand()%5 * 1000);
                 } else SpellTimer1 -= diff;
             }
             //Illidari Mind Breaker
@@ -1353,7 +1398,7 @@ public:
                         if (target->GetTypeId() == TYPEID_PLAYER)
                         {
                             DoCast(target, SpawnCast[1].SpellId); //Focused Bursts
-                            SpellTimer1 = SpawnCast[1].Timer2 + (rand32() % 5 * 1000);
+                            SpellTimer1 = SpawnCast[1].Timer2 + (rand()%5 * 1000);
                         } else SpellTimer1 = 2000;
                     }
                 } else SpellTimer1 -= diff;
@@ -1361,13 +1406,13 @@ public:
                 if (SpellTimer2 <= diff)
                 {
                     DoCastVictim(SpawnCast[2].SpellId);//Psychic Scream
-                    SpellTimer2 = SpawnCast[2].Timer2 + (rand32() % 13 * 1000);
+                    SpellTimer2 = SpawnCast[2].Timer2 + (rand()%13 * 1000);
                 } else SpellTimer2 -= diff;
 
                 if (SpellTimer3 <= diff)
                 {
                     DoCastVictim(SpawnCast[3].SpellId);//Mind Blast
-                    SpellTimer3 = SpawnCast[3].Timer2 + (rand32() % 8 * 1000);
+                    SpellTimer3 = SpawnCast[3].Timer2 + (rand()%8 * 1000);
                 } else SpellTimer3 -= diff;
             }
             //Illidari Highlord
@@ -1376,13 +1421,13 @@ public:
                 if (SpellTimer1 <= diff)
                 {
                     DoCastVictim(SpawnCast[4].SpellId);//Curse Of Flames
-                    SpellTimer1 = SpawnCast[4].Timer2 + (rand32() % 10 * 1000);
+                    SpellTimer1 = SpawnCast[4].Timer2 + (rand()%10 * 1000);
                 } else SpellTimer1 -= diff;
 
                 if (SpellTimer2 <= diff)
                 {
                     DoCastVictim(SpawnCast[5].SpellId);//Flamestrike
-                    SpellTimer2 = SpawnCast[5].Timer2 + (rand32() % 7 * 13000);
+                    SpellTimer2 = SpawnCast[5].Timer2 + (rand()%7 * 13000);
                 } else SpellTimer2 -= diff;
             }
 
@@ -1400,16 +1445,19 @@ void npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI::SummonNextWave()
 
     for (uint8 i = 0; i < count; ++i)
     {
-        Creature* Spawn = me->SummonCreature(WavesInfo[WaveCount].CreatureId, SpawnLocation[locIndex + i], TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 60000);
+        Creature* Spawn = NULL;
+        float X = SpawnLocation[locIndex + i].x;
+        float Y = SpawnLocation[locIndex + i].y;
+        float Z = SpawnLocation[locIndex + i].z;
+        float O = SpawnLocation[locIndex + i].o;
+        Spawn = me->SummonCreature(WavesInfo[WaveCount].CreatureId, X, Y, Z, O, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 60000);
         ++LiveCount;
 
         if (Spawn)
         {
-            Spawn->LoadCreaturesAddon();
-
             if (WaveCount == 0)//1 Wave
             {
-                if (rand32() % 3 == 1 && FelguardCount<2)
+                if (rand()%3 == 1 && FelguardCount<2)
                 {
                     Spawn->SetDisplayId(18654);
                     ++FelguardCount;
@@ -1437,14 +1485,14 @@ void npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI::SummonNextWave()
                         Spawn->GetMotionMaster()->MovePoint(0, x, y, z);
                     }
                 }
-                ENSURE_AI(npc_illidari_spawn::npc_illidari_spawnAI, Spawn->AI())->LordIllidanGUID = me->GetGUID();
+                CAST_AI(npc_illidari_spawn::npc_illidari_spawnAI, Spawn->AI())->LordIllidanGUID = me->GetGUID();
             }
 
             if (WavesInfo[WaveCount].CreatureId == 22076) // Torloth
             {
-                ENSURE_AI(npc_torloth_the_magnificent::npc_torloth_the_magnificentAI, Spawn->AI())->LordIllidanGUID = me->GetGUID();
+                CAST_AI(npc_torloth_the_magnificent::npc_torloth_the_magnificentAI, Spawn->AI())->LordIllidanGUID = me->GetGUID();
                 if (PlayerGUID)
-                    ENSURE_AI(npc_torloth_the_magnificent::npc_torloth_the_magnificentAI, Spawn->AI())->AggroTargetGUID = PlayerGUID;
+                    CAST_AI(npc_torloth_the_magnificent::npc_torloth_the_magnificentAI, Spawn->AI())->AggroTargetGUID = PlayerGUID;
             }
         }
     }
@@ -1462,17 +1510,17 @@ class go_crystal_prison : public GameObjectScript
 public:
     go_crystal_prison() : GameObjectScript("go_crystal_prison") { }
 
-    bool OnQuestAccept(Player* player, GameObject* /*go*/, Quest const* quest) override
+    bool OnQuestAccept(Player* player, GameObject* /*go*/, Quest const* quest)
     {
         if (quest->GetQuestId() == QUEST_BATTLE_OF_THE_CRIMSON_WATCH)
         {
             Creature* Illidan = player->FindNearestCreature(22083, 50);
 
-            if (Illidan && !ENSURE_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->EventStarted)
+            if (Illidan && !CAST_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->EventStarted)
             {
-                ENSURE_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->PlayerGUID = player->GetGUID();
-                ENSURE_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->LiveCount = 0;
-                ENSURE_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->EventStarted = true;
+                CAST_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->PlayerGUID = player->GetGUID();
+                CAST_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->LiveCount = 0;
+                CAST_AI(npc_lord_illidan_stormrage::npc_lord_illidan_stormrageAI, Illidan->AI())->EventStarted=true;
             }
         }
      return true;
@@ -1531,7 +1579,7 @@ class npc_enraged_spirit : public CreatureScript
 public:
     npc_enraged_spirit() : CreatureScript("npc_enraged_spirit") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
     return new npc_enraged_spiritAI(creature);
     }
@@ -1540,11 +1588,11 @@ public:
     {
         npc_enraged_spiritAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Reset() override { }
+        void Reset() { }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) { }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*killer*/)
         {
             // always spawn spirit on death
             // if totem around
@@ -1596,45 +1644,12 @@ public:
 
                      if (Unit* owner = totemOspirits->GetOwner())
                          if (Player* player = owner->ToPlayer())
-                             player->KilledMonsterCredit(credit);
+                             player->KilledMonsterCredit(credit, 0);
                      DoCast(totemOspirits, SPELL_SOUL_CAPTURED);
                  }
             }
         }
     };
-};
-
-enum ZuluhedChains
-{
-    NPC_KARYNAKU    = 22112,
-};
-
-class spell_unlocking_zuluheds_chains : public SpellScriptLoader
-{
-    public:
-        spell_unlocking_zuluheds_chains() : SpellScriptLoader("spell_unlocking_zuluheds_chains") { }
-
-        class spell_unlocking_zuluheds_chains_SpellScript : public SpellScript
-        {
-            PrepareSpellScript(spell_unlocking_zuluheds_chains_SpellScript);
-
-            void HandleAfterHit()
-            {
-                if (Player* caster = GetCaster()->ToPlayer())
-                    if (Creature* karynaku = caster->FindNearestCreature(NPC_KARYNAKU, 15.0f))
-                        caster->KilledMonsterCredit(NPC_KARYNAKU, karynaku->GetGUID());
-            }
-
-            void Register() override
-            {
-                AfterHit += SpellHitFn(spell_unlocking_zuluheds_chains_SpellScript::HandleAfterHit);
-            }
-        };
-
-        SpellScript* GetSpellScript() const override
-        {
-            return new spell_unlocking_zuluheds_chains_SpellScript();
-        }
 };
 
 enum ShadowMoonTuberEnum
@@ -1659,7 +1674,14 @@ public:
     {
         npc_shadowmoon_tuber_nodeAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void SetData(uint32 id, uint32 data) override
+        void Reset()
+        {
+            tapped = false;
+            tuberGUID = 0;
+            resetTimer = 60000;
+        }
+
+        void SetData(uint32 id, uint32 data)
         {
             if (id == TYPE_BOAR && data == DATA_BOAR)
             {
@@ -1669,26 +1691,52 @@ public:
                 // Despawn the tuber
                 if (GameObject* tuber = me->FindNearestGameObject(GO_SHADOWMOON_TUBER_MOUND, 5.0f))
                 {
-                    tuber->SetLootState(GO_JUST_DEACTIVATED);
-                    me->DespawnOrUnsummon();
+                    tuberGUID = tuber->GetGUID();
+                    // @Workaround: find how to properly despawn the GO
+                    tuber->SetPhaseMask(2, true);
                 }
             }
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellInfo* spell) override
+        void SpellHit(Unit* /*caster*/, const SpellInfo* spell)
         {
-            if (spell->Id == SPELL_WHISTLE)
+            if (!tapped && spell->Id == SPELL_WHISTLE)
             {
                 if (Creature* boar = me->FindNearestCreature(NPC_BOAR_ENTRY, 30.0f))
                 {
+                    // Disable trigger and force nearest boar to walk to him
+                    tapped = true;
                     boar->SetWalk(false);
                     boar->GetMotionMaster()->MovePoint(POINT_TUBER, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
                 }
             }
         }
+
+        void UpdateAI(uint32 diff)
+        {
+            if (tapped)
+            {
+                if (resetTimer <= diff)
+                {
+                    // Respawn the tuber
+                    if (tuberGUID)
+                        if (GameObject* tuber = ObjectAccessor::GetGameObject(*me, tuberGUID))
+                        // @Workaround: find how to properly respawn the GO
+                            tuber->SetPhaseMask(1, true);
+
+                    Reset();
+                }
+                else
+                    resetTimer -= diff;
+            }
+        }
+    private:
+        bool tapped;
+        uint64 tuberGUID;
+        uint32 resetTimer;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_shadowmoon_tuber_nodeAI(creature);
     }
@@ -1696,6 +1744,11 @@ public:
 
 void AddSC_shadowmoon_valley()
 {
+	// Ours
+	new spell_q10612_10613_the_fel_and_the_furious();
+	new spell_q10563_q10596_to_legion_hold();
+
+	// Theirs
     new npc_invis_infernal_caster();
     new npc_infernal_attacker();
     new npc_mature_netherwing_drake();
@@ -1710,6 +1763,5 @@ void AddSC_shadowmoon_valley()
     new npc_illidari_spawn();
     new npc_torloth_the_magnificent();
     new npc_enraged_spirit();
-    new spell_unlocking_zuluheds_chains();
     new npc_shadowmoon_tuber_node();
 }

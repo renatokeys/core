@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -45,23 +45,31 @@ enum VehicleFlags
     VEHICLE_FLAG_CUSTOM_PITCH                    = 0x00000040,           // If set use pitchMin and pitchMax from DBC, otherwise pitchMin = -pi/2, pitchMax = pi/2
     VEHICLE_FLAG_ADJUST_AIM_ANGLE                = 0x00000400,           // Lua_IsVehicleAimAngleAdjustable
     VEHICLE_FLAG_ADJUST_AIM_POWER                = 0x00000800,           // Lua_IsVehicleAimPowerAdjustable
-    VEHICLE_FLAG_FIXED_POSITION                  = 0x00200000            // Used for cannons, when they should be rooted
 };
 
 enum VehicleSpells
 {
-    VEHICLE_SPELL_RIDE_HARDCODED                 = 46598,
-    VEHICLE_SPELL_PARACHUTE                      = 45472
+    VEHICLE_SPELL_RIDE_HARDCODED                = 46598,
+    VEHICLE_SPELL_PARACHUTE                     = 45472,
+
+	VEHICLE_SPELL_GEIST_CONTROL_END				= 58119,
+	VEHICLE_SPELL_SHADE_CONTROL_END				= 58664
+};
+
+enum VehicleNPCs
+{
+	NPC_EIDOLON_WATCHER							= 31110,
+	NPC_LITHE_STALKER							= 30895
 };
 
 struct PassengerInfo
 {
-    ObjectGuid Guid;
+    uint64 Guid;
     bool IsUnselectable;
 
     void Reset()
     {
-        Guid.Clear();
+        Guid = 0;
         IsUnselectable = false;
     }
 };
@@ -73,7 +81,7 @@ struct VehicleSeat
         Passenger.Reset();
     }
 
-    bool IsEmpty() const { return Passenger.Guid.IsEmpty(); }
+    bool IsEmpty() const { return !Passenger.Guid; }
 
     VehicleSeatEntry const* SeatInfo;
     PassengerInfo Passenger;
@@ -82,9 +90,9 @@ struct VehicleSeat
 struct VehicleAccessory
 {
     VehicleAccessory(uint32 entry, int8 seatId, bool isMinion, uint8 summonType, uint32 summonTime) :
-        AccessoryEntry(entry), IsMinion(isMinion), SummonTime(summonTime), SeatId(seatId), SummonedType(summonType) { }
+        AccessoryEntry(entry), IsMinion(isMinion), SummonTime(summonTime), SeatId(seatId), SummonedType(summonType) {}
     uint32 AccessoryEntry;
-    bool IsMinion;
+    uint32 IsMinion;
     uint32 SummonTime;
     int8 SeatId;
     uint8 SummonedType;

@@ -1,48 +1,28 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss_Epoch_Hunter
-SD%Complete: 60
-SDComment: Missing spawns pre-event, missing speech to be coordinated with rest of escort event.
-SDCategory: Caverns of Time, Old Hillsbrad Foothills
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "old_hillsbrad.h"
 
-/*###################
-# boss_epoch_hunter #
-####################*/
 
 enum EpochHunter
 {
-    SAY_ENTER                   = 0,
-    SAY_AGGRO                   = 1,
-    SAY_SLAY                    = 2,
-    SAY_BREATH                  = 3,
-    SAY_DEATH                   = 4,
+    SAY_AGGRO					= 3,
+    SAY_SLAY					= 4,
+    SAY_BREATH					= 5,
+    SAY_DEATH					= 6,
 
     SPELL_SAND_BREATH           = 31914,
     SPELL_IMPENDING_DEATH       = 31916,
     SPELL_MAGIC_DISRUPTION_AURA = 33834,
-    SPELL_WING_BUFFET           = 31475
+    SPELL_WING_BUFFET           = 31475,
+
+	EVENT_SPELL_SAND_BREATH		= 1,
+	EVENT_SPELL_IMPENDING_DEATH	= 2,
+	EVENT_SPELL_DISRUPTION		= 3,
+	EVENT_SPELL_WING_BUFFET		= 4
 };
 
 class boss_epoch_hunter : public CreatureScript
@@ -50,94 +30,77 @@ class boss_epoch_hunter : public CreatureScript
 public:
     boss_epoch_hunter() : CreatureScript("boss_epoch_hunter") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return GetInstanceAI<boss_epoch_hunterAI>(creature);
     }
 
     struct boss_epoch_hunterAI : public ScriptedAI
     {
-        boss_epoch_hunterAI(Creature* creature) : ScriptedAI(creature)
+        boss_epoch_hunterAI(Creature* creature) : ScriptedAI(creature) { }
+
+        EventMap events;
+
+        void Reset()
         {
-            Initialize();
-            instance = creature->GetInstanceScript();
         }
 
-        void Initialize()
-        {
-            SandBreath_Timer = urand(8000, 16000);
-            ImpendingDeath_Timer = urand(25000, 30000);
-            WingBuffet_Timer = 35000;
-            Mda_Timer = 40000;
-        }
-
-        InstanceScript* instance;
-
-        uint32 SandBreath_Timer;
-        uint32 ImpendingDeath_Timer;
-        uint32 WingBuffet_Timer;
-        uint32 Mda_Timer;
-
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             Talk(SAY_AGGRO);
+
+			events.ScheduleEvent(EVENT_SPELL_SAND_BREATH, 8000);
+			events.ScheduleEvent(EVENT_SPELL_IMPENDING_DEATH, 2000);
+			events.ScheduleEvent(EVENT_SPELL_DISRUPTION, 20000);
+			events.ScheduleEvent(EVENT_SPELL_WING_BUFFET, 14000);
         }
 
-        void KilledUnit(Unit* /*victim*/) override
+        void KilledUnit(Unit* victim)
         {
-            Talk(SAY_SLAY);
+			if (victim->GetTypeId() == TYPEID_PLAYER)
+				Talk(SAY_SLAY);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* killer)
         {
+			if (killer == me)
+				return;
             Talk(SAY_DEATH);
-
-            if (instance->GetData(TYPE_THRALL_EVENT) == IN_PROGRESS)
-                instance->SetData(TYPE_THRALL_PART4, DONE);
+			me->GetInstanceScript()->SetData(DATA_ESCORT_PROGRESS, ENCOUNTER_PROGRESS_EPOCH_KILLED);
+			if (Creature* taretha = ObjectAccessor::GetCreature(*me, me->GetInstanceScript()->GetData64(DATA_TARETHA_GUID)))
+				taretha->AI()->DoAction(me->GetEntry());
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
-            //Return since we have no target
             if (!UpdateVictim())
                 return;
 
-            //Sand Breath
-            if (SandBreath_Timer <= diff)
-            {
-                if (me->IsNonMeleeSpellCast(false))
-                    me->InterruptNonMeleeSpells(false);
+			events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
 
-                DoCastVictim(SPELL_SAND_BREATH);
-
-                Talk(SAY_BREATH);
-
-                SandBreath_Timer = urand(10000, 20000);
-            } else SandBreath_Timer -= diff;
-
-            if (ImpendingDeath_Timer <= diff)
-            {
-                DoCastVictim(SPELL_IMPENDING_DEATH);
-                ImpendingDeath_Timer = 25000 + rand32() % 5000;
-            } else ImpendingDeath_Timer -= diff;
-
-            if (WingBuffet_Timer <= diff)
-            {
-                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                    DoCast(target, SPELL_WING_BUFFET);
-                WingBuffet_Timer = 25000 + rand32() % 10000;
-            } else WingBuffet_Timer -= diff;
-
-            if (Mda_Timer <= diff)
-            {
-                DoCast(me, SPELL_MAGIC_DISRUPTION_AURA);
-                Mda_Timer = 15000;
-            } else Mda_Timer -= diff;
+			switch (events.ExecuteEvent())
+			{
+				case EVENT_SPELL_SAND_BREATH:
+					if (roll_chance_i(50))
+						Talk(SAY_BREATH);
+					me->CastSpell(me->GetVictim(), SPELL_SAND_BREATH, false);
+					events.ScheduleEvent(EVENT_SPELL_SAND_BREATH, 20000);
+					break;
+				case EVENT_SPELL_IMPENDING_DEATH:
+					me->CastSpell(me->GetVictim(), SPELL_IMPENDING_DEATH, false);
+					events.ScheduleEvent(EVENT_SPELL_IMPENDING_DEATH, 30000);
+					break;
+				case EVENT_SPELL_WING_BUFFET:
+					me->CastSpell(me, SPELL_WING_BUFFET, false);
+					events.ScheduleEvent(EVENT_SPELL_WING_BUFFET, 30000);
+					break;
+				case EVENT_SPELL_DISRUPTION:
+					me->CastSpell(me, SPELL_MAGIC_DISRUPTION_AURA, false);
+					events.ScheduleEvent(EVENT_SPELL_DISRUPTION, 30000);
+					break;
+			}
 
             DoMeleeAttackIfReady();
         }

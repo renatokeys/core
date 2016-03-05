@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,8 +20,10 @@
 #define __BATTLEGROUNDAV_H
 
 #include "Battleground.h"
-#include "BattlegroundScore.h"
-#include "Object.h"
+
+#define LANG_BG_AV_A_CAPTAIN_BUFF       "Begone. Uncouth scum! The Alliance shall prevail in Alterac Valley!"
+#define LANG_BG_AV_H_CAPTAIN_BUFF       "Now is the time to attack! For the Horde!"
+#define LANG_BG_AV_S_MINE_BOSS_CLAIMS   "Snivvle is here! Snivvle claims the Coldtooth Mine!"
 
 #define BG_AV_CAPTIME                    240000  //4:00
 #define BG_AV_SNOWFALL_FIRSTCAP          300000  //5:00 but i also have seen 4:05
@@ -48,15 +50,10 @@
 #define BG_AV_KILL_SURVIVING_CAPTAIN    2
 #define BG_AV_REP_SURVIVING_CAPTAIN     125
 
-#define BG_AV_EVENT_START_BATTLE           9166 // Achievement: The Alterac Blitz
-
-enum SharedActions
-{
-    ACTION_BUFF_YELL    = -30001
-};
+#define AV_EVENT_START_BATTLE           9166 // Achievement: The Alterac Blitz
 
 enum BG_AV_Sounds
-{ /// @todo: get out if there comes a sound when neutral team captures mine
+{ //TODO: get out if there comes a sound when neutral team captures mine
 
 /*
 8212:
@@ -89,7 +86,7 @@ horde:
     horde wins
     */
 
-    AV_SOUND_NEAR_VICTORY                   = 8456, /// @todo: Not confirmed yet
+    AV_SOUND_NEAR_VICTORY                   = 8456, //not confirmed yet
 
     AV_SOUND_ALLIANCE_ASSAULTS              = 8212, //tower, grave + enemy boss if someone tries to attack him
     AV_SOUND_HORDE_ASSAULTS                 = 8174,
@@ -107,12 +104,12 @@ enum BG_AV_OTHER_VALUES
     AV_NORTH_MINE              = 0,
     AV_SOUTH_MINE              = 1,
     AV_MINE_TICK_TIMER         = 45000,
-    AV_MINE_RECLAIM_TIMER      = 1200000, /// @todo: get the right value.. this is currently 20 minutes
-    AV_NEUTRAL_TEAM            = 0 //this is the neutral owner of snowfall
+    AV_MINE_RECLAIM_TIMER      = 1200000 //TODO: get the right value.. this is currently 20 minutes
 };
+
 enum BG_AV_ObjectIds
 {
-    //cause the mangos-system is a bit different, we don't use the right go-ids for every node.. if we want to be 100% like another big server, we must take one object for every node
+    //cause the moongose-system is a bit different, we don't use the right go-ids for every node.. if we want to be 100% like another big server, we must take one object for every node
     //snowfall 4flags as eyecandy 179424 (alliance neutral)
     //Banners - stolen from battleground_AB.h ;-)
     BG_AV_OBJECTID_BANNER_A             = 178925, // can only be used by horde
@@ -133,10 +130,10 @@ enum BG_AV_ObjectIds
     BG_AV_OBJECTID_SNOWFALL_CANDY_PH    = 179425,
 
     //banners on top of towers:
-    BG_AV_OBJECTID_TOWER_BANNER_A       = 178927, //[PH] Alliance A1 Tower Banner BIG
-    BG_AV_OBJECTID_TOWER_BANNER_H       = 178955, //[PH] Horde H1 Tower Banner BIG
-    BG_AV_OBJECTID_TOWER_BANNER_PA      = 179446, //[PH] Alliance H1 Tower Pre-Banner BIG
-    BG_AV_OBJECTID_TOWER_BANNER_PH      = 179436, //[PH] Horde A1 Tower Pre-Banner BIG
+    BG_AV_OBJECTID_TOWER_BANNER_A  = 178927, //[PH] Alliance A1 Tower Banner BIG
+    BG_AV_OBJECTID_TOWER_BANNER_H  = 178955, //[PH] Horde H1 Tower Banner BIG
+    BG_AV_OBJECTID_TOWER_BANNER_PA = 179446, //[PH] Alliance H1 Tower Pre-Banner BIG
+    BG_AV_OBJECTID_TOWER_BANNER_PH = 179436, //[PH] Horde A1 Tower Pre-Banner BIG
 
     //Auras
     BG_AV_OBJECTID_AURA_A               = 180421,
@@ -150,11 +147,17 @@ enum BG_AV_ObjectIds
     BG_AV_OBJECTID_GATE_H               = 180424,
 
     //mine supplies
-    BG_AV_OBJECTID_MINE_N               = 178785,
-    BG_AV_OBJECTID_MINE_S               = 178784,
+    BG_AV_OBJECTID_MINE_N				= 178785,
+    BG_AV_OBJECTID_MINE_S				= 178784,
 
-    BG_AV_OBJECTID_FIRE                 = 179065,
-    BG_AV_OBJECTID_SMOKE                = 179066
+    BG_AV_OBJECTID_FIRE					= 179065,
+    BG_AV_OBJECTID_SMOKE				= 179066,
+
+	// Winter Veil Hardpacked Snowdrift
+	BG_AV_OBJECTID_HARDPACKED_SNOWDRIFT	= 180654,
+
+	BG_AV_OBJECTID_FROSTWOLF_BANNER		= 179025,
+	BG_AV_OBJECTID_STORMPIKE_BANNER		= 179024,
 };
 
 enum BG_AV_Nodes
@@ -307,59 +310,67 @@ enum BG_AV_ObjectTypes
     BG_AV_OBJECT_MINE_SUPPLY_N_MAX           = 224,
     BG_AV_OBJECT_MINE_SUPPLY_S_MIN           = 225,
     BG_AV_OBJECT_MINE_SUPPLY_S_MAX           = 236,
+	BG_AV_OBJECT_HANDPACKED_SNOWDRIFT_MIN    = 237,
+	BG_AV_OBJECT_HANDPACKED_SNOWDRIFT_MAX    = 246,
+	BG_AV_OBJECT_FROSTWOLF_BANNER			 = 247,
+	BG_AV_OBJECT_STORMPIKE_BANNER			 = 248,
 
-    BG_AV_OBJECT_MAX                         = 237
+    BG_AV_OBJECT_MAX                         = 249
 };
 
 enum BG_AV_OBJECTS
 {
-    AV_OPLACE_FIRSTAID_STATION              = 0,
-    AV_OPLACE_STORMPIKE_GRAVE               = 1,
-    AV_OPLACE_STONEHEART_GRAVE              = 2,
-    AV_OPLACE_SNOWFALL_GRAVE                = 3,
-    AV_OPLACE_ICEBLOOD_GRAVE                = 4,
-    AV_OPLACE_FROSTWOLF_GRAVE               = 5,
-    AV_OPLACE_FROSTWOLF_HUT                 = 6,
-    AV_OPLACE_DUNBALDAR_SOUTH               = 7,
-    AV_OPLACE_DUNBALDAR_NORTH               = 8,
-    AV_OPLACE_ICEWING_BUNKER                = 9,
-    AV_OPLACE_STONEHEART_BUNKER             = 10,
-    AV_OPLACE_ICEBLOOD_TOWER                = 11,
-    AV_OPLACE_TOWER_POINT                   = 12,
-    AV_OPLACE_FROSTWOLF_ETOWER              = 13,
-    AV_OPLACE_FROSTWOLF_WTOWER              = 14,
-    AV_OPLACE_BIGBANNER_DUNBALDAR_SOUTH     = 15,
-    AV_OPLACE_BIGBANNER_DUNBALDAR_NORTH     = 16,
-    AV_OPLACE_BIGBANNER_ICEWING_BUNKER      = 17,
-    AV_OPLACE_BIGBANNER_STONEHEART_BUNKER   = 18,
-    AV_OPLACE_BIGBANNER_ICEBLOOD_TOWER      = 19,
-    AV_OPLACE_BIGBANNER_TOWER_POINT         = 20,
-    AV_OPLACE_BIGBANNER_FROSTWOLF_ETOWER    = 21,
-    AV_OPLACE_BIGBANNER_FROSTWOLF_WTOWER    = 22,
+    AV_OPLACE_FIRSTAID_STATION          = 0,
+    AV_OPLACE_STORMPIKE_GRAVE         = 1,
+    AV_OPLACE_STONEHEART_GRAVE        = 2,
+    AV_OPLACE_SNOWFALL_GRAVE          = 3,
+    AV_OPLACE_ICEBLOOD_GRAVE          = 4,
+    AV_OPLACE_FROSTWOLF_GRAVE         = 5,
+    AV_OPLACE_FROSTWOLF_HUT           = 6,
+    AV_OPLACE_DUNBALDAR_SOUTH         = 7,
+    AV_OPLACE_DUNBALDAR_NORTH         = 8,
+    AV_OPLACE_ICEWING_BUNKER          = 9,
+    AV_OPLACE_STONEHEART_BUNKER       = 10,
+    AV_OPLACE_ICEBLOOD_TOWER          = 11,
+    AV_OPLACE_TOWER_POINT             = 12,
+    AV_OPLACE_FROSTWOLF_ETOWER        = 13,
+    AV_OPLACE_FROSTWOLF_WTOWER        = 14,
+    AV_OPLACE_BIGBANNER_DUNBALDAR_SOUTH         = 15,
+    AV_OPLACE_BIGBANNER_DUNBALDAR_NORTH         = 16,
+    AV_OPLACE_BIGBANNER_ICEWING_BUNKER          = 17,
+    AV_OPLACE_BIGBANNER_STONEHEART_BUNKER       = 18,
+    AV_OPLACE_BIGBANNER_ICEBLOOD_TOWER          = 19,
+    AV_OPLACE_BIGBANNER_TOWER_POINT             = 20,
+    AV_OPLACE_BIGBANNER_FROSTWOLF_ETOWER        = 21,
+    AV_OPLACE_BIGBANNER_FROSTWOLF_WTOWER        = 22,
 
-    AV_OPLACE_BURN_DUNBALDAR_SOUTH          = 23,
-    AV_OPLACE_BURN_DUNBALDAR_NORTH          = 33,
-    AV_OPLACE_BURN_ICEWING_BUNKER           = 43,
-    AV_OPLACE_BURN_STONEHEART_BUNKER        = 53,
-    AV_OPLACE_BURN_ICEBLOOD_TOWER           = 63,
-    AV_OPLACE_BURN_TOWER_POINT              = 73,
-    AV_OPLACE_BURN_FROSTWOLF_ETOWER         = 83,
-    AV_OPLACE_BURN_FROSTWOLF_WTOWER         = 93,
-    AV_OPLACE_BURN_BUILDING_A               = 103,
-    AV_OPLACE_BURN_BUILDING_H               = 113,
-    AV_OPLACE_SNOW_1                        = 123,
-    AV_OPLACE_SNOW_2                        = 124,
-    AV_OPLACE_SNOW_3                        = 125,
-    AV_OPLACE_SNOW_4                        = 126,
-    AV_OPLACE_MINE_SUPPLY_N_MIN             = 127,
-    AV_OPLACE_MINE_SUPPLY_N_MAX             = 136,
-    AV_OPLACE_MINE_SUPPLY_S_MIN             = 137,
-    AV_OPLACE_MINE_SUPPLY_S_MAX             = 148,
+    AV_OPLACE_BURN_DUNBALDAR_SOUTH         = 23,
+    AV_OPLACE_BURN_DUNBALDAR_NORTH         = 33,
+    AV_OPLACE_BURN_ICEWING_BUNKER          = 43,
+    AV_OPLACE_BURN_STONEHEART_BUNKER       = 53,
+    AV_OPLACE_BURN_ICEBLOOD_TOWER          = 63,
+    AV_OPLACE_BURN_TOWER_POINT             = 73,
+    AV_OPLACE_BURN_FROSTWOLF_ETOWER        = 83,
+    AV_OPLACE_BURN_FROSTWOLF_WTOWER        = 93,
+    AV_OPLACE_BURN_BUILDING_A        = 103,
+    AV_OPLACE_BURN_BUILDING_H        = 113,
+    AV_OPLACE_SNOW_1                      = 123,
+    AV_OPLACE_SNOW_2                      = 124,
+    AV_OPLACE_SNOW_3                      = 125,
+    AV_OPLACE_SNOW_4                      = 126,
+    AV_OPLACE_MINE_SUPPLY_N_MIN           = 127,
+    AV_OPLACE_MINE_SUPPLY_N_MAX           = 136,
+    AV_OPLACE_MINE_SUPPLY_S_MIN           = 137,
+    AV_OPLACE_MINE_SUPPLY_S_MAX           = 148,
+	AV_OPLACE_HANDPACKED_SNOWDRIFT_MIN    = 149,
+	AV_OPLACE_HANDPACKED_SNOWDRIFT_MAX    = 158,
+	AV_OPLACE_FROSTWOLF_BANNER			  = 159,
+	AV_OPLACE_STORMPIKE_BANNER			  = 160,
 
-    AV_OPLACE_MAX                           = 149
+    AV_OPLACE_MAX                         = 161
 };
 
-Position const BG_AV_ObjectPos[AV_OPLACE_MAX] =
+const float BG_AV_ObjectPos[AV_OPLACE_MAX][4] =
 {
     {638.592f, -32.422f, 46.0608f, -1.62316f }, //firstaid station
     {669.007f, -294.078f, 30.2909f, 2.77507f }, //stormpike
@@ -528,10 +539,23 @@ Position const BG_AV_ObjectPos[AV_OPLACE_MAX] =
     {-844.25f, -60.0374f, 72.1031f, -2.19912f},
     {-820.644f, -136.043f, 63.1977f, 2.40855f},
     {-947.642f, -208.807f, 77.0101f, 1.36136f},
-    {-951.394f, -193.695f, 67.634f, 0.802851f}
+    {-951.394f, -193.695f, 67.634f, 0.802851f},
+	// hardpacked snowdrift
+	{712.1f, -446.49f, 65.74f, 2.13f},
+	{696.4f, -276.4f, 28.55f, 3.2f},
+	{74.0f, -313.27f, 31.16f, 0.17f},
+	{-75.4f, -224.4f, 10.24f, 2.99f},
+	{-160.9f, -72.1f, 33.36f, 5.5f},
+	{-255.8f, -217.55f, 7.66f, 2.8f},
+	{-361.49f, -115.5f, 26.42f, 0.6f},
+	{-389.5f, -325.0f, 17.98f, 3.89f},
+	{-919.57f, -362.48f, 52.13f, 3.8f},
+	{-1259.1f, -500.8f, 50.81f, 1.2f},
+	{-1552.55f, -359.738f, 66.948f, 2.8875f},
+	{40.0913f, 0.0153897f, -4.0962f, 0.96131f}
 };
 
-Position const BG_AV_DoorPositons[2] =
+const float BG_AV_DoorPositons[2][4] =
 {
     {780.487f, -493.024f, 99.9553f, 3.0976f},   //alliance
     {-1375.193f, -538.981f, 55.2824f, 0.72178f} //horde
@@ -550,7 +574,7 @@ enum BG_AV_CreaturePlace
     AV_CPLACE_SPIRIT_FROST_HUT      = 6,
     AV_CPLACE_SPIRIT_MAIN_ALLIANCE  = 7,
     AV_CPLACE_SPIRIT_MAIN_HORDE     = 8,
-//I don't add a variable for all 4 positions... I think one is enough to compute the rest
+//i don't will add for all 4 positions a variable.. i think one is enough to compute the rest
     AV_CPLACE_DEFENSE_STORM_AID      = 9,
     AV_CPLACE_DEFEMSE_STORM_GRAVE    = 13,
     AV_CPLACE_DEFENSE_STONE_GRAVE    = 17,
@@ -627,7 +651,8 @@ enum BG_AV_CreaturePlace
     AV_CPLACE_MAX = 321
 };
 
-Position const BG_AV_CreaturePos[AV_CPLACE_MAX] =
+//x, y, z, o
+const float BG_AV_CreaturePos[AV_CPLACE_MAX][4] =
 {
     //spiritguides
     {643.000000f, 44.000000f, 69.740196f, -0.001854f},
@@ -682,7 +707,7 @@ Position const BG_AV_CreaturePos[AV_CPLACE_MAX] =
     {575.411f, -83.597f, 52.3626f, 6.26573f},
     {571.352f, -75.6582f, 52.479f, 0.523599f},
     //dun north - OK
-    {668.60f, -122.53f, 64.12f, 2.34f}, /// @todo: To be confirm - Not completely okay
+    {668.60f, -122.53f, 64.12f, 2.34f}, //not 100% ok
     {662.253f, -129.105f, 64.1794f, 2.77507f},
     {661.209f, -138.877f, 64.2251f, 3.38594f},
     {665.481f, -146.857f, 64.1271f, 3.75246f},
@@ -722,7 +747,7 @@ Position const BG_AV_CreaturePos[AV_CPLACE_MAX] =
     {723.058f, -14.1548f, 50.7046f, 3.40339f}, // north
     {715.691f, -4.72233f, 50.2187f, 3.47321f}, // icewing
     {720.046f, -19.9413f, 50.2187f, 3.36849f}, // stone
-/// horde @todo: Confirm positions
+//horde  (coords not 100% ok)
     {-1363.99f, -221.99f, 98.4053f, 4.93012f},
     {-1370.96f, -223.532f, 98.4266f, 4.93012f},
     {-1378.37f, -228.614f, 99.3546f, 5.38565f},
@@ -987,6 +1012,7 @@ Position const BG_AV_CreaturePos[AV_CPLACE_MAX] =
 
 enum BG_AV_CreatureIds
 {
+
     AV_NPC_A_TOWERDEFENSE  = 0,     // stormpike bowman
     AV_NPC_A_GRAVEDEFENSE0 = 1,     // stormpike Defender
     AV_NPC_A_GRAVEDEFENSE1 = 2,     // seasoned defender
@@ -1038,10 +1064,9 @@ enum BG_AV_CreatureIds
     AV_NPC_S_MINE_H_4      = 46,
     AV_NPC_HERALD          = 47,
     AV_NPC_INFO_MAX        = 48
+
 };
 
-//entry, team, minlevel, maxlevel
-/// @todo: this array should be removed, the only needed things are the entrys (for spawning(?) and handlekillunit)
 const uint32 BG_AV_CreatureInfo[AV_NPC_INFO_MAX] =
 {
     12050, // Stormpike Defender
@@ -1228,6 +1253,7 @@ const float BG_AV_StaticCreaturePos[AV_STATICCPLACE_MAX][5] =
     {773.651f, -497.482f, 99.0408f, 2.11185f, 46 }, //14284 - Stormpike Battleguard
     {949.1f, -506.913f, 95.4237f, 3.31613f, 46 }, //14284 - Stormpike Battleguard
     {-1370.9f, -219.793f, 98.4258f, 5.04381f, 47}, //drek thar
+
 };
 
 const uint32 BG_AV_StaticCreatureInfo[51] =
@@ -1312,7 +1338,7 @@ const uint32 BG_AV_GraveyardIds[9]=
 };
 
 enum BG_AV_BUFF
-{ /// @todo: Add all other buffs here
+{ //TODO add all other buffs here
     AV_BUFF_ARMOR = 21163,
     AV_BUFF_A_CAPTAIN = 23693, //the buff which the alliance captain does
     AV_BUFF_H_CAPTAIN = 22751 //the buff which the horde captain does
@@ -1356,7 +1382,7 @@ enum BG_AV_WorldStates
     //Neutral
     //Snowfall Grave
 */
-    AV_SNOWFALL_N                   = 1966 //over aa
+    AV_SNOWFALL_N                   = 1966, //over aa
 /*
     AV_SNOWFALL_A_C                 = 1341, //over hc
     AV_SNOWFALL_A_A                 = 1343, //over ha
@@ -1436,6 +1462,7 @@ enum BG_AV_WorldStates
     AV_FROSTWOLFE_UNUSED            = 1393,
     AV_FROSTWOLFW_UNUSED            = 1392
 */
+
 };
 
 //alliance_control neutral_control horde_control
@@ -1443,6 +1470,41 @@ const uint32 BG_AV_MineWorldStates[2][3] =
 {
     {1358, 1360, 1359},
     {1355, 1357, 1356}
+};
+
+//alliance_control alliance_assault h_control h_assault
+const uint32 BG_AV_NodeWorldStates[16][4] =
+{
+    //Stormpike first aid station
+    {1325, 1326, 1327, 1328},
+    //Stormpike Graveyard
+    {1333, 1335, 1334, 1336},
+    //Stoneheart Grave
+    {1302, 1304, 1301, 1303},
+    //Snowfall Grave
+    {1341, 1343, 1342, 1344},
+    //Iceblood grave
+    {1346, 1348, 1347, 1349},
+    //Frostwolf Grave
+    {1337, 1339, 1338, 1340},
+    //Frostwolf Hut
+    {1329, 1331, 1330, 1332},
+    //Dunbaldar South Bunker
+    {1361, 1375, 1370, 1378},
+    //Dunbaldar North Bunker
+    {1362, 1374, 1371, 1379},
+    //Icewing Bunker
+    {1363, 1376, 1372, 1380},
+    //Stoneheart Bunker
+    {1364, 1377, 1373, 1381},
+    //Iceblood Tower
+    {1368, 1390, 1385, 1395},
+    //Tower Point
+    {1367, 1389, 1384, 1394},
+    //Frostwolf East
+    {1366, 1388, 1383, 1393},
+    //Frostwolf West
+    {1365, 1387, 1382, 1392},
 };
 
 enum BG_AV_QuestIds
@@ -1479,129 +1541,30 @@ enum BG_AV_Objectives
     AV_OBJECTIVE_DEFEND_GRAVEYARD   = 65
 };
 
-struct StaticNodeInfo
-{
-    BG_AV_Nodes NodeId;
-
-    struct
-    {
-        uint8 AllianceCapture;
-        uint8 AllianceAttack;
-        uint8 HordeCapture;
-        uint8 HordeAttack;
-    } TextIds;
-
-    struct
-    {
-        uint32 AllianceControl;
-        uint32 AllianceAssault;
-        uint32 HordeControl;
-        uint32 HordeAssault;
-    } WorldStateIds;
-};
-
-static StaticNodeInfo const BGAVNodeInfo[] =
-{
-    { BG_AV_NODES_FIRSTAID_STATION,  { 47, 48, 45, 46 }, { 1325, 1326, 1327, 1328 } }, // Stormpike First Aid Station
-    { BG_AV_NODES_STORMPIKE_GRAVE,   {  1,  2,  3,  4 }, { 1333, 1335, 1334, 1336 } }, // Stormpike Graveyard
-    { BG_AV_NODES_STONEHEART_GRAVE,  { 55, 56, 53, 54 }, { 1302, 1304, 1301, 1303 } }, // Stoneheart Graveyard
-    { BG_AV_NODES_SNOWFALL_GRAVE,    {  5,  6,  7,  8 }, { 1341, 1343, 1342, 1344 } }, // Snowfall Graveyard
-    { BG_AV_NODES_ICEBLOOD_GRAVE,    { 59, 60, 57, 58 }, { 1346, 1348, 1347, 1349 } }, // Iceblood Graveyard
-    { BG_AV_NODES_FROSTWOLF_GRAVE,   {  9, 10, 11, 12 }, { 1337, 1339, 1338, 1340 } }, // Frostwolf Graveyard
-    { BG_AV_NODES_FROSTWOLF_HUT,     { 51, 52, 49, 50 }, { 1329, 1331, 1330, 1332 } }, // Frostwolf Hut
-    { BG_AV_NODES_DUNBALDAR_SOUTH,   { 16, 15, 14, 13 }, { 1361, 1375, 1370, 1378 } }, // Dunbaldar South Bunker
-    { BG_AV_NODES_DUNBALDAR_NORTH,   { 20, 19, 18, 17 }, { 1362, 1374, 1371, 1379 } }, // Dunbaldar North Bunker
-    { BG_AV_NODES_ICEWING_BUNKER,    { 24, 23, 22, 21 }, { 1363, 1376, 1372, 1380 } }, // Icewing Bunker
-    { BG_AV_NODES_STONEHEART_BUNKER, { 28, 27, 26, 25 }, { 1364, 1377, 1373, 1381 } }, // Stoneheart Bunker
-    { BG_AV_NODES_ICEBLOOD_TOWER,    { 44, 43, 42, 41 }, { 1368, 1390, 1385, 1395 } }, // Iceblood Tower
-    { BG_AV_NODES_TOWER_POINT,       { 40, 39, 38, 37 }, { 1367, 1389, 1384, 1394 } }, // Tower Point
-    { BG_AV_NODES_FROSTWOLF_ETOWER,  { 36, 35, 34, 33 }, { 1366, 1388, 1383, 1393 } }, // Frostwolf East Tower
-    { BG_AV_NODES_FROSTWOLF_WTOWER,  { 32, 31, 30, 29 }, { 1365, 1387, 1382, 1392 } }, // Frostwolf West Tower
-};
-
-enum Texts
-{
-    // Herold
-    // Towers/Graveyards = 1 - 60
-    TEXT_COLDTOOTH_MINE_ALLIANCE_TAKEN  = 61,
-    TEXT_IRONDEEP_MINE_ALLIANCE_TAKEN   = 62,
-    TEXT_COLDTOOTH_MINE_HORDE_TAKEN     = 63,
-    TEXT_IRONDEEP_MINE_HORDE_TAKEN      = 64,
-    TEXT_FROSTWOLF_GENERAL_DEAD         = 65, /// @todo: sound is missing
-    TEXT_STORMPIKE_GENERAL_DEAD         = 66, /// @todo: sound is missing
-    TEXT_ALLIANCE_WINS                  = 67, // NYI /// @todo: sound is missing
-    TEXT_HORDE_WINS                     = 68, // NYI /// @todo: sound is missing
-
-    // Taskmaster Snivvle
-    TEXT_SNIVVLE_RANDOM                 = 0
-};
-
 struct BG_AV_NodeInfo
 {
     BG_AV_States State;
     BG_AV_States PrevState;
     uint32       Timer;
-    uint16       TotalOwner;
-    uint16       Owner;
-    uint16       PrevOwner;
+    TeamId       TotalOwnerId;
+    TeamId       OwnerId;
+    TeamId       PrevOwnerId;
     bool         Tower;
 };
 
-inline BG_AV_Nodes &operator++(BG_AV_Nodes& i) { return i = BG_AV_Nodes(i + 1); }
+inline BG_AV_Nodes &operator++(BG_AV_Nodes &i){ return i = BG_AV_Nodes(i + 1); }
 
-struct BattlegroundAVScore final : public BattlegroundScore
+struct BattlegroundAVScore : public BattlegroundScore
 {
-    friend class BattlegroundAV;
-
-    protected:
-        BattlegroundAVScore(ObjectGuid playerGuid) : BattlegroundScore(playerGuid), GraveyardsAssaulted(0), GraveyardsDefended(0), TowersAssaulted(0), TowersDefended(0), MinesCaptured(0) { }
-
-        void UpdateScore(uint32 type, uint32 value) override
-        {
-            switch (type)
-            {
-                case SCORE_GRAVEYARDS_ASSAULTED:
-                    GraveyardsAssaulted += value;
-                    break;
-                case SCORE_GRAVEYARDS_DEFENDED:
-                    GraveyardsDefended += value;
-                    break;
-                case SCORE_TOWERS_ASSAULTED:
-                    TowersAssaulted += value;
-                    break;
-                case SCORE_TOWERS_DEFENDED:
-                    TowersDefended += value;
-                    break;
-                case SCORE_MINES_CAPTURED:
-                    MinesCaptured += value;
-                    break;
-                default:
-                    BattlegroundScore::UpdateScore(type, value);
-                    break;
-            }
-        }
-
-        void BuildObjectivesBlock(WorldPacket& data) final override
-        {
-            data << uint32(5); // Objectives Count
-            data << uint32(GraveyardsAssaulted);
-            data << uint32(GraveyardsDefended);
-            data << uint32(TowersAssaulted);
-            data << uint32(TowersDefended);
-            data << uint32(MinesCaptured);
-        }
-
-        uint32 GetAttr1() const final override { return GraveyardsAssaulted; }
-        uint32 GetAttr2() const final override { return GraveyardsDefended; }
-        uint32 GetAttr3() const final override { return TowersAssaulted; }
-        uint32 GetAttr4() const final override { return TowersDefended; }
-        uint32 GetAttr5() const final override { return MinesCaptured; }
-
-        uint32 GraveyardsAssaulted;
-        uint32 GraveyardsDefended;
-        uint32 TowersAssaulted;
-        uint32 TowersDefended;
-        uint32 MinesCaptured;
+    BattlegroundAVScore(Player* player) : BattlegroundScore(player), GraveyardsAssaulted(0), GraveyardsDefended(0), TowersAssaulted(0), TowersDefended(0), MinesCaptured(0), LeadersKilled(0), SecondaryObjectives(0) { }
+    ~BattlegroundAVScore() { }
+    uint32 GraveyardsAssaulted;
+    uint32 GraveyardsDefended;
+    uint32 TowersAssaulted;
+    uint32 TowersDefended;
+    uint32 MinesCaptured;
+    uint32 LeadersKilled;
+    uint32 SecondaryObjectives;
 };
 
 class BattlegroundAV : public Battleground
@@ -1611,68 +1574,64 @@ class BattlegroundAV : public Battleground
         ~BattlegroundAV();
 
         /* inherited from BattlegroundClass */
-        void AddPlayer(Player* player) override;
-        void StartingEventCloseDoors() override;
-        void StartingEventOpenDoors() override;
+        void AddPlayer(Player* player);
+        void StartingEventCloseDoors();
+        void StartingEventOpenDoors();
 
-        void RemovePlayer(Player* player, ObjectGuid guid, uint32 team) override;
-        void HandleAreaTrigger(Player* player, uint32 trigger) override;
-        bool SetupBattleground() override;
-        void ResetBGSubclass() override;
+        void RemovePlayer(Player* player);
+        void HandleAreaTrigger(Player* player, uint32 trigger);
+        bool SetupBattleground();
+        void ResetBGSubclass();
 
         /*general stuff*/
-        void UpdateScore(uint16 team, int16 points);
-        bool UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor = true) override;
+        void UpdateScore(TeamId teamId, int16 points);
+        void UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor = true);
 
         /*handlestuff*/ //these are functions which get called from extern
-        void EventPlayerClickedOnFlag(Player* source, GameObject* target_obj) override;
-        void HandleKillPlayer(Player* player, Player* killer) override;
-        void HandleKillUnit(Creature* unit, Player* killer) override;
-        void HandleQuestComplete(uint32 questid, Player* player) override;
-        bool CanActivateGO(int32 GOId, uint32 team) const override;
+        void EventPlayerClickedOnFlag(Player* source, GameObject* gameObject);
+        void HandleKillPlayer(Player* player, Player* killer);
+        void HandleKillUnit(Creature* unit, Player* killer);
+        void HandleQuestComplete(uint32 questid, Player* player);
+        bool PlayerCanDoMineQuest(int32 GOId, TeamId teamId);
+		TeamId GetMineOwner(uint8 mine) { return m_Mine_Owner[mine]; }
 
-        void EndBattleground(uint32 winner) override;
+        void EndBattleground(TeamId winnerTeamId);
 
-        WorldSafeLocsEntry const* GetClosestGraveYard(Player* player) override;
+        WorldSafeLocsEntry const* GetClosestGraveyard(Player* player);
 
-        // Achievement: Av perfection and Everything counts
-        bool CheckAchievementCriteriaMeet(uint32 criteriaId, Player const* source, Unit const* target = nullptr, uint32 miscvalue1 = 0) override;
-
-        uint32 GetPrematureWinner() override;
+        /* achievement req. */
+        bool IsBothMinesControlledByTeam(TeamId teamId) const;
+        bool IsAllTowersControlledAndCaptainAlive(TeamId teamId) const;
+        
+        TeamId GetPrematureWinner();
 
     private:
-        void PostUpdateImpl(uint32 diff) override;
+        void PostUpdateImpl(uint32 diff);
 
         /* Nodes occupying */
         void EventPlayerAssaultsPoint(Player* player, uint32 object);
         void EventPlayerDefendsPoint(Player* player, uint32 object);
         void EventPlayerDestroyedPoint(BG_AV_Nodes node);
 
-        void AssaultNode(BG_AV_Nodes node, uint16 team);
+        void AssaultNode(BG_AV_Nodes node, TeamId teamId);
         void DestroyNode(BG_AV_Nodes node);
-        void InitNode(BG_AV_Nodes node, uint16 team, bool tower);
-        void DefendNode(BG_AV_Nodes node, uint16 team);
+        void InitNode(BG_AV_Nodes node, TeamId teamId, bool tower);
+        void DefendNode(BG_AV_Nodes node, TeamId teamId);
 
         void PopulateNode(BG_AV_Nodes node);
         void DePopulateNode(BG_AV_Nodes node);
 
-        StaticNodeInfo const* GetStaticNodeInfo(BG_AV_Nodes node) const
-        {
-            for (uint8 i = 0; i < BG_AV_NODES_MAX; ++i)
-                if (BGAVNodeInfo[i].NodeId == node)
-                    return &BGAVNodeInfo[i];
-            return nullptr;
-        }
-
         BG_AV_Nodes GetNodeThroughObject(uint32 object);
         uint32 GetObjectThroughNode(BG_AV_Nodes node);
+        char const* GetNodeName(BG_AV_Nodes node);
         bool IsTower(BG_AV_Nodes node) { return m_Nodes[node].Tower; }
 
         /*mine*/
-        void ChangeMineOwner(uint8 mine, uint32 team, bool initial=false);
+        void ChangeMineOwner(uint8 mine, TeamId teamId, bool initial=false);
 
         /*worldstates*/
-        void FillInitialWorldStates(WorldPacket& data) override;
+        void FillInitialWorldStates(WorldPacket& data);
+        uint8 GetWorldStateType(uint8 state, TeamId teamId);
         void SendMineWorldStates(uint32 mine);
         void UpdateNodeWorldState(BG_AV_Nodes node);
 
@@ -1685,8 +1644,7 @@ class BattlegroundAV : public Battleground
 
         BG_AV_NodeInfo m_Nodes[BG_AV_NODES_MAX];
 
-        uint32 m_Mine_Owner[2];
-        uint32 m_Mine_PrevOwner[2]; //only for worldstates needed
+        TeamId m_Mine_Owner[2];
         int32 m_Mine_Timer; //ticks for both teams
         uint32 m_Mine_Reclaim_Timer[2];
         uint32 m_CaptainBuffTimer[2];

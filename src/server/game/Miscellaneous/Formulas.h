@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,7 +23,7 @@
 #include "SharedDefines.h"
 #include "ScriptMgr.h"
 #include "Player.h"
-#include "WorldSession.h"
+#include "Creature.h"
 
 namespace Trinity
 {
@@ -32,7 +32,7 @@ namespace Trinity
         inline float hk_honor_at_level_f(uint8 level, float multiplier = 1.0f)
         {
             float honor = multiplier * level * 1.55f;
-            sScriptMgr->OnHonorCalculation(honor, level, multiplier);
+            //sScriptMgr->OnHonorCalculation(honor, level, multiplier); // pussywizard: optimization
             return honor;
         }
 
@@ -40,8 +40,7 @@ namespace Trinity
         {
             return uint32(ceil(hk_honor_at_level_f(level, multiplier)));
         }
-    } // namespace Trinity::Honor
-
+    }
     namespace XP
     {
         inline uint8 GetGrayLevel(uint8 pl_level)
@@ -57,7 +56,7 @@ namespace Trinity
             else
                 level = pl_level - 9;
 
-            sScriptMgr->OnGrayLevelCalculation(level, pl_level);
+            //sScriptMgr->OnGrayLevelCalculation(level, pl_level); // pussywizard: optimization
             return level;
         }
 
@@ -76,7 +75,7 @@ namespace Trinity
             else
                 color = XP_GRAY;
 
-            sScriptMgr->OnColorCodeCalculation(color, pl_level, mob_level);
+            //sScriptMgr->OnColorCodeCalculation(color, pl_level, mob_level); // pussywizard: optimization
             return color;
         }
 
@@ -109,7 +108,7 @@ namespace Trinity
             else
                 diff = 17;
 
-            sScriptMgr->OnZeroDifferenceCalculation(diff, pl_level);
+            //sScriptMgr->OnZeroDifferenceCalculation(diff, pl_level); // pussywizard: optimization
             return diff;
         }
 
@@ -130,7 +129,7 @@ namespace Trinity
                     nBaseExp = 580;
                     break;
                 default:
-                    TC_LOG_ERROR("misc", "BaseGain: Unsupported content level %u", content);
+                    sLog->outError("BaseGain: Unsupported content level %u", content);
                     nBaseExp = 45;
                     break;
             }
@@ -155,47 +154,36 @@ namespace Trinity
                     baseGain = 0;
             }
 
-            sScriptMgr->OnBaseGainCalculation(baseGain, pl_level, mob_level, content);
+            //sScriptMgr->OnBaseGainCalculation(baseGain, pl_level, mob_level, content); // pussywizard: optimization
             return baseGain;
         }
 
-        inline uint32 Gain(Player* player, Unit* u, bool isBattleGround = false)
+        inline uint32 Gain(Player* player, Unit* u)
         {
-            Creature* creature = u->ToCreature();
-            uint32 gain = 0;
+            uint32 gain;
 
-            if (!creature || (!creature->IsTotem() && !creature->IsPet() && !creature->IsCritter() &&
-                !(creature->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_XP_AT_KILL)))
+            if (u->GetTypeId() == TYPEID_UNIT &&
+                (((Creature*)u)->IsTotem() || ((Creature*)u)->IsPet() ||
+                (((Creature*)u)->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_XP_AT_KILL) ||
+                u->IsCritter()))
+                gain = 0;
+            else
             {
-                float xpMod = 1.0f;
-
                 gain = BaseGain(player->getLevel(), u->getLevel(), GetContentLevelsForMapAndZone(u->GetMapId(), u->GetZoneId()));
 
-                if (gain && creature)
+                if (gain != 0 && u->GetTypeId() == TYPEID_UNIT && ((Creature*)u)->isElite())
                 {
-                    if (creature->isElite())
-                    {
-                        // Elites in instances have a 2.75x XP bonus instead of the regular 2x world bonus.
-                        if (u->GetMap()->IsDungeon())
-                            xpMod *= 2.75f;
-                        else
-                            xpMod *= 2.0f;
-                    }
-
-                    xpMod *= creature->GetCreatureTemplate()->ModExperience;
+                    // Elites in instances have a 2.75x XP bonus instead of the regular 2x world bonus.
+                    if (u->GetMap()->IsDungeon())
+                       gain = uint32(gain * 2.75);
+                    else
+                        gain *= 2;
                 }
 
-                xpMod *= isBattleGround ? sWorld->getRate(RATE_XP_BG_KILL) : sWorld->getRate(RATE_XP_KILL);
-				if(player->GetSession()->IsPremium())
-                    xpMod *= isBattleGround ? sWorld->getRate(RATE_XP_BG_KILL) : sWorld->getRate(RATE_XP_KILL_PREMIUM);
-
-                if (creature && creature->m_PlayerDamageReq) // if players dealt less than 50% of the damage and were credited anyway (due to CREATURE_FLAG_EXTRA_NO_PLAYER_DAMAGE_REQ), scale XP gained appropriately (linear scaling)
-                    xpMod *= 1.0f - 2.0f*creature->m_PlayerDamageReq / creature->GetMaxHealth();
-
-                gain = uint32(gain * xpMod);
+                gain = uint32(gain * sWorld->getRate(RATE_XP_KILL));
             }
 
-            sScriptMgr->OnGainCalculation(gain, player, u);
+            //sScriptMgr->OnGainCalculation(gain, player, u); // pussywizard: optimization
             return gain;
         }
 
@@ -229,10 +217,10 @@ namespace Trinity
                 }
             }
 
-            sScriptMgr->OnGroupRateCalculation(rate, count, isRaid);
+            //sScriptMgr->OnGroupRateCalculation(rate, count, isRaid); // pussywizard: optimization
             return rate;
         }
-    } // namespace Trinity::XP
-} // namespace Trinity
+    }
+}
 
 #endif

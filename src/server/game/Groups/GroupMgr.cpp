@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,8 +23,7 @@
 
 GroupMgr::GroupMgr()
 {
-    NextGroupDbStoreId = 1;
-    NextGroupId = 1;
+    _nextGroupId = 0;
 }
 
 GroupMgr::~GroupMgr()
@@ -33,66 +32,46 @@ GroupMgr::~GroupMgr()
         delete itr->second;
 }
 
-uint32 GroupMgr::GenerateNewGroupDbStoreId()
+void GroupMgr::InitGroupIds()
 {
-    uint32 newStorageId = NextGroupDbStoreId;
+    _nextGroupId = 1;
 
-    for (uint32 i = ++NextGroupDbStoreId; i < 0xFFFFFFFF; ++i)
+    QueryResult result = CharacterDatabase.Query("SELECT MAX(guid) FROM groups");
+    if (result)
     {
-        if ((i < GroupDbStore.size() && GroupDbStore[i] == NULL) || i >= GroupDbStore.size())
-        {
-            NextGroupDbStoreId = i;
-            break;
-        }
+        uint32 maxId = (*result)[0].GetUInt32();
+        _groupIds.resize(maxId+1);
     }
+}
 
-    if (newStorageId == NextGroupDbStoreId)
+void GroupMgr::RegisterGroupId(uint32 groupId)
+{
+    // Allocation was done in InitGroupIds()
+    _groupIds[groupId] = true;
+
+	// Groups are pulled in ascending order from db and _nextGroupId is initialized with 1,
+    // so if the instance id is used, increment
+	if (_nextGroupId == groupId)
+		++_nextGroupId;
+}
+
+uint32 GroupMgr::GenerateGroupId()
+{
+    uint32 newGroupId = _nextGroupId;
+
+    // find the lowest available id starting from the current _nextGroupId
+	while (_nextGroupId < 0xFFFFFFFF && ++_nextGroupId < _groupIds.size() && _groupIds[_nextGroupId]);
+
+    if (_nextGroupId == 0xFFFFFFFF)
     {
-        TC_LOG_ERROR("misc", "Group storage ID overflow!! Can't continue, shutting down server. ");
+        sLog->outError("Group ID overflow!! Can't continue, shutting down server.");
         World::StopNow(ERROR_EXIT_CODE);
     }
 
-    return newStorageId;
+    return newGroupId;
 }
 
-void GroupMgr::RegisterGroupDbStoreId(uint32 storageId, Group* group)
-{
-    // Allocate space if necessary.
-    if (storageId >= uint32(GroupDbStore.size()))
-        GroupDbStore.resize(storageId + 1);
-
-    GroupDbStore[storageId] = group;
-}
-
-void GroupMgr::FreeGroupDbStoreId(Group* group)
-{
-    uint32 storageId = group->GetDbStoreId();
-
-    if (storageId < NextGroupDbStoreId)
-        NextGroupDbStoreId = storageId;
-
-    GroupDbStore[storageId] = NULL;
-}
-
-Group* GroupMgr::GetGroupByDbStoreId(uint32 storageId) const
-{
-    if (storageId < GroupDbStore.size())
-        return GroupDbStore[storageId];
-
-    return NULL;
-}
-
-ObjectGuid::LowType GroupMgr::GenerateGroupId()
-{
-    if (NextGroupId >= 0xFFFFFFFE)
-    {
-        TC_LOG_ERROR("misc", "Group guid overflow!! Can't continue, shutting down server. ");
-        World::StopNow(ERROR_EXIT_CODE);
-    }
-    return NextGroupId++;
-}
-
-Group* GroupMgr::GetGroupByGUID(ObjectGuid::LowType groupId) const
+Group* GroupMgr::GetGroupByGUID(uint32 groupId) const
 {
     GroupContainer::const_iterator itr = GroupStore.find(groupId);
     if (itr != GroupStore.end())
@@ -118,50 +97,55 @@ void GroupMgr::LoadGroups()
 
         // Delete all groups whose leader does not exist
         CharacterDatabase.DirectExecute("DELETE FROM groups WHERE leaderGuid NOT IN (SELECT guid FROM characters)");
-        // Delete all groups with less than 2 members
-        CharacterDatabase.DirectExecute("DELETE FROM groups WHERE guid NOT IN (SELECT guid FROM group_member GROUP BY guid HAVING COUNT(guid) > 1)");
+        // Delete all groups with less than 2 members (or less than 1 for lfg groups)
+        CharacterDatabase.DirectExecute("DELETE groups FROM groups LEFT JOIN ((SELECT guid, count(*) as cnt FROM group_member GROUP BY guid) t) ON groups.guid = t.guid WHERE t.guid IS NULL OR (t.cnt<=1 AND groups.groupType <> 12)");
+		// Delete invalid lfg_data
+		CharacterDatabase.DirectExecute("DELETE lfg_data FROM lfg_data LEFT JOIN groups ON lfg_data.guid = groups.guid WHERE groups.guid IS NULL OR groups.groupType <> 12");
+		// CharacterDatabase.DirectExecute("DELETE groups FROM groups LEFT JOIN lfg_data ON groups.guid = lfg_data.guid WHERE groups.groupType=12 AND lfg_data.guid IS NULL"); // group should be left so binds are cleared when disbanded
+
+		InitGroupIds();
 
         //                                                        0              1           2             3                 4      5          6      7         8       9
         QueryResult result = CharacterDatabase.Query("SELECT g.leaderGuid, g.lootMethod, g.looterGuid, g.lootThreshold, g.icon1, g.icon2, g.icon3, g.icon4, g.icon5, g.icon6"
             //  10         11          12         13              14                  15            16        17          18
-            ", g.icon7, g.icon8, g.groupType, g.difficulty, g.raidDifficulty, g.masterLooterGuid, g.guid, lfg.dungeon, lfg.state FROM groups g LEFT JOIN lfg_data lfg ON lfg.guid = g.guid ORDER BY g.guid ASC");
-        if (!result)
+            ", g.icon7, g.icon8, g.groupType, g.difficulty, g.raiddifficulty, g.masterLooterGuid, g.guid, lfg.dungeon, lfg.state FROM groups g LEFT JOIN lfg_data lfg ON lfg.guid = g.guid ORDER BY g.guid ASC");
+
+		if (!result)
         {
-            TC_LOG_INFO("server.loading", ">> Loaded 0 group definitions. DB table `groups` is empty!");
-            return;
+            sLog->outString(">> Loaded 0 group definitions. DB table `groups` is empty!");
+            sLog->outString();
         }
+		else
+		{
+			uint32 count = 0;
+			do
+			{
+				Field* fields = result->Fetch();
+				Group* group = new Group;
+				if (!group->LoadGroupFromDB(fields))
+				{
+					delete group;
+					continue;
+				}
+				AddGroup(group);
 
-        uint32 count = 0;
-        do
-        {
-            Field* fields = result->Fetch();
-            Group* group = new Group;
-            group->LoadGroupFromDB(fields);
-            AddGroup(group);
+				RegisterGroupId(group->GetLowGUID());
 
-            // Get the ID used for storing the group in the database and register it in the pool.
-            uint32 storageId = group->GetDbStoreId();
+				++count;
+			}
+			while (result->NextRow());
 
-            RegisterGroupDbStoreId(storageId, group);
-
-            // Increase the next available storage ID
-            if (storageId == NextGroupDbStoreId)
-                NextGroupDbStoreId++;
-
-            ++count;
-        }
-        while (result->NextRow());
-
-        TC_LOG_INFO("server.loading", ">> Loaded %u group definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+			sLog->outString(">> Loaded %u group definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+			sLog->outString();
+		}
     }
 
-    TC_LOG_INFO("server.loading", "Loading Group members...");
+    sLog->outString("Loading Group members...");
     {
         uint32 oldMSTime = getMSTime();
 
-        // Delete all rows from group_member or group_instance with no group
+        // Delete all rows from group_member with no group
         CharacterDatabase.DirectExecute("DELETE FROM group_member WHERE guid NOT IN (SELECT guid FROM groups)");
-        CharacterDatabase.DirectExecute("DELETE FROM group_instance WHERE guid NOT IN (SELECT guid FROM groups)");
         // Delete all members that does not exist
         CharacterDatabase.DirectExecute("DELETE FROM group_member WHERE memberGuid NOT IN (SELECT guid FROM characters)");
 
@@ -169,69 +153,28 @@ void GroupMgr::LoadGroups()
         QueryResult result = CharacterDatabase.Query("SELECT guid, memberGuid, memberFlags, subgroup, roles FROM group_member ORDER BY guid");
         if (!result)
         {
-            TC_LOG_INFO("server.loading", ">> Loaded 0 group members. DB table `group_member` is empty!");
-            return;
+            sLog->outString(">> Loaded 0 group members. DB table `group_member` is empty!");
+            sLog->outString();
         }
+		else
+		{
+			uint32 count = 0;
+			do
+			{
+				Field* fields = result->Fetch();
+				Group* group = GetGroupByGUID(fields[0].GetUInt32());
 
-        uint32 count = 0;
+				if (group)
+					group->LoadMemberFromDB(fields[1].GetUInt32(), fields[2].GetUInt8(), fields[3].GetUInt8(), fields[4].GetUInt8());
+				//else
+				//    sLog->outError("GroupMgr::LoadGroups: Consistency failed, can't find group (storage id: %u)", fields[0].GetUInt32());
 
-        do
-        {
-            Field* fields = result->Fetch();
-            Group* group = GetGroupByDbStoreId(fields[0].GetUInt32());
+				++count;
+			}
+			while (result->NextRow());
 
-            if (group)
-                group->LoadMemberFromDB(fields[1].GetUInt32(), fields[2].GetUInt8(), fields[3].GetUInt8(), fields[4].GetUInt8());
-            else
-                TC_LOG_ERROR("misc", "GroupMgr::LoadGroups: Consistency failed, can't find group (storage id: %u)", fields[0].GetUInt32());
-
-            ++count;
-        }
-        while (result->NextRow());
-
-        TC_LOG_INFO("server.loading", ">> Loaded %u group members in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
-    }
-
-    TC_LOG_INFO("server.loading", "Loading Group instance saves...");
-    {
-        uint32 oldMSTime = getMSTime();
-        //                                                   0           1        2              3             4             5            6
-        QueryResult result = CharacterDatabase.Query("SELECT gi.guid, i.map, gi.instance, gi.permanent, i.difficulty, i.resettime, COUNT(g.guid) "
-            "FROM group_instance gi INNER JOIN instance i ON gi.instance = i.id "
-            "LEFT JOIN character_instance ci LEFT JOIN groups g ON g.leaderGuid = ci.guid ON ci.instance = gi.instance AND ci.permanent = 1 GROUP BY gi.instance ORDER BY gi.guid");
-        if (!result)
-        {
-            TC_LOG_INFO("server.loading", ">> Loaded 0 group-instance saves. DB table `group_instance` is empty!");
-            return;
-        }
-
-        uint32 count = 0;
-        do
-        {
-            Field* fields = result->Fetch();
-            Group* group = GetGroupByDbStoreId(fields[0].GetUInt32());
-            // group will never be NULL (we have run consistency sql's before loading)
-
-            MapEntry const* mapEntry = sMapStore.LookupEntry(fields[1].GetUInt16());
-            if (!mapEntry || !mapEntry->IsDungeon())
-            {
-                TC_LOG_ERROR("sql.sql", "Incorrect entry in group_instance table : no dungeon map %d", fields[1].GetUInt16());
-                continue;
-            }
-
-            uint32 diff = fields[4].GetUInt8();
-            if (diff >= uint32(mapEntry->IsRaid() ? MAX_RAID_DIFFICULTY : MAX_DUNGEON_DIFFICULTY))
-            {
-                TC_LOG_ERROR("sql.sql", "Wrong dungeon difficulty use in group_instance table: %d", diff + 1);
-                diff = 0;                                   // default for both difficaly types
-            }
-
-            InstanceSave* save = sInstanceSaveMgr->AddInstanceSave(mapEntry->MapID, fields[2].GetUInt32(), Difficulty(diff), time_t(fields[5].GetUInt32()), fields[6].GetUInt64() != 0, true);
-            group->BindToInstance(save, fields[3].GetBool(), true);
-            ++count;
-        }
-        while (result->NextRow());
-
-        TC_LOG_INFO("server.loading", ">> Loaded %u group-instance saves in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+			sLog->outString(">> Loaded %u group members in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+			sLog->outString();
+		}
     }
 }

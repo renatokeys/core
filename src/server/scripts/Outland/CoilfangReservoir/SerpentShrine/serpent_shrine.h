@@ -1,60 +1,64 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
+REWRITTEN BY XINEF
  */
 
 #ifndef DEF_SERPENT_SHRINE_H
 #define DEF_SERPENT_SHRINE_H
 
-#define DataHeader "SS"
-
-enum WaterEventState
-{
-    WATERSTATE_NONE     = 0,
-    WATERSTATE_FRENZY   = 1,
-    WATERSTATE_SCALDING = 2
-};
-
 enum DataTypes
 {
-    DATA_CANSTARTPHASE3             = 1,
-    DATA_CARIBDIS                   = 2,
-    DATA_HYDROSSTHEUNSTABLEEVENT    = 3,
-    DATA_KARATHRESS                 = 4,
-    DATA_KARATHRESSEVENT            = 5,
-    DATA_KARATHRESSEVENT_STARTER    = 6,
-    DATA_LADYVASHJ                  = 7,
-    DATA_LADYVASHJEVENT             = 8,
-    DATA_LEOTHERASTHEBLINDEVENT     = 9,
-    DATA_MOROGRIMTIDEWALKEREVENT    = 10,
-    DATA_SHARKKIS                   = 11,
-    DATA_SHIELDGENERATOR1           = 12,
-    DATA_SHIELDGENERATOR2           = 13,
-    DATA_SHIELDGENERATOR3           = 14,
-    DATA_SHIELDGENERATOR4           = 15,
-    DATA_THELURKERBELOW             = 16,
-    DATA_THELURKERBELOWEVENT        = 17,
-    DATA_TIDALVESS                  = 18,
-    DATA_FATHOMLORDKARATHRESSEVENT  = 19,
-    DATA_LEOTHERAS                  = 20,
-    DATA_LEOTHERAS_EVENT_STARTER    = 21,
-    DATA_CONTROL_CONSOLE            = 22,
-    DATA_STRANGE_POOL               = 23,
-    DATA_WATER                      = 24,
-    DATA_TRASH                      = 25,
+	DATA_HYDROSS_THE_UNSTABLE				= 0,
+	DATA_THE_LURKER_BELOW					= 1,
+	DATA_LEOTHERAS_THE_BLIND				= 2,
+	DATA_FATHOM_LORD_KARATHRESS				= 3,
+	DATA_MOROGRIM_TIDEWALKER				= 4,
+	DATA_BRIDGE_EMERGED						= 5,
+	DATA_LADY_VASHJ							= 6,
+	MAX_ENCOUNTERS							= 7,
+
+	DATA_PLATFORM_KEEPER_RESPAWNED			= 20,
+	DATA_PLATFORM_KEEPER_DIED				= 21,
+	DATA_ALIVE_KEEPERS						= 22,
+	DATA_BRIDGE_ACTIVATED					= 23,
+	DATA_ACTIVATE_SHIELD					= 24,
+
+
+};
+
+enum SSNPCs
+{
+	NPC_HYDROSS_THE_UNSTABLE				= 21216,
+	NPC_THE_LURKER_BELOW					= 21217,
+	NPC_LEOTHERAS_THE_BLIND					= 21215,
+	NPC_CYCLONE_KARATHRESS					= 22104,
+	NPC_LADY_VASHJ							= 21212,
+
+	NPC_COILFANG_SHATTERER					= 21301,
+	NPC_COILFANG_PRIESTESS					= 21220,
+	
+	NPC_ENCHANTED_ELEMENTAL					= 21958,
+	NPC_COILFANG_ELITE						= 22055,
+	NPC_COILFANG_STRIDER					= 22056,
+	NPC_TAINTED_ELEMENTAL					= 22009,
+	NPC_TOXIC_SPOREBAT						= 22140,
+
+	GO_LADY_VASHJ_BRIDGE_CONSOLE			= 184568,
+	GO_COILFANG_BRIDGE1						= 184203,
+	GO_COILFANG_BRIDGE2						= 184204,
+	GO_COILFANG_BRIDGE3						= 184205,
+
+	GO_SHIELD_GENERATOR1					= 185051,
+	GO_SHIELD_GENERATOR2					= 185052,
+	GO_SHIELD_GENERATOR3					= 185053,
+	GO_SHIELD_GENERATOR4					= 185054
+};
+
+enum SSSpells
+{
+	SPELL_SUMMON_SERPENTSHRINE_PARASITE		= 39045,
+	SPELL_RAMPART_INFECTION					= 39042,
+	SPELL_SCALDING_WATER					= 37284,
+	SPELL_FRENZY_WATER						= 37026
 };
 
 #endif

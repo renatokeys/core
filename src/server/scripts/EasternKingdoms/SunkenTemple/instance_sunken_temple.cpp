@@ -1,204 +1,286 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Instance_Sunken_Temple
-SD%Complete: 100
-SDComment:Place Holder
-SDCategory: Sunken Temple
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
 #include "sunken_temple.h"
 
-enum Gameobject
-{
-    GO_ATALAI_STATUE1           = 148830,
-    GO_ATALAI_STATUE2           = 148831,
-    GO_ATALAI_STATUE3           = 148832,
-    GO_ATALAI_STATUE4           = 148833,
-    GO_ATALAI_STATUE5           = 148834,
-    GO_ATALAI_STATUE6           = 148835,
-    GO_ATALAI_IDOL              = 148836,
-    GO_ATALAI_LIGHT1            = 148883,
-    GO_ATALAI_LIGHT2            = 148937
-
-};
-
-enum CreatureIds
-{
-    NPC_MALFURION_STORMRAGE     = 15362
-};
-
 class instance_sunken_temple : public InstanceMapScript
 {
-public:
-    instance_sunken_temple() : InstanceMapScript("instance_sunken_temple", 109) { }
+	public:
+		instance_sunken_temple() : InstanceMapScript("instance_sunken_temple", 109) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* map) const override
-    {
-        return new instance_sunken_temple_InstanceMapScript(map);
-    }
+		struct instance_sunken_temple_InstanceMapScript : public InstanceScript
+		{
+			instance_sunken_temple_InstanceMapScript(Map* map) : InstanceScript(map)
+			{
+			}
 
-    struct instance_sunken_temple_InstanceMapScript : public InstanceScript
-    {
-        instance_sunken_temple_InstanceMapScript(Map* map) : InstanceScript(map)
+			void Initialize()
+			{
+				_statuePhase = 0;
+				_defendersKilled = 0;
+				memset(&_encounters, 0, sizeof(_encounters));
+
+				_forcefieldGUID = 0;
+				_jammalanGUID = 0;
+			}
+
+			void OnCreatureCreate(Creature* creature)
+			{
+				switch (creature->GetEntry())
+				{
+					case NPC_JAMMAL_AN_THE_PROPHET:
+						_jammalanGUID = creature->GetGUID();
+						break;
+				}
+
+				if (creature->IsAlive() && creature->GetDBTableGUIDLow() && creature->GetCreatureType() == CREATURE_TYPE_DRAGONKIN && creature->GetEntry() != NPC_SHADE_OF_ERANIKUS)
+					_dragonkinList.push_back(creature->GetGUID());
+			}
+
+			void OnUnitDeath(Unit* unit)
+			{
+				if (unit->GetTypeId() == TYPEID_UNIT && unit->GetCreatureType() == CREATURE_TYPE_DRAGONKIN && unit->GetEntry() != NPC_SHADE_OF_ERANIKUS)
+					_dragonkinList.remove(unit->GetGUID());
+			}
+
+			void OnGameObjectCreate(GameObject* gameobject)
+			{
+				switch (gameobject->GetEntry())
+				{
+					case GO_ATALAI_STATUE1:
+					case GO_ATALAI_STATUE2:
+					case GO_ATALAI_STATUE3:
+					case GO_ATALAI_STATUE4:
+					case GO_ATALAI_STATUE5:
+					case GO_ATALAI_STATUE6:
+						if (gameobject->GetEntry() < GO_ATALAI_STATUE1+_statuePhase)
+						{
+							instance->SummonGameObject(GO_ATALAI_LIGHT2, gameobject->GetPositionX(), gameobject->GetPositionY(), gameobject->GetPositionZ(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+							gameobject->SetUInt32Value(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+						}
+						break;
+					case GO_ATALAI_IDOL:
+						if (_statuePhase == MAX_STATUE_PHASE)
+							gameobject->SummonGameObject(GO_IDOL_OF_HAKKAR, -480.08f, 94.29f, -189.72f, 1.571f, 0.0f, 0.0f, 0.0f, 0.0f, 0);
+						break;
+					case GO_IDOL_OF_HAKKAR:
+						if (_encounters[TYPE_ATAL_ALARION] == DONE)
+							gameobject->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+						break;
+					case GO_FORCEFIELD:
+						_forcefieldGUID = gameobject->GetGUID();
+						if (_defendersKilled == DEFENDERS_COUNT)
+							gameobject->SetGoState(GO_STATE_ACTIVE);
+				}
+			}
+
+			 void SetData(uint32 type, uint32 data)
+			 {
+				switch (type)
+				{
+					case DATA_STATUES:
+						_events.ScheduleEvent(DATA_STATUES, 0);
+						break;
+					case DATA_DEFENDER_KILLED:
+						++_defendersKilled;
+						if (_defendersKilled == DEFENDERS_COUNT)
+						{
+							instance->LoadGrid(-425.89f, -86.07f);
+							if (Creature* jammal = instance->GetCreature(_jammalanGUID))
+								jammal->AI()->Talk(0);
+							if (GameObject* forcefield = instance->GetGameObject(_forcefieldGUID))
+								forcefield->SetGoState(GO_STATE_ACTIVE);
+						}
+						break;
+					case DATA_ERANIKUS_FIGHT:
+						for (std::list<uint64>::const_iterator itr = _dragonkinList.begin(); itr != _dragonkinList.end(); ++itr)
+						{
+							if (Creature* creature = instance->GetCreature(*itr))
+								if (instance->IsGridLoaded(creature->GetPositionX(), creature->GetPositionY()))
+									creature->SetInCombatWithZone();
+						}
+						break;
+					case TYPE_ATAL_ALARION:
+					case TYPE_JAMMAL_AN:
+					case TYPE_HAKKAR_EVENT:
+						_encounters[type] = data;
+						break;
+				}
+
+				SaveToDB();
+			 }
+
+			 uint32 GetData(uint32 type) const
+			 {
+				 switch (type)
+				 {
+					case DATA_STATUES:
+						return _statuePhase;
+					case DATA_DEFENDER_KILLED:
+						return _defendersKilled;
+					case TYPE_ATAL_ALARION:
+					case TYPE_JAMMAL_AN:
+					case TYPE_HAKKAR_EVENT:
+						return _encounters[type];
+				 }
+
+				return 0;
+			}
+
+			void Update(uint32 diff)
+			{
+				_events.Update(diff);
+				switch (_events.ExecuteEvent())
+				{
+					case DATA_STATUES:
+						++_statuePhase;
+						if (_statuePhase == MAX_STATUE_PHASE)
+							instance->SummonGameObject(GO_IDOL_OF_HAKKAR, -480.08f, 94.29f, -189.72f, 1.571f, 0.0f, 0.0f, 0.0f, 0.0f, 0);
+						break;
+				}
+			}
+
+			std::string GetSaveData()
+			{
+				std::ostringstream saveStream;
+				saveStream << "T A " << _encounters[0] << ' ' << _encounters[1] << ' ' << _encounters[2] << ' ' << _statuePhase << ' ' << _defendersKilled;
+				return saveStream.str();
+			}
+
+			void Load(const char* in)
+			{
+				if (!in)
+					return;
+
+				char dataHead1, dataHead2;
+				std::istringstream loadStream(in);
+				loadStream >> dataHead1 >> dataHead2;
+				if (dataHead1 == 'T' && dataHead2 == 'A')
+				{
+					for (uint8 i = 0; i < MAX_ENCOUNTERS; ++i)
+					{
+						loadStream >> _encounters[i];
+						if (_encounters[i] == IN_PROGRESS)
+							_encounters[i] = NOT_STARTED;
+					}
+
+					loadStream >> _statuePhase;
+					loadStream >> _defendersKilled;
+				}
+			}
+
+		private:
+			uint32 _statuePhase;
+			uint32 _defendersKilled;
+			uint32 _encounters[MAX_ENCOUNTERS];
+
+			uint64 _forcefieldGUID;
+			uint64 _jammalanGUID;
+			std::list<uint64> _dragonkinList;
+			EventMap _events;
+		};
+
+		InstanceScript* GetInstanceScript(InstanceMap* map) const
+		{
+			return new instance_sunken_temple_InstanceMapScript(map);
+		}
+};
+
+enum MalfurionMisc
+{
+    QUEST_ERANIKUS_TYRANT_OF_DREAMS   = 8733,
+    QUEST_THE_CHARGE_OF_DRAGONFLIGHTS = 8555,
+};
+
+class at_malfurion_stormrage : public AreaTriggerScript
+{
+    public:
+        at_malfurion_stormrage() : AreaTriggerScript("at_malfurion_stormrage") { }
+
+        bool OnTrigger(Player* player, const AreaTriggerEntry* /*at*/)
         {
-            SetHeaders(DataHeader);
-            State = 0;
-
-            s1 = false;
-            s2 = false;
-            s3 = false;
-            s4 = false;
-            s5 = false;
-            s6 = false;
+            if (player->GetInstanceScript() && !player->FindNearestCreature(NPC_MALFURION_STORMRAGE, 15.0f) &&
+                player->GetQuestStatus(QUEST_THE_CHARGE_OF_DRAGONFLIGHTS) == QUEST_STATUS_REWARDED && player->GetQuestStatus(QUEST_ERANIKUS_TYRANT_OF_DREAMS) != QUEST_STATUS_REWARDED)
+                player->SummonCreature(NPC_MALFURION_STORMRAGE, player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), -1.52f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 100000);
+            return false;
         }
+};
 
-        ObjectGuid GOAtalaiStatue1;
-        ObjectGuid GOAtalaiStatue2;
-        ObjectGuid GOAtalaiStatue3;
-        ObjectGuid GOAtalaiStatue4;
-        ObjectGuid GOAtalaiStatue5;
-        ObjectGuid GOAtalaiStatue6;
-        ObjectGuid GOAtalaiIdol;
+class spell_temple_of_atal_hakkar_hex_of_jammal_an : public SpellScriptLoader
+{
+    public:
+        spell_temple_of_atal_hakkar_hex_of_jammal_an() : SpellScriptLoader("spell_temple_of_atal_hakkar_hex_of_jammal_an") { }
 
-        uint32 State;
-
-        bool s1;
-        bool s2;
-        bool s3;
-        bool s4;
-        bool s5;
-        bool s6;
-
-        void OnGameObjectCreate(GameObject* go) override
+        class spell_temple_of_atal_hakkar_hex_of_jammal_an_AuraScript : public AuraScript
         {
-            switch (go->GetEntry())
+            PrepareAuraScript(spell_temple_of_atal_hakkar_hex_of_jammal_an_AuraScript);
+
+            void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
             {
-                case GO_ATALAI_STATUE1: GOAtalaiStatue1 = go->GetGUID();   break;
-                case GO_ATALAI_STATUE2: GOAtalaiStatue2 = go->GetGUID();   break;
-                case GO_ATALAI_STATUE3: GOAtalaiStatue3 = go->GetGUID();   break;
-                case GO_ATALAI_STATUE4: GOAtalaiStatue4 = go->GetGUID();   break;
-                case GO_ATALAI_STATUE5: GOAtalaiStatue5 = go->GetGUID();   break;
-                case GO_ATALAI_STATUE6: GOAtalaiStatue6 = go->GetGUID();   break;
-                case GO_ATALAI_IDOL:    GOAtalaiIdol = go->GetGUID();      break;
+				if (Unit* caster = GetCaster())
+					if (caster->IsAlive() && caster->IsInCombat())
+					{
+						caster->CastSpell(GetTarget(), HEX_OF_JAMMAL_AN, true);
+						caster->CastSpell(GetTarget(), HEX_OF_JAMMAL_AN_CHARM, true);
+					}
             }
-        }
 
-         virtual void Update(uint32 /*diff*/) override // correct order goes form 1-6
-         {
-             switch (State)
-             {
-             case GO_ATALAI_STATUE1:
-                if (!s1 && !s2 && !s3 && !s4 && !s5 && !s6)
-                {
-                    if (GameObject* pAtalaiStatue1 = instance->GetGameObject(GOAtalaiStatue1))
-                        UseStatue(pAtalaiStatue1);
-                    s1 = true;
-                    State = 0;
-                };
-                break;
-             case GO_ATALAI_STATUE2:
-                if (s1 && !s2 && !s3 && !s4 && !s5 && !s6)
-                {
-                    if (GameObject* pAtalaiStatue2 = instance->GetGameObject(GOAtalaiStatue2))
-                        UseStatue(pAtalaiStatue2);
-                    s2 = true;
-                    State = 0;
-                };
-                break;
-             case GO_ATALAI_STATUE3:
-                if (s1 && s2 && !s3 && !s4 && !s5 && !s6)
-                {
-                    if (GameObject* pAtalaiStatue3 = instance->GetGameObject(GOAtalaiStatue3))
-                        UseStatue(pAtalaiStatue3);
-                    s3 = true;
-                    State = 0;
-                };
-                break;
-             case GO_ATALAI_STATUE4:
-                if (s1 && s2 && s3 && !s4 && !s5 && !s6)
-                {
-                    if (GameObject* pAtalaiStatue4 = instance->GetGameObject(GOAtalaiStatue4))
-                        UseStatue(pAtalaiStatue4);
-                    s4 = true;
-                    State = 0;
-                }
-                break;
-             case GO_ATALAI_STATUE5:
-                if (s1 && s2 && s3 && s4 && !s5 && !s6)
-                {
-                    if (GameObject* pAtalaiStatue5 = instance->GetGameObject(GOAtalaiStatue5))
-                        UseStatue(pAtalaiStatue5);
-                    s5 = true;
-                    State = 0;
-                }
-                break;
-             case GO_ATALAI_STATUE6:
-                if (s1 && s2 && s3 && s4 && s5 && !s6)
-                {
-                    if (GameObject* pAtalaiStatue6 = instance->GetGameObject(GOAtalaiStatue6))
-                        UseStatue(pAtalaiStatue6);
-                    s6 = true;
-                    State = 0;
-                }
-                break;
-             }
-         };
+            void Register()
+            {
+                OnEffectRemove += AuraEffectRemoveFn(spell_temple_of_atal_hakkar_hex_of_jammal_an_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+            }
+        };
 
-        void UseStatue(GameObject* go)
+        AuraScript* GetAuraScript() const
         {
-            go->SummonGameObject(GO_ATALAI_LIGHT1, go->GetPositionX(), go->GetPositionY(), go->GetPositionZ(), 0, 0, 0, 0, 0, 0);
-            go->SetUInt32Value(GAMEOBJECT_FLAGS, 4);
+            return new spell_temple_of_atal_hakkar_hex_of_jammal_an_AuraScript();
         }
+};
 
-         /*
-         void UseLastStatue(GameObject* go)
-         {
-             AtalaiStatue1->SummonGameObject(GO_ATALAI_LIGHT2, AtalaiStatue1->GetPositionX(), AtalaiStatue1->GetPositionY(), AtalaiStatue1->GetPositionZ(), 0, 0, 0, 0, 0, 100);
-             AtalaiStatue2->SummonGameObject(GO_ATALAI_LIGHT2, AtalaiStatue2->GetPositionX(), AtalaiStatue2->GetPositionY(), AtalaiStatue2->GetPositionZ(), 0, 0, 0, 0, 0, 100);
-             AtalaiStatue3->SummonGameObject(GO_ATALAI_LIGHT2, AtalaiStatue3->GetPositionX(), AtalaiStatue3->GetPositionY(), AtalaiStatue3->GetPositionZ(), 0, 0, 0, 0, 0, 100);
-             AtalaiStatue4->SummonGameObject(GO_ATALAI_LIGHT2, AtalaiStatue4->GetPositionX(), AtalaiStatue4->GetPositionY(), AtalaiStatue4->GetPositionZ(), 0, 0, 0, 0, 0, 100);
-             AtalaiStatue5->SummonGameObject(GO_ATALAI_LIGHT2, AtalaiStatue5->GetPositionX(), AtalaiStatue5->GetPositionY(), AtalaiStatue5->GetPositionZ(), 0, 0, 0, 0, 0, 100);
-             AtalaiStatue6->SummonGameObject(GO_ATALAI_LIGHT2, AtalaiStatue6->GetPositionX(), AtalaiStatue6->GetPositionY(), AtalaiStatue6->GetPositionZ(), 0, 0, 0, 0, 0, 100);
-             go->SummonGameObject(148838, -488.997, 96.61, -189.019, -1.52, 0, 0, 0, 0, 100);
-         }
-         */
+class spell_temple_of_atal_hakkar_awaken_the_soulflayer : public SpellScriptLoader
+{
+	public:
+		spell_temple_of_atal_hakkar_awaken_the_soulflayer() : SpellScriptLoader("spell_temple_of_atal_hakkar_awaken_the_soulflayer") { }
 
-         void SetData(uint32 type, uint32 data) override
-         {
-            if (type == EVENT_STATE)
-                State = data;
-         }
+		class spell_temple_of_atal_hakkar_awaken_the_soulflayer_SpellScript : public SpellScript
+		{
+			PrepareSpellScript(spell_temple_of_atal_hakkar_awaken_the_soulflayer_SpellScript);
 
-         uint32 GetData(uint32 type) const override
-         {
-            if (type == EVENT_STATE)
-                return State;
-            return 0;
-         }
-    };
+			void HandleSendEvent(SpellEffIndex effIndex)
+			{
+				PreventHitDefaultEffect(effIndex);
+				InstanceScript* instanceScript = GetCaster()->GetInstanceScript();
+				Map* map = GetCaster()->FindMap();
+				if (!map || !instanceScript || instanceScript->GetData(TYPE_HAKKAR_EVENT) != NOT_STARTED)
+					return;
 
+				Position pos = {-466.795f, 272.863f, -90.447f, 1.57f};
+				if (TempSummon* summon = map->SummonCreature(NPC_SHADE_OF_HAKKAR, pos))
+				{
+					summon->SetTempSummonType(TEMPSUMMON_MANUAL_DESPAWN);
+					instanceScript->SetData(TYPE_HAKKAR_EVENT, IN_PROGRESS);
+				}
+			}
+
+			void Register()
+			{
+				OnEffectHit += SpellEffectFn(spell_temple_of_atal_hakkar_awaken_the_soulflayer_SpellScript::HandleSendEvent, EFFECT_0, SPELL_EFFECT_SEND_EVENT);
+			}
+		};
+
+		SpellScript* GetSpellScript() const
+		{
+			return new spell_temple_of_atal_hakkar_awaken_the_soulflayer_SpellScript();
+		}
 };
 
 void AddSC_instance_sunken_temple()
 {
     new instance_sunken_temple();
+    new at_malfurion_stormrage();
+	new spell_temple_of_atal_hakkar_hex_of_jammal_an();
+	new spell_temple_of_atal_hakkar_awaken_the_soulflayer();
 }

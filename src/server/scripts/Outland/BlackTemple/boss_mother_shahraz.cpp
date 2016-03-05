@@ -1,281 +1,368 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/* ScriptData
-SDName: Boss_Mother_Shahraz
-SD%Complete: 80
-SDComment: Fatal Attraction slightly incorrect; need to damage only if affected players are within range of each other
-SDCategory: Black Temple
-EndScriptData */
+REWRITTEN BY XINEF
+*/
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "black_temple.h"
 
-enum Texts
+enum Says
 {
-    //Speech'n'Sounds
-    SAY_TAUNT    = 0,
-    SAY_AGGRO    = 1,
-    SAY_SPELL    = 2,
-    SAY_SLAY     = 3,
-    SAY_ENRAGE   = 4,
-    SAY_DEATH    = 5
+	SAY_TAUNT						= 0,
+	SAY_AGGRO						= 1,
+	SAY_SPELL						= 2,
+	SAY_SLAY						= 3,
+	SAY_ENRAGE						= 4,
+	SAY_DEATH						= 5,
+	SAY_EMOTE_FRENZY				= 6
 };
 
 enum Spells
 {
-    SPELL_BEAM_SINISTER     = 40859,
-    SPELL_BEAM_VILE         = 40860,
-    SPELL_BEAM_WICKED       = 40861,
-    SPELL_BEAM_SINFUL       = 40827,
-    SPELL_ATTRACTION        = 40871,
-    SPELL_SILENCING_SHRIEK  = 40823,
-    SPELL_ENRAGE            = 23537,
-    SPELL_SABER_LASH        = 40810, //43267
-    SPELL_SABER_LASH_IMM    = 43690,
-    SPELL_TELEPORT_VISUAL   = 40869,
-    SPELL_BERSERK           = 45078
+	SPELL_PRISMATIC_AURA_SHADOW		= 40880,
+	SPELL_PRISMATIC_AURA_FIRE		= 40882,
+	SPELL_PRISMATIC_AURA_NATURE		= 40883,
+	SPELL_PRISMATIC_AURA_ARCANE		= 40891,
+	SPELL_PRISMATIC_AURA_FROST		= 40896,
+	SPELL_PRISMATIC_AURA_HOLY		= 40897,
+	SPELL_SABER_LASH_AURA			= 40816,
+	SPELL_SABER_LASH				= 40810,
+	SPELL_SILENCING_SHRIEK			= 40823,
+	SPELL_RANDOM_PERIODIC			= 40867,
+	SPELL_SINFUL_PERIODIC			= 40862,
+	SPELL_SINISTER_PERIODIC			= 40863,
+	SPELL_VILE_PERIODIC				= 40865,
+	SPELL_WICKED_PERIODIC			= 40866,
+	SPELL_FATAL_ATTRACTION			= 40869,
+	SPELL_FATAL_ATTRACTION_AURA		= 41001,
+	SPELL_FATAL_ATTRACTION_DAMAGE	= 40871,
+	SPELL_ENRAGE					= 45078,
+	SPELL_FRENZY					= 40683,
+	SPELL_SABER_LASH_IMMUNITY		= 43690
 };
 
-enum Events
+enum Misc
 {
-    EVENT_RANDOM_BEAM       = 1,
-    EVENT_PRISMATIC_SHIELD,
-    EVENT_FATAL_ATTRACTION,
-    EVENT_FATAL_ATTRACTION_EXPLOSION,
-    EVENT_SABER_SLASH,
-    EVENT_SILENCING_SHRIEK,
-    EVENT_RANDOM_TAUNT,
-    EVENT_BERSERK
-};
-
-enum Beams
-{
-    SINISTER_BEAM,
-    VILE_BEAM,
-    WICKED_BEAM,
-    SINFUL_BEAM
-};
-
-uint32 PrismaticAuras[]=
-{
-    40880,                                                  // Shadow
-    40882,                                                  // Fire
-    40883,                                                  // Nature
-    40891,                                                  // Arcane
-    40896,                                                  // Frost
-    40897,                                                  // Holy
-};
-
-G3D::Vector3 const TeleportPoint[]=
-{
-    {959.996f, 212.576f, 193.843f},
-    {932.537f, 231.813f, 193.838f},
-    {958.675f, 254.767f, 193.822f},
-    {946.955f, 201.316f, 192.535f},
-    {944.294f, 149.676f, 197.551f},
-    {930.548f, 284.888f, 193.367f},
-    {965.997f, 278.398f, 195.777f}
+	EVENT_KILL_TALK					= 1,
+	EVENT_CHECK_HEALTH				= 2,
+	EVENT_RANDOM_TALK				= 3,
+	EVENT_SPELL_ENRAGE				= 4,
+	EVENT_SPELL_PRISMATIC_AURA		= 5,
+	EVENT_SPELL_SILENCING_SHRIEK	= 6,
+	EVENT_SPELL_FATAL_ATTRACTION	= 7,
+	EVENT_SPELL_SABER_LASH			= 8
 };
 
 class boss_mother_shahraz : public CreatureScript
 {
-public:
-    boss_mother_shahraz() : CreatureScript("boss_mother_shahraz") { }
+	public:
+		boss_mother_shahraz() : CreatureScript("boss_mother_shahraz") { }
 
-    struct boss_shahrazAI : public BossAI
-    {
-        boss_shahrazAI(Creature* creature) : BossAI(creature, DATA_MOTHER_SHAHRAZ)
+		CreatureAI* GetAI(Creature* creature) const
+		{
+			return GetInstanceAI<boss_shahrazAI>(creature);
+		}
+
+		struct boss_shahrazAI : public BossAI
+		{
+			boss_shahrazAI(Creature* creature) : BossAI(creature, DATA_MOTHER_SHAHRAZ)
+			{
+			}
+
+			void Reset()
+			{
+				BossAI::Reset();
+			}
+
+			void EnterCombat(Unit* who)
+			{
+				BossAI::EnterCombat(who);
+				Talk(SAY_AGGRO);
+
+				me->CastSpell(me, SPELL_SABER_LASH_AURA, true);
+				me->CastSpell(me, SPELL_RANDOM_PERIODIC, true);
+				events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+				events.ScheduleEvent(EVENT_RANDOM_TALK, 60000);
+				events.ScheduleEvent(EVENT_SPELL_PRISMATIC_AURA, 0);
+				events.ScheduleEvent(EVENT_SPELL_ENRAGE, 600000);
+				events.ScheduleEvent(EVENT_SPELL_SILENCING_SHRIEK, 30000);
+				events.ScheduleEvent(EVENT_SPELL_FATAL_ATTRACTION, 50000);
+				events.ScheduleEvent(EVENT_SPELL_SABER_LASH, 4000);
+			}
+
+			void KilledUnit(Unit* /*victim*/)
+			{
+				if (events.GetNextEventTime(EVENT_KILL_TALK) == 0)
+				{
+					Talk(SAY_SLAY);
+					events.ScheduleEvent(EVENT_KILL_TALK, 6000);
+				}
+			}
+
+			void JustDied(Unit* killer)
+			{
+				BossAI::JustDied(killer);
+				Talk(SAY_DEATH);
+			}
+
+			void UpdateAI(uint32 diff)
+			{
+				if (!UpdateVictim())
+					return;
+
+				events.Update(diff);
+				if (me->HasUnitState(UNIT_STATE_CASTING))
+					return;
+
+				switch (events.ExecuteEvent())
+				{
+					case EVENT_CHECK_HEALTH:
+						if (HealthBelowPct(10))
+						{
+							me->CastSpell(me, SPELL_FRENZY, true);
+							Talk(SAY_EMOTE_FRENZY);
+							break;
+						}
+						events.ScheduleEvent(EVENT_CHECK_HEALTH, 1000);
+						break;
+					case EVENT_SPELL_ENRAGE:
+						me->CastSpell(me, SPELL_ENRAGE, true);
+						Talk(SAY_ENRAGE);
+						break;
+					case EVENT_RANDOM_TALK:
+						Talk(SAY_TAUNT);
+						events.ScheduleEvent(EVENT_RANDOM_TALK, urand(60000, 120000));
+						break;
+					case EVENT_SPELL_SABER_LASH:
+						me->CastSpell(me->GetVictim(), SPELL_SABER_LASH, false);
+						events.ScheduleEvent(EVENT_SPELL_SABER_LASH, 30000);
+						break;
+					case EVENT_SPELL_PRISMATIC_AURA:
+						me->CastSpell(me, RAND(SPELL_PRISMATIC_AURA_SHADOW, SPELL_PRISMATIC_AURA_FIRE, SPELL_PRISMATIC_AURA_NATURE, SPELL_PRISMATIC_AURA_ARCANE, SPELL_PRISMATIC_AURA_FROST, SPELL_PRISMATIC_AURA_HOLY), false);
+						events.ScheduleEvent(EVENT_SPELL_PRISMATIC_AURA, 15000);
+						break;
+					case EVENT_SPELL_SILENCING_SHRIEK:
+						me->CastSpell(me, SPELL_SILENCING_SHRIEK, false);
+						events.ScheduleEvent(EVENT_SPELL_SILENCING_SHRIEK, 30000);
+						break;
+					case EVENT_SPELL_FATAL_ATTRACTION:
+						Talk(SAY_SPELL);
+						me->CastCustomSpell(SPELL_FATAL_ATTRACTION, SPELLVALUE_MAX_TARGETS, 3, me, false);
+						events.ScheduleEvent(EVENT_SPELL_FATAL_ATTRACTION, 60000);
+						break;
+				}
+
+				DoMeleeAttackIfReady();
+			}
+		};
+};
+
+class spell_mother_shahraz_random_periodic : public SpellScriptLoader
+{
+    public:
+        spell_mother_shahraz_random_periodic() : SpellScriptLoader("spell_mother_shahraz_random_periodic") { }
+
+        class spell_mother_shahraz_random_periodic_AuraScript : public AuraScript
         {
-            Initialize();
-        }
+            PrepareAuraScript(spell_mother_shahraz_random_periodic_AuraScript);
 
-        void Initialize()
-        {
-            for (uint8 i = 0; i < 3; ++i)
-                TargetGUID[i].Clear();
+			void Update(AuraEffect const* effect)
+			{                
+				PreventDefaultAction();
+				if (effect->GetTickNumber()%5 == 1)
+					GetUnitOwner()->CastSpell(GetUnitOwner(), RAND(SPELL_SINFUL_PERIODIC, SPELL_SINISTER_PERIODIC, SPELL_VILE_PERIODIC, SPELL_WICKED_PERIODIC), true);
+			}
 
-            BeamCount = 0;
-            CurrentBeam = SINISTER_BEAM;   // 0 - Sinister, 1 - Vile, 2 - Wicked, 3 - Sinful
-            ExplosionCount = 0;
-            Enraged = false;
-        }
-
-        void Reset() override
-        {
-            Initialize();
-            _Reset();
-        }
-
-        void EnterCombat(Unit* /*who*/) override
-        {
-            _EnterCombat();
-            events.ScheduleEvent(EVENT_RANDOM_BEAM, 20000); // Timers may be incorrect
-            events.ScheduleEvent(EVENT_FATAL_ATTRACTION, 60000);
-            events.ScheduleEvent(EVENT_FATAL_ATTRACTION_EXPLOSION, 70000);
-            events.ScheduleEvent(EVENT_SILENCING_SHRIEK, 30000);
-            events.ScheduleEvent(EVENT_SABER_SLASH, 35000);
-            events.ScheduleEvent(EVENT_RANDOM_TAUNT, urand(70000, 111000));
-            events.ScheduleEvent(EVENT_PRISMATIC_SHIELD, 1000);
-            events.ScheduleEvent(EVENT_BERSERK, 600000);
-            Talk(SAY_AGGRO);
-        }
-
-        void KilledUnit(Unit* /*victim*/) override
-        {
-            Talk(SAY_SLAY);
-        }
-
-        void JustDied(Unit* /*killer*/) override
-        {
-            _JustDied();
-            Talk(SAY_DEATH);
-        }
-
-        void TeleportPlayers()
-        {
-            uint32 random = urand(0, 7);
-            float X = TeleportPoint[random].x;
-            float Y = TeleportPoint[random].y;
-            float Z = TeleportPoint[random].z;
-            for (uint8 i = 0; i < 3; ++i)
+            void Register()
             {
-                if (Unit* unit = SelectTarget(SELECT_TARGET_RANDOM, 1))
-                    if (unit->IsAlive() && unit->GetTypeId() == TYPEID_PLAYER)
-                    {
-                        TargetGUID[i] = unit->GetGUID();
-                        unit->CastSpell(unit, SPELL_TELEPORT_VISUAL, true);
-                        DoTeleportPlayer(unit, X, Y, Z, unit->GetOrientation());
-                    }
+				OnEffectPeriodic += AuraEffectPeriodicFn(spell_mother_shahraz_random_periodic_AuraScript::Update, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL);
             }
-        }
+        };
 
-        void DamageTaken(Unit* /*attacker*/, uint32 &damage) override
+        AuraScript* GetAuraScript() const
         {
-            if (!Enraged && me->HealthBelowPctDamaged(10, damage))
-            {
-                Enraged = true;
-                DoCast(me, SPELL_ENRAGE, true);
-                Talk(SAY_ENRAGE);
-            }
+            return new spell_mother_shahraz_random_periodic_AuraScript();
         }
+};
 
-        void ExecuteEvent(uint32 eventId) override
+class spell_mother_shahraz_beam_periodic : public SpellScriptLoader
+{
+    public:
+        spell_mother_shahraz_beam_periodic() : SpellScriptLoader("spell_mother_shahraz_beam_periodic") { }
+
+        class spell_mother_shahraz_beam_periodic_AuraScript : public AuraScript
         {
-            switch (eventId)
+            PrepareAuraScript(spell_mother_shahraz_beam_periodic_AuraScript);
+
+			void Update(AuraEffect const* effect)
+			{                
+				PreventDefaultAction();
+				if (Unit* target = GetUnitOwner()->GetAI()->SelectTarget(SELECT_TARGET_RANDOM, 0))
+					GetUnitOwner()->CastSpell(target, GetSpellInfo()->Effects[effect->GetEffIndex()].TriggerSpell, true);
+			}
+
+            void Register()
             {
-                case EVENT_RANDOM_BEAM:
-                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                    {
-                        switch (CurrentBeam)
-                        {
-                            case SINISTER_BEAM:
-                                DoCast(target, SPELL_BEAM_SINISTER);
-                                break;
-                            case VILE_BEAM:
-                                DoCast(target, SPELL_BEAM_VILE);
-                                break;
-                            case WICKED_BEAM:
-                                DoCast(target, SPELL_BEAM_WICKED);
-                                break;
-                            case SINFUL_BEAM:
-                                DoCast(target, SPELL_BEAM_SINFUL);
-                                break;
-                            default:
-                                break;
-                        }
-
-                        ++BeamCount;
-                        uint32 Beam = CurrentBeam;
-                        if (BeamCount > 3)
-                            while (CurrentBeam == Beam)
-                                CurrentBeam = urand(0, 3);
-                    }
-                    events.ScheduleEvent(EVENT_RANDOM_BEAM, 9000);
-                    break;
-                case EVENT_PRISMATIC_SHIELD:
-                    // Random Prismatic Shield every 15 seconds.
-                    DoCast(me, PrismaticAuras[urand(0, 6)]);
-                    events.ScheduleEvent(EVENT_PRISMATIC_SHIELD, 15000);
-                    break;
-                case EVENT_FATAL_ATTRACTION:
-                    // Select 3 random targets (can select same target more than once), teleport to a random location then make them cast explosions until they get away from each other.
-                    ExplosionCount = 0;
-                    TeleportPlayers();
-                    Talk(SAY_SPELL);
-                    events.ScheduleEvent(EVENT_FATAL_ATTRACTION_EXPLOSION, 2000);
-                    events.ScheduleEvent(EVENT_FATAL_ATTRACTION, 40000, 71000);
-                    break;
-                case EVENT_FATAL_ATTRACTION_EXPLOSION:
-                    // Just make them explode three times... they're supposed to keep exploding while they are in range, but it'll take too much code. I'll try to think of an efficient way for it later.
-                    if (ExplosionCount < 3)
-                    {
-                        for (uint8 i = 0; i < 3; ++i)
-                        {
-                            if (TargetGUID[i])
-                            {
-                                if (Unit* unit = ObjectAccessor::GetUnit(*me, TargetGUID[i]))
-                                    unit->CastSpell(unit, SPELL_ATTRACTION, true);
-                                TargetGUID[i].Clear();
-                            }
-                        }
-                        ++ExplosionCount;
-                    }
-                    else
-                        ExplosionCount = 0;
-                    events.ScheduleEvent(EVENT_FATAL_ATTRACTION_EXPLOSION, ExplosionCount < 3 ? 1000 : events.GetTimeUntilEvent(EVENT_FATAL_ATTRACTION) + 2000);
-                    break;
-                case EVENT_SILENCING_SHRIEK:
-                    DoCastVictim(SPELL_SILENCING_SHRIEK);
-                    events.ScheduleEvent(EVENT_SILENCING_SHRIEK, urand(25000, 35000));
-                    break;
-                case EVENT_SABER_SLASH:
-                    DoCastVictim(SPELL_SABER_LASH);
-                    events.ScheduleEvent(EVENT_SABER_SLASH, urand(25000, 35000));
-                    break;
-                case EVENT_RANDOM_TAUNT:
-                    Talk(SAY_TAUNT);
-                    events.ScheduleEvent(EVENT_RANDOM_TAUNT, urand(60000, 151000));
-                    break;
-                case EVENT_BERSERK:
-                    DoCast(me, SPELL_BERSERK);
-                    Talk(SAY_ENRAGE);
-                    break;
-                default:
-                    break;
+				OnEffectPeriodic += AuraEffectPeriodicFn(spell_mother_shahraz_beam_periodic_AuraScript::Update, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL);
             }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_mother_shahraz_beam_periodic_AuraScript();
         }
+};
 
-    private:
-        ObjectGuid TargetGUID[3];
-        uint32 BeamCount;
-        uint32 CurrentBeam;
-        uint32 ExplosionCount;
-        bool Enraged;
-    };
+class spell_mother_shahraz_saber_lash : public SpellScriptLoader
+{
+    public:
+        spell_mother_shahraz_saber_lash() : SpellScriptLoader("spell_mother_shahraz_saber_lash") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return GetBlackTempleAI<boss_shahrazAI>(creature);
-    }
+        class spell_mother_shahraz_saber_lash_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_mother_shahraz_saber_lash_AuraScript);
+
+            bool CheckProc(ProcEventInfo& eventInfo)
+            {
+				return false;
+            }
+
+			void Update(AuraEffect const* effect)
+			{                
+				PreventDefaultAction();
+				if (Unit* target = GetUnitOwner()->GetVictim())
+					GetUnitOwner()->CastSpell(target, GetSpellInfo()->Effects[effect->GetEffIndex()].TriggerSpell, true);
+			}
+
+            void Register()
+            {
+                DoCheckProc += AuraCheckProcFn(spell_mother_shahraz_saber_lash_AuraScript::CheckProc);
+				OnEffectPeriodic += AuraEffectPeriodicFn(spell_mother_shahraz_saber_lash_AuraScript::Update, EFFECT_1, SPELL_AURA_PERIODIC_TRIGGER_SPELL);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_mother_shahraz_saber_lash_AuraScript();
+        }
+};
+
+class spell_mother_shahraz_fatal_attraction : public SpellScriptLoader
+{
+    public:
+        spell_mother_shahraz_fatal_attraction() : SpellScriptLoader("spell_mother_shahraz_fatal_attraction") { }
+
+        class spell_mother_shahraz_fatal_attraction_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_mother_shahraz_fatal_attraction_SpellScript);
+
+            void FilterTargets(std::list<WorldObject*>& targets)
+            {
+				targets.remove_if(Trinity::UnitAuraCheck(true, SPELL_SABER_LASH_IMMUNITY));
+				if (targets.size() <= 1)
+					FinishCast(SPELL_FAILED_DONT_REPORT);
+            }
+
+            void SetDest(SpellDestination& dest)
+            {
+				std::list<Spell::TargetInfo> const* targetsInfo = GetSpell()->GetUniqueTargetInfo();
+				for (std::list<Spell::TargetInfo>::const_iterator ihit = targetsInfo->begin(); ihit != targetsInfo->end(); ++ihit)
+					if (Unit* target = ObjectAccessor::GetUnit(*GetCaster(), ihit->targetGUID))
+					{
+						dest.Relocate(*target);
+						if (roll_chance_i(50))
+							break;
+					}
+            }
+
+            void HandleTeleportUnits(SpellEffIndex effIndex)
+            {
+				if (Unit* target = GetHitUnit())
+					GetCaster()->CastSpell(target, SPELL_FATAL_ATTRACTION_AURA, true);
+            }
+
+            void Register()
+            {
+                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_mother_shahraz_fatal_attraction_SpellScript::FilterTargets, EFFECT_ALL, TARGET_UNIT_SRC_AREA_ENEMY);
+                OnDestinationTargetSelect += SpellDestinationTargetSelectFn(spell_mother_shahraz_fatal_attraction_SpellScript::SetDest, EFFECT_1, TARGET_DEST_CASTER_RANDOM);
+                OnEffectHitTarget += SpellEffectFn(spell_mother_shahraz_fatal_attraction_SpellScript::HandleTeleportUnits, EFFECT_1, SPELL_EFFECT_TELEPORT_UNITS);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_mother_shahraz_fatal_attraction_SpellScript();
+        }
+};
+
+class spell_mother_shahraz_fatal_attraction_dummy : public SpellScriptLoader
+{
+    public:
+        spell_mother_shahraz_fatal_attraction_dummy() : SpellScriptLoader("spell_mother_shahraz_fatal_attraction_dummy") { }
+
+        class spell_mother_shahraz_fatal_attraction_dummy_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_mother_shahraz_fatal_attraction_dummy_SpellScript);
+
+            void HandleDummy(SpellEffIndex effIndex)
+            {
+				if (Unit* target = GetHitUnit())
+				{
+					target->CastSpell(target, SPELL_FATAL_ATTRACTION_DAMAGE, true);
+					if (AuraEffect* aurEff = target->GetAuraEffect(SPELL_FATAL_ATTRACTION_AURA, EFFECT_1))
+						aurEff->SetAmount(aurEff->GetTickNumber());
+				}
+            }
+
+            void Register()
+            {
+                OnEffectHitTarget += SpellEffectFn(spell_mother_shahraz_fatal_attraction_dummy_SpellScript::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+            }
+        };
+
+        SpellScript* GetSpellScript() const
+        {
+            return new spell_mother_shahraz_fatal_attraction_dummy_SpellScript();
+        }
+};
+
+class spell_mother_shahraz_fatal_attraction_aura : public SpellScriptLoader
+{
+    public:
+        spell_mother_shahraz_fatal_attraction_aura() : SpellScriptLoader("spell_mother_shahraz_fatal_attraction_aura") { }
+
+        class spell_mother_shahraz_fatal_attraction_aura_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_mother_shahraz_fatal_attraction_aura_AuraScript);
+
+			void Update(AuraEffect const* effect)
+			{                
+				if (effect->GetTickNumber() > uint32(effect->GetAmount()+1))
+				{
+					PreventDefaultAction();
+					SetDuration(0);
+				}
+			}
+
+            void Register()
+            {
+				OnEffectPeriodic += AuraEffectPeriodicFn(spell_mother_shahraz_fatal_attraction_aura_AuraScript::Update, EFFECT_1, SPELL_AURA_PERIODIC_TRIGGER_SPELL);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_mother_shahraz_fatal_attraction_aura_AuraScript();
+        }
 };
 
 void AddSC_boss_mother_shahraz()
 {
     new boss_mother_shahraz();
+	new spell_mother_shahraz_random_periodic();
+	new spell_mother_shahraz_beam_periodic();
+	new spell_mother_shahraz_saber_lash();
+	new spell_mother_shahraz_fatal_attraction();
+	new spell_mother_shahraz_fatal_attraction_dummy();
+	new spell_mother_shahraz_fatal_attraction_aura();
 }

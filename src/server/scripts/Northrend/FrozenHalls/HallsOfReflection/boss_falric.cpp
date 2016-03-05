@@ -1,159 +1,173 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+REWRITTEN FROM SCRATCH BY PUSSYWIZARD, IT OWNS NOW!
+*/
 
-#include "ScriptMgr.h"
-#include "ScriptedCreature.h"
+#include "ScriptPCH.h"
 #include "halls_of_reflection.h"
 
-enum Texts
+enum Yells
 {
-    SAY_AGGRO                                     = 0,
-    SAY_SLAY                                      = 1,
-    SAY_DEATH                                     = 2,
-    SAY_IMPENDING_DESPAIR                         = 3,
-    SAY_DEFILING_HORROR                           = 4
+	SAY_AGGRO                                     = 50,
+	SAY_SLAY_1                                    = 51,
+	SAY_SLAY_2                                    = 52,
+	SAY_DEATH                                     = 53,
+	SAY_IMPENDING_DESPAIR                         = 54,
+	SAY_DEFILING_HORROR                           = 55,
 };
 
 enum Spells
 {
-    SPELL_QUIVERING_STRIKE                        = 72422,
-    SPELL_IMPENDING_DESPAIR                       = 72426,
-    SPELL_DEFILING_HORROR                         = 72435,
-    SPELL_HOPELESSNESS_1                          = 72395,
-    SPELL_HOPELESSNESS_2                          = 72396,
-    SPELL_HOPELESSNESS_3                          = 72397
+	SPELL_QUIVERING_STRIKE                        = 72422,
+	SPELL_IMPENDING_DESPAIR                       = 72426,
+	SPELL_DEFILING_HORROR                         = 72435,
 };
 
 enum Events
 {
-    EVENT_NONE,
-    EVENT_QUIVERING_STRIKE,
-    EVENT_IMPENDING_DESPAIR,
-    EVENT_DEFILING_HORROR
+	EVENT_NONE,
+	EVENT_QUIVERING_STRIKE,
+	EVENT_IMPENDING_DESPAIR,
+	EVENT_DEFILING_HORROR,
+	EVENT_UNROOT,
 };
 
-uint32 const HopelessnessHelper[3] = { SPELL_HOPELESSNESS_1, SPELL_HOPELESSNESS_2, SPELL_HOPELESSNESS_3 };
+const uint32 hopelessnessId[3][2] = { {72395, 72390}, {72396, 72391}, {72397, 72393} };
 
 class boss_falric : public CreatureScript
 {
-    public:
-        boss_falric() : CreatureScript("boss_falric") { }
+public:
+	boss_falric() : CreatureScript("boss_falric") { }
 
-        struct boss_falricAI : public boss_horAI
-        {
-            boss_falricAI(Creature* creature) : boss_horAI(creature, DATA_FALRIC)
-            {
-                Initialize();
-            }
+	struct boss_falricAI : public ScriptedAI
+	{
+		boss_falricAI(Creature* creature) : ScriptedAI(creature)
+		{
+			pInstance = creature->GetInstanceScript();
+		}
 
-            void Initialize()
-            {
-                _hopelessnessCount = 0;
-            }
+		InstanceScript* pInstance;
+		EventMap events;
+		uint8 uiHopelessnessCount;
+		uint16 startFightTimer;
 
-            void Reset() override
-            {
-                boss_horAI::Reset();
-                Initialize();
-            }
+		void Reset()
+		{
+			startFightTimer = 0;
+			uiHopelessnessCount = 0;
+			me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+			me->SetControlled(false, UNIT_STATE_ROOT);
+			events.Reset();
+			if (pInstance)
+				pInstance->SetData(DATA_FALRIC, NOT_STARTED);
+		}
 
-            void EnterCombat(Unit* /*who*/) override
-            {
-                Talk(SAY_AGGRO);
-                DoZoneInCombat();
-                instance->SetBossState(DATA_FALRIC, IN_PROGRESS);
+		void EnterCombat(Unit* /*who*/)
+		{
+			me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
 
-                events.ScheduleEvent(EVENT_QUIVERING_STRIKE, 23000);
-                events.ScheduleEvent(EVENT_IMPENDING_DESPAIR, 9000);
-                events.ScheduleEvent(EVENT_DEFILING_HORROR, urand(21000, 39000));
-            }
+			events.ScheduleEvent(EVENT_QUIVERING_STRIKE, 5000);
+			events.ScheduleEvent(EVENT_IMPENDING_DESPAIR, 11000);
+			events.ScheduleEvent(EVENT_DEFILING_HORROR, 20000);
+		}
 
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
-            {
-                if ((_hopelessnessCount < 1 && me->HealthBelowPctDamaged(66, damage))
-                    || (_hopelessnessCount < 2 && me->HealthBelowPctDamaged(33, damage))
-                    || (_hopelessnessCount < 3 && me->HealthBelowPctDamaged(10, damage)))
-                {
-                    if (_hopelessnessCount)
-                        me->RemoveOwnedAura(sSpellMgr->GetSpellIdForDifficulty(HopelessnessHelper[_hopelessnessCount - 1], me));
-                    DoCast(me, HopelessnessHelper[_hopelessnessCount]);
-                    ++_hopelessnessCount;
-                }
-            }
+		void DoAction(int32 a)
+		{
+			if (a == 1)
+			{
+				Talk(SAY_AGGRO);
+				startFightTimer = 8000;
+			}
+		}
 
-            void JustDied(Unit* /*killer*/) override
-            {
-                Talk(SAY_DEATH);
-                events.Reset();
-                instance->SetBossState(DATA_FALRIC, DONE);
-            }
+		void UpdateAI(uint32 diff)
+		{
+			if (startFightTimer)
+			{
+				if (startFightTimer <= diff)
+				{
+					startFightTimer = 0;
+					me->SetInCombatWithZone();
+				}
+				else
+					startFightTimer -= diff;
+			}
 
-            void KilledUnit(Unit* who) override
-            {
-                if (who->GetTypeId() == TYPEID_PLAYER)
-                    Talk(SAY_SLAY);
-            }
+			if (!UpdateVictim())
+				return;
 
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
+			events.Update(diff);
 
-                events.Update(diff);
+			if (me->HasUnitState(UNIT_STATE_CASTING))
+				return;
 
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
+			switch (events.ExecuteEvent())
+			{
+				case EVENT_QUIVERING_STRIKE:
+					me->CastSpell(me->GetVictim(), SPELL_QUIVERING_STRIKE, false);
+					events.ScheduleEvent(EVENT_QUIVERING_STRIKE, 5000);
+					break;
+				case EVENT_IMPENDING_DESPAIR:
+					if (Unit* target = SelectTargetFromPlayerList(45.0f, 0, true))
+					{
+						Talk(SAY_IMPENDING_DESPAIR);
+						me->CastSpell(target, SPELL_IMPENDING_DESPAIR, false);
+					}
+					events.ScheduleEvent(EVENT_IMPENDING_DESPAIR, 12000);
+					break;
+				case EVENT_DEFILING_HORROR:
+					Talk(SAY_DEFILING_HORROR);
+					me->CastSpell((Unit*)NULL, SPELL_DEFILING_HORROR, false);
+					me->SetControlled(true, UNIT_STATE_ROOT);
+					events.DelayEventsToMax(5000, 0);
+					events.ScheduleEvent(EVENT_UNROOT, 4000);
+					events.ScheduleEvent(EVENT_DEFILING_HORROR, 20000);
+					break;
+				case EVENT_UNROOT:
+					me->SetControlled(false, UNIT_STATE_ROOT);
+					break;
+			}
 
-                switch (events.ExecuteEvent())
-                {
-                    case EVENT_QUIVERING_STRIKE:
-                        DoCastVictim(SPELL_QUIVERING_STRIKE);
-                        events.ScheduleEvent(EVENT_QUIVERING_STRIKE, 10000);
-                        break;
-                    case EVENT_IMPENDING_DESPAIR:
-                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f, true))
-                        {
-                            Talk(SAY_IMPENDING_DESPAIR);
-                            DoCast(target, SPELL_IMPENDING_DESPAIR);
-                        }
-                        events.ScheduleEvent(EVENT_IMPENDING_DESPAIR, 13000);
-                        break;
-                    case EVENT_DEFILING_HORROR:
-                        DoCastAOE(SPELL_DEFILING_HORROR);
-                        events.ScheduleEvent(EVENT_DEFILING_HORROR, urand(21000, 39000));
-                        break;
-                    default:
-                        break;
-                }
+			if ((uiHopelessnessCount == 0 && HealthBelowPct(67)) || (uiHopelessnessCount == 1 && HealthBelowPct(34)) || (uiHopelessnessCount == 2 && HealthBelowPct(11)))
+			{
+				if (uiHopelessnessCount)
+					me->RemoveOwnedAura(hopelessnessId[uiHopelessnessCount-1][DUNGEON_MODE(0, 1)]);
+				me->CastSpell((Unit*)NULL, hopelessnessId[uiHopelessnessCount][DUNGEON_MODE(0, 1)], true);
+				++uiHopelessnessCount;
+			}
 
-                DoMeleeAttackIfReady();
-            }
+			if (!me->HasUnitState(UNIT_STATE_ROOT))
+				DoMeleeAttackIfReady();
+		}
 
-        private:
-            uint8 _hopelessnessCount;
-        };
+		void JustDied(Unit* /*killer*/)
+		{
+			Talk(SAY_DEATH);
+			if (pInstance)
+				pInstance->SetData(DATA_FALRIC, DONE);
+		}
 
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return GetHallsOfReflectionAI<boss_falricAI>(creature);
-        }
+		void KilledUnit(Unit* who)
+		{
+			if (who->GetTypeId() == TYPEID_PLAYER)
+				Talk(RAND(SAY_SLAY_1, SAY_SLAY_2));
+		}
+
+		void EnterEvadeMode()
+		{
+			me->SetControlled(false, UNIT_STATE_ROOT);
+			ScriptedAI::EnterEvadeMode();
+			if (startFightTimer)
+				Reset();
+		}
+	};
+
+	CreatureAI* GetAI(Creature* creature) const
+	{
+		return new boss_falricAI(creature);
+	}
 };
 
 void AddSC_boss_falric()
 {
-    new boss_falric();
+	new boss_falric();
 }

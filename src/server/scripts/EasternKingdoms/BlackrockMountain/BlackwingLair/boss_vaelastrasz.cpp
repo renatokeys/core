@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -68,29 +68,24 @@ public:
 
     struct boss_vaelAI : public BossAI
     {
-        boss_vaelAI(Creature* creature) : BossAI(creature, DATA_VAELASTRAZ_THE_CORRUPT)
+        boss_vaelAI(Creature* creature) : BossAI(creature, BOSS_VAELASTRAZ)
         {
-            Initialize();
             creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
             creature->setFaction(35);
             creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
         }
 
-        void Initialize()
-        {
-            PlayerGUID.Clear();
-            HasYelled = false;
-        }
-
-        void Reset() override
+        void Reset()
         {
             _Reset();
 
             me->SetStandState(UNIT_STAND_STATE_DEAD);
-            Initialize();
+            PlayerGUID = 0;
+
+            HasYelled = false;
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/)
         {
             _EnterCombat();
 
@@ -114,15 +109,15 @@ public:
             events.ScheduleEvent(EVENT_SPEECH_1, 1000);
         }
 
-        void KilledUnit(Unit* victim) override
+        void KilledUnit(Unit* victim)
         {
-            if (rand32() % 5)
+            if (rand()%5)
                 return;
 
             Talk(SAY_KILLTARGET, victim);
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             events.Update(diff);
 
@@ -205,7 +200,7 @@ public:
                         break;
                     case EVENT_BURNINGADRENALINE_TANK:
                         // have the victim cast the spell on himself otherwise the third effect aura will be applied to Vael instead of the player
-                        me->EnsureVictim()->CastSpell(me->GetVictim(), SPELL_BURNINGADRENALINE, true);
+                        me->GetVictim()->CastSpell(me->GetVictim(), SPELL_BURNINGADRENALINE, true);
                         events.ScheduleEvent(EVENT_BURNINGADRENALINE_TANK, 45000);
                         break;
                 }
@@ -221,9 +216,9 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void sGossipSelect(Player* player, uint32 menuId, uint32 gossipListId) override
+        void sGossipSelect(Player* player, uint32 sender, uint32 action)
         {
-            if (menuId == GOSSIP_ID && gossipListId == 0)
+            if (sender == GOSSIP_ID && action == 0)
             {
                 player->CLOSE_GOSSIP_MENU();
                 BeginSpeech(player);
@@ -231,11 +226,11 @@ public:
         }
 
         private:
-            ObjectGuid PlayerGUID;
+            uint64 PlayerGUID;
             bool HasYelled;
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new boss_vaelAI(creature);
     }

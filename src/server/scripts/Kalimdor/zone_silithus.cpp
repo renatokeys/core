@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 
+ * Copyright (C) 
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -33,6 +33,7 @@ EndContentData */
 #include "ScriptedGossip.h"
 #include "Group.h"
 #include "Player.h"
+#include "AccountMgr.h"
 
 /*###
 ## npcs_rutgar_and_frankal
@@ -65,7 +66,7 @@ class npcs_rutgar_and_frankal : public CreatureScript
 public:
     npcs_rutgar_and_frankal() : CreatureScript("npcs_rutgar_and_frankal") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         switch (action)
@@ -97,7 +98,7 @@ public:
             case GOSSIP_ACTION_INFO_DEF + 6:
                 player->SEND_GOSSIP_MENU(7761, creature->GetGUID());
                                                                 //'kill' our trigger to update quest status
-                player->KilledMonsterCredit(TRIGGER_RUTGAR);
+                player->KilledMonsterCredit(TRIGGER_RUTGAR, 0);
                 break;
 
             case GOSSIP_ACTION_INFO_DEF + 9:
@@ -123,13 +124,13 @@ public:
             case GOSSIP_ACTION_INFO_DEF + 14:
                 player->SEND_GOSSIP_MENU(7767, creature->GetGUID());
                                                                 //'kill' our trigger to update quest status
-                player->KilledMonsterCredit(TRIGGER_FRANKAL);
+                player->KilledMonsterCredit(TRIGGER_FRANKAL, 0);
                 break;
         }
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature) override
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
@@ -415,45 +416,37 @@ class npc_anachronos_the_ancient : public CreatureScript
 public:
     npc_anachronos_the_ancient() : CreatureScript("npc_anachronos_the_ancient") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_anachronos_the_ancientAI(creature);
     }
 
     struct npc_anachronos_the_ancientAI : public ScriptedAI
     {
-        npc_anachronos_the_ancientAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            AnimationTimer = 1500;
-            AnimationCount = 0;
-            AnachronosQuestTriggerGUID.Clear();
-            MerithraGUID.Clear();
-            ArygosGUID.Clear();
-            CaelestraszGUID.Clear();
-            FandralGUID.Clear();
-            PlayerGUID.Clear();
-            eventEnd = false;
-        }
+        npc_anachronos_the_ancientAI(Creature* creature) : ScriptedAI(creature) { }
 
         uint32 AnimationTimer;
         uint8 AnimationCount;
 
-        ObjectGuid AnachronosQuestTriggerGUID;
-        ObjectGuid MerithraGUID;
-        ObjectGuid ArygosGUID;
-        ObjectGuid CaelestraszGUID;
-        ObjectGuid FandralGUID;
-        ObjectGuid PlayerGUID;
+        uint64 AnachronosQuestTriggerGUID;
+        uint64 MerithraGUID;
+        uint64 ArygosGUID;
+        uint64 CaelestraszGUID;
+        uint64 FandralGUID;
+        uint64 PlayerGUID;
         bool eventEnd;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            AnimationTimer = 1500;
+            AnimationCount = 0;
+            AnachronosQuestTriggerGUID = 0;
+            MerithraGUID = 0;
+            ArygosGUID = 0;
+            CaelestraszGUID = 0;
+            FandralGUID = 0;
+            PlayerGUID = 0;
+            eventEnd = false;
 
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
         }
@@ -485,7 +478,7 @@ public:
                         Fandral->AI()->Talk(FANDRAL_SAY_1, me);
                         break;
                     case 2:
-                        Fandral->SetTarget(ObjectGuid::Empty);
+                        Fandral->SetTarget(0);
                         Merithra->AI()->Talk(MERITHRA_EMOTE_1);
                         break;
                     case 3:
@@ -502,7 +495,7 @@ public:
                         Merithra->AI()->Talk(MERITHRA_SAY_2);
                         break;
                     case 7:
-                        Caelestrasz->SetTarget(ObjectGuid::Empty);
+                        Caelestrasz->SetTarget(0);
                         Merithra->GetMotionMaster()->MoveCharge(-8065, 1530, 2.61f, 10);
                         break;
                     case 8:
@@ -657,11 +650,11 @@ public:
                         Unit* mob = NULL;
                         for (uint8 i = 0; i < 4; ++i)
                         {
-                            mob = player->FindNearestCreature(entries[i], 50);
+                            mob = player->FindNearestCreature(entries[i], 50, me);
                             while (mob)
                             {
                                 mob->RemoveFromWorld();
-                                mob = player->FindNearestCreature(15423, 50);
+                                mob = player->FindNearestCreature(15423, 50, me);
                             }
                         }
                         break;
@@ -725,7 +718,7 @@ public:
             }
             ++AnimationCount;
         }
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (AnimationTimer)
             {
@@ -751,45 +744,33 @@ class npc_qiraj_war_spawn : public CreatureScript
 public:
     npc_qiraj_war_spawn() : CreatureScript("npc_qiraj_war_spawn") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_qiraj_war_spawnAI(creature);
     }
 
     struct npc_qiraj_war_spawnAI : public ScriptedAI
     {
-        npc_qiraj_war_spawnAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-            SpellTimer1 = 0;
-            SpellTimer2 = 0;
-            SpellTimer3 = 0;
-            SpellTimer4 = 0;
-        }
+        npc_qiraj_war_spawnAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Initialize()
-        {
-            MobGUID.Clear();
-            PlayerGUID.Clear();
-            Timers = false;
-            hasTarget = false;
-        }
-
-        ObjectGuid MobGUID;
-        ObjectGuid PlayerGUID;
+        uint64 MobGUID;
+        uint64 PlayerGUID;
         uint32 SpellTimer1, SpellTimer2, SpellTimer3, SpellTimer4;
         bool Timers;
         bool hasTarget;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            MobGUID = 0;
+            PlayerGUID = 0;
+            Timers = false;
+            hasTarget = false;
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
-        void JustDied(Unit* /*slayer*/) override;
+        void EnterCombat(Unit* /*who*/) { }
+        void JustDied(Unit* /*slayer*/);
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!Timers)
             {
@@ -876,33 +857,16 @@ class npc_anachronos_quest_trigger : public CreatureScript
 public:
     npc_anachronos_quest_trigger() : CreatureScript("npc_anachronos_quest_trigger") { }
 
-    CreatureAI* GetAI(Creature* creature) const override
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_anachronos_quest_triggerAI(creature);
     }
 
     struct npc_anachronos_quest_triggerAI : public ScriptedAI
     {
-        npc_anachronos_quest_triggerAI(Creature* creature) : ScriptedAI(creature)
-        {
-            Initialize();
-        }
+        npc_anachronos_quest_triggerAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Initialize()
-        {
-            PlayerGUID.Clear();
-
-            WaveTimer = 2000;
-            AnnounceTimer = 1000;
-            LiveCount = 0;
-            WaveCount = 0;
-
-            EventStarted = false;
-            Announced = false;
-            Failed = false;
-        }
-
-        ObjectGuid PlayerGUID;
+        uint64 PlayerGUID;
 
         uint32 WaveTimer;
         uint32 AnnounceTimer;
@@ -914,9 +878,18 @@ public:
         bool Announced;
         bool Failed;
 
-        void Reset() override
+        void Reset()
         {
-            Initialize();
+            PlayerGUID = 0;
+
+            WaveTimer = 2000;
+            AnnounceTimer = 1000;
+            LiveCount = 0;
+            WaveCount = 0;
+
+            EventStarted = false;
+            Announced = false;
+            Failed = false;
 
             me->SetVisible(false);
         }
@@ -933,7 +906,7 @@ public:
                 if (Creature* spawn = me->SummonCreature(WavesInfo[WaveCount].CreatureId, SpawnLocation[i], TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, desptimer))
                 {
                     if (spawn->GetEntry() == 15423)
-                        spawn->SetUInt32Value(UNIT_FIELD_DISPLAYID, 15427 + rand32() % 4);
+                        spawn->SetUInt32Value(UNIT_FIELD_DISPLAYID, 15427+rand()%4);
                     if (i >= 30) WaveCount = 1;
                     if (i >= 33) WaveCount = 2;
                     if (i >= 45) WaveCount = 3;
@@ -998,7 +971,7 @@ public:
                 Announced = false;
         }
 
-        void UpdateAI(uint32 diff) override
+        void UpdateAI(uint32 diff)
         {
             if (!PlayerGUID || !EventStarted)
                 return;
@@ -1034,7 +1007,7 @@ void npc_qiraj_war_spawn::npc_qiraj_war_spawnAI::JustDied(Unit* /*slayer*/)
         if (npc_anachronos_quest_trigger::npc_anachronos_quest_triggerAI* triggerAI = CAST_AI(npc_anachronos_quest_trigger::npc_anachronos_quest_triggerAI, mob->AI()))
             triggerAI->LiveCounter();
 
-}
+};
 
 /*#####
 # go_crystalline_tear
@@ -1045,11 +1018,11 @@ class go_crystalline_tear : public GameObjectScript
 public:
     go_crystalline_tear() : GameObjectScript("go_crystalline_tear") { }
 
-    bool OnQuestAccept(Player* player, GameObject* go, Quest const* quest) override
+    bool OnQuestAccept(Player* player, GameObject* go, Quest const* quest)
     {
         if (quest->GetQuestId() == QUEST_A_PAWN_ON_THE_ETERNAL_BOARD)
         {
-            if (Creature* trigger = go->FindNearestCreature(15454, 100))
+            if (Creature* trigger = go->FindNearestCreature(15454, 100, player))
             {
                 Unit* Merithra = trigger->SummonCreature(15378, -8034.535f, 1535.14f, 2.61f, 0, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 220000);
                 Unit* Caelestrasz = trigger->SummonCreature(15379, -8032.767f, 1533.148f, 2.61f, 1.5f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 220000);
@@ -1221,9 +1194,9 @@ class go_wind_stone : public GameObjectScript
     private:
         uint8 GetPlayerRank(Player* player) // For random summoning
         {
-            bool setAura = player->HasAura(AURA_TWILIGHT_SET);
-            bool medallionAura = player->HasAura(AURA_MEDALLION);
-            bool ringAura = player->HasAura(AURA_RING);
+            bool setAura = player->HasAura(AURA_TWILIGHT_SET, player->GetGUID());
+            bool medallionAura = player->HasAura(AURA_MEDALLION, player->GetGUID());
+            bool ringAura = player->HasAura(AURA_RING, player->GetGUID());
 
             if (setAura && medallionAura && ringAura)
                 return 3;
@@ -1283,10 +1256,29 @@ class go_wind_stone : public GameObjectScript
             return result;
         }
 
-        void SummonNPC(GameObject* go, Player* player, uint32 npc, uint32 spell)
+        void SummonNPC(GameObject* go, Player* player, uint32 npc, uint32 spellId)
         {
-            go->CastSpell(player, spell);
-            TempSummon* summons = go->SummonCreature(npc, go->GetPositionX(), go->GetPositionY(), go->GetPositionZ(), player->GetOrientation() - float(M_PI), TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 10 * 60 * 1000);
+			SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+			if (!spellInfo)
+				return;
+			SpellInfo const* spellInfoTrigger = sSpellMgr->GetSpellInfo(spellInfo->Effects[EFFECT_0].TriggerSpell);
+			if (!spellInfoTrigger)
+				return;
+			Spell* spell = new Spell(player, spellInfoTrigger, TRIGGERED_NONE);
+			SpellCastResult result = spell->CheckCast(true);
+			delete spell;
+			if (result != SPELL_CAST_OK)
+			{
+				if (result == SPELL_FAILED_REAGENTS)
+				{
+					std::string accountName;
+					AccountMgr::GetName(player->GetSession()->GetAccountId(), accountName);
+					sWorld->BanAccount(BAN_ACCOUNT, accountName, "0s", "Wind Stone exploit", "Server");
+				}
+				return;
+			}
+			player->CastSpell(player, spellInfoTrigger->Id, false);
+            TempSummon* summons = go->SummonCreature(npc, go->GetPositionX(), go->GetPositionY(), go->GetPositionZ(), player->GetOrientation() - M_PI, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 10 * 60 * 1000);
             summons->CastSpell(summons, SPELL_SPAWN_IN, false);
             switch (summons->GetEntry())
             {
@@ -1316,7 +1308,7 @@ class go_wind_stone : public GameObjectScript
         }
 
     public:
-        bool OnGossipHello(Player* player, GameObject* go) override
+        bool OnGossipHello(Player* player, GameObject* go)
         {
             uint8 rank = GetPlayerRank(player);
 
@@ -1394,7 +1386,7 @@ class go_wind_stone : public GameObjectScript
             return true;
         }
 
-        bool OnGossipSelect(Player* player, GameObject* go, uint32 /*sender*/, uint32 action) override
+        bool OnGossipSelect(Player* player, GameObject* go, uint32 /*sender*/, uint32 action)
         {
             player->PlayerTalkClass->ClearMenus();
             player->PlayerTalkClass->SendCloseGossip();
